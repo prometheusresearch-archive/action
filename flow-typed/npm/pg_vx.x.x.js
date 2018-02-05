@@ -14,12 +14,44 @@
  */
 
 declare module 'pg' {
+  declare export type Config = {
+    // default process.env.PGUSER || process.env.USER
+    user?: string,
+    //default process.env.PGPASSWORD
+    password?: string,
+    // default process.env.PGDATABASE || process.env.USER
+    database?: string,
+    // default process.env.PGPORT
+    port?: number,
+    // e.g. postgres://user:password@host:5432/database
+    connectionString?: string,
+    // passed directly to node.TLSSocket
+    ssl?: any,
+    // custom type parsers
+    types?: any,
+    // number of milliseconds before a query will time out default is no timeout
+    statement_timeout?: number,
+  };
+
+  declare export type FieldInfo = {};
+
+  declare export type Row = {
+    [key: string]: mixed,
+  };
+
+  declare export type Result = {
+    command: string,
+    rowCount: number,
+    rows: Array<Row>,
+    fields: Array<FieldInfo>,
+  };
+
   declare export class Client {
     constructor(params: Object): Client;
 
     connect(): Promise<void>;
 
-    query(query: string, value: Array<mixed>): Promise<Object>;
+    query(query: string, value: Array<mixed>): Promise<Result>;
 
     end(): Promise<void>;
   }

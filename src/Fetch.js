@@ -6,14 +6,18 @@
 
 const invariant = require('invariant');
 const pg = require('pg');
+const makeDebug = require('debug');
 
 import * as t from './types.js';
 import * as gql from 'graphql';
 import * as gqlType from 'graphql/type';
+import * as Db from './Db.js';
+
+const debug = makeDebug('RexAction:Fetch');
 
 type Params = {
   univ: t.Universe,
-  db: pg.Client,
+  db: Db.Db,
 };
 
 export function create(params: Params) {
@@ -136,14 +140,12 @@ function createEntityFieldResolver(params, entityType: t.EntityType, field: t.Fi
               columnName,
               referencedColumn,
             ] of constraint.referencedColumnsBy.entries()) {
-              console.log(columnName, referencedColumn.name);
               const target = `"${targetTable.name}"."${columnName}"`;
               where.push(`${target} = $${values.length + 1}`);
               values.push(entity[referencedColumn.name]);
             }
             const whereQuery = where.join(' AND ');
             const query = `select * from "${targetTable.name}" where ${whereQuery}`;
-            console.log(query, values);
             const result = await params.db.query(query, values);
             return result.rows;
           }
