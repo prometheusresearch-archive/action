@@ -7,7 +7,7 @@ const mkDebug = require('debug');
 
 export type Db = {
   client: pg.Client,
-  query(query: string, values: Array<mixed>): Promise<pg.Result>,
+  query(query: string, values: $ReadOnlyArray<mixed>): Promise<pg.Result>,
   disconnect(): Promise<void>,
 };
 
@@ -18,7 +18,8 @@ export async function connect(config: pg.Config): Promise<Db> {
   await client.connect();
 
   function query(query, values) {
-    debug(query);
+    // TODO: do a proper query logging
+    debug(query.replace(/[\n\s]+/g, ' ').trim());
     return client.query(query, values);
   }
   function disconnect() {

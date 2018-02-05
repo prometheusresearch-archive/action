@@ -18,7 +18,7 @@ export async function reflect(
   function reflectTableToEntity(table: PgStructure.Table): t.EntityType {
     const fields = {};
     for (const column of table.columns.values()) {
-      fields[column.name] = reflectColumnToField(column);
+      fields[column.name] = reflectColumnToField(table, column);
     }
     for (const rel of table.o2mRelations.values()) {
       const name = rel.generateName();
@@ -38,6 +38,7 @@ export async function reflect(
 
   function reflectO2MRelationToField(rel: PgStructure.O2MRelation): t.Field {
     // entity might not be reflected yet, store type as a thunk we force later
+    // $FlowFixMe: ...
     const type: any = () => {
       const entityType = entity[rel.targetTable.name];
       return {type: 'ListType', child: entityType};
@@ -48,6 +49,7 @@ export async function reflect(
 
   function reflectM2ORelationToField(rel: PgStructure.M2ORelation): t.Field {
     // entity might not be reflected yet, store type as a thunk we force later
+    // $FlowFixMe: ...
     const type: any = () => {
       const entityType = entity[rel.targetTable.name];
       return entityType;
@@ -56,9 +58,30 @@ export async function reflect(
     return {kind: 'Relation', type, name, relation: rel};
   }
 
-  function reflectColumnToField(column: PgStructure.Column): t.Field {
-    // TODO: handle other types
-    const type = {type: 'StringType'};
+  const stringType = {type: 'StringType'};
+  const integerType = {type: 'IntegerType'};
+  const booleanType = {type: 'BooleanType'};
+
+  function reflectColumnToField(
+    table: PgStructure.Table,
+    column: PgStructure.Column,
+  ): t.Field {
+    function reflectColumnType(type) {
+      switch (type) {
+        case 'text':
+          return stringType;
+        case 'integer':
+          return integerType;
+        case 'bigint':
+          return integerType;
+        case 'boolean':
+          return booleanType;
+        default:
+          // TODO: handle other types
+          return stringType;
+      }
+    }
+    const type = reflectColumnType(column.type);
     return {kind: 'Attribute', type, name: column.name};
   }
 

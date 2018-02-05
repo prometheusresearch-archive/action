@@ -51,7 +51,7 @@ declare module 'pg' {
 
     connect(): Promise<void>;
 
-    query(query: string, value: Array<mixed>): Promise<Result>;
+    query(query: string, value: $ReadOnlyArray<mixed>): Promise<Result>;
 
     end(): Promise<void>;
   }

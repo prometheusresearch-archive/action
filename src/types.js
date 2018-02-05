@@ -22,8 +22,12 @@ export type StringType = {
   type: 'StringType',
 };
 
-export type NumberType = {
-  type: 'NumberType',
+export type IntegerType = {
+  type: 'IntegerType',
+};
+
+export type BooleanType = {
+  type: 'BooleanType',
 };
 
 export type DateType = {
@@ -76,7 +80,8 @@ export type EntityType = {
 
 export type Type =
   | StringType
-  | NumberType
+  | IntegerType
+  | BooleanType
   | DateType
   | DateTimeType
   | EntityType
