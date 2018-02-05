@@ -1,0 +1,28 @@
+entity:
+
+  male:
+    entity: individual
+    where: sex = 'male'
+
+  female:
+    entity: individual
+    where: sex = 'female'
+
+workflow:
+
+  start:
+  - pick-or-make-individual:
+    - view-individual
+    - edit-individual
+
+  pick-or-make-individual:
+  - pick-individual
+  - make-individual
+
+  pick-individual:
+    type: pick
+    entity: individual
+
+  make-individual:
+    type: make
+    entity: individual

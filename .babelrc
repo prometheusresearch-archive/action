@@ -1,0 +1,16 @@
+{
+  "only": "*.js",
+  "presets": [
+    [
+      "env",
+      {
+        "useBuiltIns": true,
+        "targets": {
+          "node": 8
+        }
+      }
+    ],
+    "flow",
+    "stage-3"
+  ]
+}

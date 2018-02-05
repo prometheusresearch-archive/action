@@ -1,0 +1,40 @@
+{
+  "name": "rex-action",
+  "version": "2.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andrey Popp <8mayday@gmail.com> (http://andreypopp.com/)",
+  "license": "MIT",
+  "@std/esm": {
+    "esm": "js"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.0",
+    "babel-jest": "^22.1.0",
+    "babel-preset-env": "^1.6.1",
+    "babel-preset-flow": "^6.23.0",
+    "babel-preset-stage-3": "^6.24.1",
+    "flow-bin": "^0.64.0",
+    "flow-typed": "^2.3.0",
+    "jest": "^22.1.4",
+    "pg-native": "^2.2.0",
+    "prettier": "^1.10.2"
+  },
+  "dependencies": {
+    "dataloader": "^1.4.0",
+    "graphql": "^0.12.3",
+    "invariant": "^2.2.2",
+    "js-yaml": "^3.10.0",
+    "loud-rejection": "^1.6.0",
+    "mkdirp": "^0.5.1",
+    "pg": "^7.4.1",
+    "pg-structure": "^4.0.7",
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0",
+    "rimraf": "^2.6.2"
+  }
+}
