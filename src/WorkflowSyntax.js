@@ -1,5 +1,5 @@
 /**
- * @flow
+ * @noflow
  */
 
 const invariant = require('invariant');

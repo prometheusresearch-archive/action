@@ -2,6 +2,8 @@
  * @flow
  */
 
+import * as express from 'express';
+const graphqlHTTP = require('express-graphql');
 const loudRejection = require('loud-rejection');
 const invariant = require('invariant');
 
@@ -16,25 +18,73 @@ import * as Db from './src/Db.js';
 
 loudRejection();
 
+type Settings = {
+  workflowConfig: string,
+  db: pg.Config,
+};
+
 const settings = {
   workflowConfig: './boot.yaml',
   db: {database: 'study_demo'},
 };
 
+async function loadWorkflow(db: Db.Db, settings: Settings) {
+  const univ = Universe.create();
+  await ReflectDB.reflect(univ, db.client);
+  const workflow = await Config.configureOf(univ, settings.workflowConfig);
+  const graphqlSchema = Fetch.create({univ: workflow.univ, db});
+  return {graphqlSchema, workflow, univ};
+}
+
 async function query(settings, query) {
   const db: Db.Db = await Db.connect(settings.db);
-
   try {
-    const univ = Universe.create();
-    await ReflectDB.reflect(univ, db.client);
-    const workflow = await Config.configureOf(univ, settings.workflowConfig);
-    const schema = Fetch.create({univ: workflow.univ, db});
-
-    const response = await gql.graphql(schema, query, null);
+    const {graphqlSchema} = await loadWorkflow(db, settings);
+    const response = await gql.graphql(graphqlSchema, query, null);
     console.log(JSON.stringify(response, null, 2));
   } finally {
     await db.disconnect();
   }
 }
 
-query(settings, process.argv[2]);
+async function serveWorkflow(settings) {
+  const db: Db.Db = await Db.connect(settings.db);
+  const {graphqlSchema} = await loadWorkflow(db, settings);
+
+  const router = new express.Router();
+
+  router.use(catchAllErrors);
+
+  router.get('/', async (req: express.$Request, res, next) => {
+    const yep = await 'hello';
+    res.send(yep);
+  });
+
+  router.use(
+    '/graphql',
+    graphqlHTTP({
+      schema: graphqlSchema,
+      graphiql: true,
+    }),
+  );
+
+  router.get('/graphql', async (req: express.$Request, res, next) => {
+    const yep = await 'hello';
+    res.send(yep);
+  });
+
+  const app = express.default();
+  app.use(router);
+  app.listen(3000, () => console.log('Server running on localhost:3000'));
+}
+
+const catchAllErrors: express.Middleware = function(
+  req: express.$Request,
+  res: express.$Response,
+  next: express.NextFunction,
+) {
+  Promise.reject().catch(next);
+};
+
+serveWorkflow(settings);
+//query(settings, process.argv[2]);
