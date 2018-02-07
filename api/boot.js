@@ -75,7 +75,8 @@ async function serveWorkflow(settings) {
 
   const app = express.default();
   app.use(router);
-  app.listen(3000, () => console.log('Server running on localhost:3000'));
+  const port = 3001;
+  app.listen(port, () => console.log(`Server running on localhost:${port}`));
 }
 
 const catchAllErrors: express.Middleware = function(

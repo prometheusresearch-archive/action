@@ -1,0 +1,14 @@
+[ignore]
+
+[include]
+../node_modules/**/*
+
+[libs]
+../flow-typed
+
+[lints]
+all=error
+
+[options]
+
+[strict]
