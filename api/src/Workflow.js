@@ -34,7 +34,7 @@ export type Data = {};
  * View is a piece of UI which operates in some context, requires some data and
  * can prodice an updated context.
  */
-export type View<Data> = {
+export type View<Data> = $ReadOnly<{
   type: 'UserAction',
 
   requires: ContextTypeShape,
@@ -49,12 +49,12 @@ export type View<Data> = {
    * Render UI given the current context and data.
    */
   render(Context, Data, (Context) => void): React.Element<*>,
-};
+}>;
 
 /**
  * Process is some procedure which doesn't require user participation.
  */
-export type Process<Data> = {
+export type Process<Data> = $ReadOnly<{
   type: 'ProcessAction',
 
   requires: ContextTypeShape,
@@ -69,40 +69,35 @@ export type Process<Data> = {
    * Execute process given the current context and data.
    */
   execute(Context, Data): Promise<Context>,
-};
+}>;
 
 /**
  * Guard wraps an action and executes it only if a query specified evaluates to
  * `true` in the current context.
  */
-export type Guard = {
+export type Guard = $ReadOnly<{
   type: 'Guard',
-
-  /**
-   * Action the guard wraps.
-   */
-  action: Action,
 
   /**
    * Query which determines if action can be executed.
    */
   query(Context): Query<boolean>,
-};
+}>;
 
 /**
  * A sequence of actions executed in order.
  */
-export type Sequence = {
+export type Sequence = $ReadOnly<{
   type: 'Sequence',
   actions: Array<Action>,
-};
+}>;
 
 /**
  * A set of actions, one of them can be executed at once.
  */
-export type Choice = {
+export type Choice = $ReadOnly<{
   type: 'Choice',
   actions: Array<Action>,
-};
+}>;
 
 export type Action = View<*> | Process<*> | Guard | Sequence | Choice;
