@@ -255,3 +255,60 @@ enroll-individual(individual: individual, study: study) = process {
     })
 }
 ```
+
+## 5.2.2018
+
+### Data layer
+
+- [ ] Reflect SQL structure into data model
+  - [ ] Relations
+    - [x] o2m
+    - [x] m2o
+    - [ ] m2m ???
+    - [ ] o2o ???
+  - [ ] Scalars
+    - [ ] Basic scalars
+      - [x] Int
+      - [x] Text
+      - [x] Bool
+      - [ ] Date
+      - [ ] Time
+      - [ ] DateTime
+      - [ ] JSON
+      - [ ] ...
+- [ ] Map data model to GraphQL types
+  - [ ] `entity(id)`
+  - [ ] `entity__list(limit, offset)`
+  - [ ] `entity { m2o }`
+  - [ ] `entity { o2m }`
+
+## 6.2.2018
+
+Working on syntax embedded in YAML.
+
+```
+workflow:
+  start:
+    action
+```
+
+```
+workflow:
+  start:
+  - action
+  - another-action
+```
+
+```
+workflow:
+  start:
+    action:
+      another-action
+```
+
+```
+workflow:
+  start:
+    action:
+      another-action
+```

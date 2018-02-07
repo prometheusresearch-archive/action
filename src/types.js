@@ -91,16 +91,16 @@ export type Type =
 /**
  * Typed value.
  */
-type Value = SimpleValue | EntityValue;
+export type Value = SimpleValue | EntityValue;
 
-type SimpleValue = {
+export type SimpleValue = {
   type: Type,
   value: mixed,
 };
 
-opaque type EntityID = string;
+export opaque type EntityID = string;
 
-type EntityValue = {
+export type EntityValue = {
   type: EntityType,
   id: EntityID,
   fields: {[name: string]: Value},
