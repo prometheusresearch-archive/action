@@ -5,3 +5,9 @@ serve-dev:
 
 check:
 	@$(BIN)/flow
+
+test:
+	@$(BIN)/jest
+
+test-watch:
+	@$(BIN)/jest --watch

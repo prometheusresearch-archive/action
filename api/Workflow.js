@@ -8,7 +8,7 @@ import * as t from './types.js';
 /**
  * A set of typed k-v pairs which workflow views and processes can access.
  */
-export type Context = {[name: string]: t.Value};
+export type Context = {[name: string]: mixed};
 
 /**
  * A pattern over the context, describes a subset of context keys and values.
@@ -23,19 +23,20 @@ export type ContextTypeShape = {[name: string]: t.Type};
 /**
  * A query which results in a Data.
  */
-export type Query<Data> = {};
+export type Query<Data> = string;
 
 /**
  * Data needed to a view or a process to execute.
  */
-export type Data = {};
+export type Data = mixed;
 
 /**
  * View is a piece of UI which operates in some context, requires some data and
  * can prodice an updated context.
  */
 export type View<Data> = $ReadOnly<{
-  type: 'UserAction',
+  type: 'View',
+  id: string,
 
   requires: ContextTypeShape,
   provides: ContextTypeShape,
@@ -55,7 +56,8 @@ export type View<Data> = $ReadOnly<{
  * Process is some procedure which doesn't require user participation.
  */
 export type Process<Data> = $ReadOnly<{
-  type: 'ProcessAction',
+  type: 'Process',
+  id: string,
 
   requires: ContextTypeShape,
   provides: ContextTypeShape,
@@ -77,6 +79,8 @@ export type Process<Data> = $ReadOnly<{
  */
 export type Guard = $ReadOnly<{
   type: 'Guard',
+  id: string,
+  requires: ContextTypeShape,
 
   /**
    * Query which determines if action can be executed.
@@ -89,7 +93,8 @@ export type Guard = $ReadOnly<{
  */
 export type Sequence = $ReadOnly<{
   type: 'Sequence',
-  actions: Array<Action>,
+  id: string,
+  sequence: Array<Action>,
 }>;
 
 /**
@@ -97,7 +102,8 @@ export type Sequence = $ReadOnly<{
  */
 export type Choice = $ReadOnly<{
   type: 'Choice',
-  actions: Array<Action>,
+  id: string,
+  choice: Array<Action>,
 }>;
 
 export type Action = View<*> | Process<*> | Guard | Sequence | Choice;

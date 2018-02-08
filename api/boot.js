@@ -53,8 +53,6 @@ async function serveWorkflow(settings) {
 
   const router = new express.Router();
 
-  router.use(catchAllErrors);
-
   router.get('/', async (req: express.$Request, res, next) => {
     const yep = await 'hello';
     res.send(yep);
@@ -74,17 +72,33 @@ async function serveWorkflow(settings) {
   });
 
   const app = express.default();
+  app.use(catchAllErrors);
+  app.use(allowCrossOrigin);
   app.use(router);
+
   const port = 3001;
   app.listen(port, () => console.log(`Server running on localhost:${port}`));
 }
 
-const catchAllErrors: express.Middleware = function(
+const catchAllErrors: express.Middleware = (
   req: express.$Request,
   res: express.$Response,
   next: express.NextFunction,
-) {
+) => {
   Promise.reject().catch(next);
+};
+
+const allowCrossOrigin: express.Middleware = (
+  req: express.$Request,
+  res: express.$Response,
+  next: express.NextFunction,
+) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept',
+  );
+  next();
 };
 
 serveWorkflow(settings);

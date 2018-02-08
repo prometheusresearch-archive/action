@@ -3,29 +3,35 @@
  */
 
 import * as React from 'react';
+const mkDebug = require('debug');
 const invariant = require('invariant');
 
-import type {Action, Context, View, Query, Data} from './Workflow.js';
+const debug = mkDebug('RexAction:api:WorkflowExecutor');
 
-type Config = {
+import type {Action, Context, ContextTypeShape, View, Query, Data} from './Workflow.js';
+
+export type Config = {
   initialAction: Action,
-  initialContext: Context,
-  waitForUserInput: (() => React.Element<*>) => void,
-  waitForData: (Query<*>) => Promise<Data>,
+  initialContext?: Context,
+  waitForUserInput: (
+    Context,
+    Data,
+    (Context) => void,
+    (Context, Data, (Context) => void) => React.Element<*>,
+  ) => *,
+  waitForData: (Query<*>) => Promise<{get(mixed): mixed}>,
+  onState?: State => void,
+  onTransition?: StateTransition => void,
 };
 
-type State = {
+export type State = {
   action: Action,
   context: Context,
 
-  allowBail(): State,
-  ignoreBail(): State,
-  withAction(Action): State,
-
-  bail(): StateTransition,
-  next(): StateTransition,
-  nextWithContext(context: Context): StateTransition,
+  bail: 'allow' | 'ignore',
 };
+
+export type StateTransition = Next | Bail | Noop;
 
 type Next = {
   type: 'Next',
@@ -36,13 +42,36 @@ type Bail = {
   type: 'Bail',
 };
 
-type StateTransition = Next | Bail;
+type Noop = {
+  type: 'Noop',
+};
+
+function bail(state: State): StateTransition {
+  switch (state.bail) {
+    case 'allow':
+      return {type: 'Bail'};
+    case 'ignore':
+      return {type: 'Noop'};
+    default:
+      invariant(false, 'Impossible');
+  }
+}
+
+function next(state: State): StateTransition {
+  return {type: 'Next', state};
+}
+
+function nextWithContext(state: State, context: Context): StateTransition {
+  return {type: 'Next', state: {...state, context}};
+}
 
 export async function run({
   initialAction,
   initialContext,
   waitForUserInput,
   waitForData,
+  onState,
+  onTransition,
 }: Config) {
   async function fetchData(state: State) {
     function findQuery(state: State) {
@@ -69,6 +98,7 @@ export async function run({
     }
 
     const query = findQuery(state);
+    debug('query', query);
 
     if (query != null) {
       const data = await waitForData(query);
@@ -78,70 +108,79 @@ export async function run({
     }
   }
 
-  async function step(state: State): Promise<?StateTransition> {
+  async function step(state: State): Promise<StateTransition> {
+    debug('state', state);
+    if (onState != null) {
+      onState(state);
+    }
+    const transition = await stepImpl(state);
+    debug('transition', transition);
+    if (onTransition != null) {
+      onTransition(transition);
+    }
+    return transition;
+  }
+
+  async function stepImpl(state: State): Promise<StateTransition> {
+    const {context, action} = state;
+
+    if (!contextConformsTo(context, getContextRequirements(action))) {
+      return bail(state);
+    }
+
     const data = await fetchData(state);
-    const {action} = state;
 
     switch (action.type) {
       case 'View': {
-        // TODO: check if context conforms to view requirements
         return new Promise(resolve => {
           const onContext = context => {
-            resolve(state.ignoreBail().nextWithContext(context));
+            state = {...state, bail: 'ignore'};
+            resolve(nextWithContext(state, context));
           };
-          const render = () => {
-            return action.render(state.context, data.get(action), onContext);
-          };
-          waitForUserInput(render);
+          waitForUserInput(state.context, data, onContext, action.render);
         });
       }
 
       case 'Process': {
-        // TODO: check if context conforms to action requirements
-        const nextContext = await action.execute(state.context, data[action]);
-        return state.nextWithContext(nextContext);
+        const nextContext = await action.execute(state.context, data);
+        return nextWithContext(state, nextContext);
       }
 
       case 'Guard': {
-        // TODO: check if context conforms to action requirements
-        const isAllowed = data.get(action);
+        const isAllowed: boolean = Boolean(data);
         if (isAllowed) {
-          return state.nextWithContext(state.context);
+          return next(state);
         } else {
-          return state.bail();
+          return bail(state);
         }
       }
 
       case 'Sequence': {
         let nextState = {...state};
-        for (const action of action.actions) {
-          nextState = nextState.withAction(action);
-          const next: ?StateTransition = await step(nextState);
-          if (next == null) {
-            continue;
-          } else if (next.type === 'Next') {
+        for (const childAction of action.sequence) {
+          nextState = {...nextState, action: childAction};
+          const next: StateTransition = await step(nextState);
+          if (next.type === 'Next') {
             nextState = next.state;
             continue;
           } else {
             return next;
           }
         }
-        return state.nextWithContext(nextState.context);
+        return next(nextState);
       }
 
       case 'Choice': {
-        for (const action of action.actions) {
-          const scopedState = state.allowBail().withAction(action);
-          const next: ?StateTransition = await step(scopedState);
-          if (next == null) {
-            continue;
-          } else if (next.type === 'Bail') {
+        for (const childAction of action.choice) {
+          const scopedState = {...state, bail: 'allow', action: childAction};
+          const next: StateTransition = await step(scopedState);
+          if (next.type === 'Bail') {
             continue;
           } else {
             return next;
           }
         }
-        return state.next();
+        return next(state);
       }
 
       default:
@@ -151,48 +190,55 @@ export async function run({
 
   const state: State = {
     prev: null,
-
     action: initialAction,
-
-    context: initialContext,
-
-    withAction(action) {
-      return {
-        ...this,
-        action,
-      };
-    },
-
-    allowBail() {
-      return {
-        ...this,
-        bail() {
-          return {type: 'Bail'};
-        },
-      };
-    },
-
-    ignoreBail() {
-      return {
-        ...this,
-        bail() {
-          return null;
-        },
-      };
-    },
-
-    bail() {
-      invariant(false, 'Unable to bail before reaching an UI');
-    },
-
-    next() {
-      return {type: 'Next', state: this};
-    },
-
-    nextWithContext(context) {
-      return {type: 'Next', state: {...this, context}};
-    },
+    context: initialContext || {},
+    bail: 'ignore',
   };
 
   return await step(state);
+}
+
+function contextConformsTo(context: Context, shape: ContextTypeShape) {
+  for (const key in shape) {
+    const value = context[key];
+    if (value == null) {
+      return false;
+    }
+    const type = shape[key];
+    switch (type.type) {
+      case 'NumberType':
+        if (typeof value !== 'number') {
+          return false;
+        }
+        break;
+      case 'StringType':
+        if (typeof value !== 'string') {
+          return false;
+        }
+        break;
+      case 'EntityType':
+        if (!(typeof value === 'object' && value != null && value.__type === type.name)) {
+          return false;
+        }
+        break;
+      default:
+        // TODO:
+        invariant(false, 'Need to handle type: %s', type.type);
+    }
+  }
+  return true;
+}
+
+function getContextRequirements(action: Action) {
+  switch (action.type) {
+    case 'View':
+    case 'Process':
+    case 'Guard':
+      return action.requires;
+    case 'Sequence':
+    case 'Choice':
+      return {};
+    default:
+      invariant(false, 'Unknown action: %s', action.type);
+  }
 }

@@ -1,0 +1,202 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`one action workflow 1`] = `
+Array [
+  Object {
+    "action": "hello",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "event": "fetch",
+    "query": Object {},
+  },
+  Object {
+    "context": Object {},
+    "event": "render",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+]
+`;
+
+exports[`one action workflow bail 1`] = `
+Array [
+  Object {
+    "action": "hello",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "event": "transition",
+    "type": "Noop",
+  },
+]
+`;
+
+exports[`one action workflow bail 2`] = `
+Array [
+  Object {
+    "action": "hello",
+    "context": Object {
+      "a": "ok",
+    },
+    "event": "state",
+  },
+  Object {
+    "event": "fetch",
+    "query": Object {},
+  },
+  Object {
+    "context": Object {
+      "a": "ok",
+    },
+    "event": "render",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+]
+`;
+
+exports[`one action workflow bail 3`] = `
+Array [
+  Object {
+    "action": "hello",
+    "context": Object {
+      "a": 21,
+    },
+    "event": "state",
+  },
+  Object {
+    "event": "transition",
+    "type": "Noop",
+  },
+]
+`;
+
+exports[`two action choice workflow 1`] = `
+Array [
+  Object {
+    "action": "choice",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "action": "hello",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "event": "fetch",
+    "query": Object {},
+  },
+  Object {
+    "context": Object {},
+    "event": "render",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+]
+`;
+
+exports[`two action sequence workflow - bail on second 1`] = `
+Array [
+  Object {
+    "action": "sequence",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "action": "hello",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "event": "fetch",
+    "query": Object {},
+  },
+  Object {
+    "context": Object {},
+    "event": "render",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+  Object {
+    "action": "world",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "event": "transition",
+    "type": "Noop",
+  },
+  Object {
+    "event": "transition",
+    "type": "Noop",
+  },
+]
+`;
+
+exports[`two action sequence workflow 1`] = `
+Array [
+  Object {
+    "action": "sequence",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "action": "hello",
+    "context": Object {},
+    "event": "state",
+  },
+  Object {
+    "event": "fetch",
+    "query": Object {},
+  },
+  Object {
+    "context": Object {},
+    "event": "render",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+  Object {
+    "action": "world",
+    "context": Object {
+      "a": 43,
+    },
+    "event": "state",
+  },
+  Object {
+    "event": "fetch",
+    "query": Object {},
+  },
+  Object {
+    "context": Object {
+      "a": 43,
+    },
+    "event": "render",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+  Object {
+    "event": "transition",
+    "type": "Next",
+  },
+]
+`;
