@@ -10,11 +10,11 @@ const invariant = require('invariant');
 import * as pg from 'pg';
 import * as gql from 'graphql';
 
-import * as Universe from './src/Universe.js';
-import * as ReflectDB from './src/ReflectUniverse.js';
-import * as Config from './src/Config.js';
-import * as Fetch from './src/Fetch.js';
-import * as Db from './src/Db.js';
+import * as Universe from './Universe.js';
+import * as ReflectDB from './ReflectUniverse.js';
+import * as Config from './Config.js';
+import * as Fetch from './Fetch.js';
+import * as Db from './Db.js';
 
 loudRejection();
 
