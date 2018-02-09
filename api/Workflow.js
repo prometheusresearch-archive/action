@@ -86,6 +86,11 @@ export type Guard = $ReadOnly<{
    * Query which determines if action can be executed.
    */
   query(Context): Query<boolean>,
+
+  /**
+   * Checks if guard allows further execution down the line.
+   */
+  allowed(Context, Data): Promise<boolean>,
 }>;
 
 /**

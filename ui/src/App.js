@@ -22,7 +22,7 @@ const pickIndividual: Action = {
   },
 
   query(context) {
-    return `individual__list {id,code}`;
+    return `individual__list {id,code,sex}`;
   },
 
   render(context, data, onContext) {
@@ -32,7 +32,8 @@ const pickIndividual: Action = {
       };
       return (
         <div key={individual.code} onClick={onClick(individual.id)}>
-          {individual.code}
+          {individual.code},
+          {individual.sex}
         </div>
       );
     });
@@ -45,12 +46,12 @@ const pickIndividual: Action = {
   },
 };
 
-const viewIndividual: Action = {
+const viewMale: Action = {
   type: 'View',
-  id: 'viewIndividual',
+  id: 'viewMale',
 
   requires: {
-    individual: {type: 'EntityType', name: 'individual', fields: {}},
+    individual: {type: 'EntityType', name: 'individual'},
   },
   provides: {},
 
@@ -61,18 +62,71 @@ const viewIndividual: Action = {
   render(context, data, onContext) {
     return (
       <div>
-        <h3>View Individual</h3>
+        <h3>View Male</h3>
         <pre>{JSON.stringify(data.individual, null, 2)}</pre>
       </div>
     );
   },
 };
 
-const workflow = {
-  type: 'Sequence',
-  id: 'sequence',
-  sequence: [pickIndividual, viewIndividual],
+const viewFemale: Action = {
+  type: 'View',
+  id: 'viewFemale',
+
+  requires: {
+    individual: {type: 'EntityType', name: 'individual'},
+  },
+  provides: {},
+
+  query(context) {
+    return `individual(id: ${context.individual.id}) {id,code,sex}`;
+  },
+
+  render(context, data, onContext) {
+    return (
+      <div>
+        <h3>View Female</h3>
+        <pre>{JSON.stringify(data.individual, null, 2)}</pre>
+      </div>
+    );
+  },
 };
+
+const ifMale: Action = {
+  type: 'Guard',
+  id: 'ifMale',
+
+  requires: {
+    individual: {type: 'EntityType', name: 'individual'},
+  },
+  provides: {},
+
+  query(context) {
+    return `individual(id: ${context.individual.id}) {id,code,sex}`;
+  },
+
+  allowed(context, data) {
+    return data.individual.sex === 'male';
+  },
+};
+
+function seq(...actions) {
+  return {
+    type: 'Sequence',
+    id: 'sequence',
+    sequence: actions,
+  };
+}
+
+function choice(...actions) {
+  return {
+    type: 'Choice',
+    id: 'choice',
+    choice: actions,
+  };
+}
+
+const workflow = seq(pickIndividual, choice(seq(ifMale, viewMale), viewFemale));
 
 export default class App extends Component<{}, State> {
   render() {

@@ -8,67 +8,68 @@ const invariant = require('invariant');
 
 const debug = mkDebug('RexAction:api:WorkflowExecutor');
 
-import type {Action, Context, ContextTypeShape, View, Query, Data} from './Workflow.js';
+import * as W from './Workflow.js';
 
 export type Config = {
-  initialAction: Action,
-  initialContext?: Context,
+  initialAction: W.Action,
+  initialContext?: W.Context,
   waitForUserInput: (
-    State,
-    Data,
-    (Context) => void,
-    (Context, Data, (Context) => void) => React.Element<*>,
+    Frame,
+    W.Data,
+    (W.Context) => void,
+    (W.Context, W.Data, (W.Context) => void) => React.Element<*>,
   ) => *,
-  waitForData: (Query<*>) => Promise<{get(mixed): mixed}>,
-  onState?: State => void,
-  onTransition?: StateTransition => void,
+  waitForData: (W.Query<*>) => Promise<{get(mixed): mixed}>,
 };
 
-export type State = {
-  action: Action,
-  context: Context,
+export type Frame = SequenceFrame | ChoiceFrame | SimpleFrame;
 
-  bail: 'allow' | 'ignore',
+export type SequenceFrame = {
+  type: 'SequenceFrame',
+  prev: ?Frame,
+  parent: ?Frame,
+  action: W.Sequence,
+  context: W.Context,
+  index: number,
 };
 
-export type StateTransition = Next | Bail | Noop;
+export type ChoiceFrame = {
+  type: 'ChoiceFrame',
+  prev: ?Frame,
+  parent: ?Frame,
+  action: W.Choice,
+  context: W.Context,
+  index: number,
+};
+
+export type SimpleFrame = {
+  type: 'SimpleFrame',
+  prev: ?Frame,
+  parent: ?Frame,
+  action: W.View<*> | W.Process<*> | W.Guard,
+  context: W.Context,
+};
+
+export type StateTransition = Next | Bail | Execute;
 
 type Next = {
   type: 'Next',
-  state: State,
+  context: W.Context,
 };
 
 type Bail = {
   type: 'Bail',
 };
 
-type Noop = {
-  type: 'Noop',
+type Execute = {
+  type: 'Execute',
+  context: W.Context,
 };
 
 export type Executor = {
-  state: State,
-  run(state: State): Promise<*>,
+  frame: Frame,
+  run(state: Frame): Promise<*>,
 };
-
-function bail(state: State): StateTransition {
-  switch (state.bail) {
-    case 'allow':
-      return {type: 'Bail'};
-    case 'ignore':
-      return {type: 'Noop'};
-    default:
-      invariant(false, 'Impossible');
-  }
-}
-
-function next(state: State): StateTransition {
-  return {type: 'Next', state};
-}
-
-function nextWithContext(state: State, context: Context): StateTransition {
-  return {type: 'Next', state: {...state, context}};
-}
 
 export function run({
   initialAction,
@@ -78,9 +79,9 @@ export function run({
   onState,
   onTransition,
 }: Config): Executor {
-  async function fetchData(state: State) {
-    function findQuery(state: State) {
-      const {action, context} = state;
+  async function fetchData(frame: Frame) {
+    function findQuery(frame: Frame) {
+      const {action, context} = frame;
       switch (action.type) {
         case 'View': {
           return action.query(context);
@@ -102,8 +103,7 @@ export function run({
       }
     }
 
-    const query = findQuery(state);
-    debug('query', query);
+    const query = findQuery(frame);
 
     if (query != null) {
       const data = await waitForData(query);
@@ -113,111 +113,153 @@ export function run({
     }
   }
 
-  async function step(state: State): Promise<StateTransition> {
-    debug('state', state);
-    if (onState != null) {
-      onState(state);
+  async function execute(frame: Frame, transition: StateTransition, prevFrame: ?Frame) {
+    function returnFrame(transition, prev) {
+      if (frame.parent != null) {
+        return execute(frame.parent, transition, prev);
+      } else {
+        return null;
+      }
     }
-    const transition = await stepImpl(state);
-    debug('transition', transition);
-    if (onTransition != null) {
-      onTransition(transition);
-    }
-    return transition;
-  }
 
-  async function stepImpl(state: State): Promise<StateTransition> {
-    const {context, action} = state;
+    debug('execute', `action=${frame.action.id}`, `transition=${transition.type}`, {
+      action: frame.action,
+      context: frame.context,
+      frame,
+      prevFrame,
+      transition,
+    });
+
+    const {context, action} = frame;
 
     if (!contextConformsTo(context, getContextRequirements(action))) {
-      return bail(state);
+      return returnFrame({type: 'Bail'}, prevFrame);
     }
 
-    const data = await fetchData(state);
-
-    switch (action.type) {
-      case 'View': {
-        return new Promise(resolve => {
-          const onContext = context => {
-            state = {...state, bail: 'ignore'};
-            resolve(nextWithContext(state, context));
-          };
-          waitForUserInput(state, data, onContext, action.render);
-        });
-      }
-
-      case 'Process': {
-        const nextContext = await action.execute(state.context, data);
-        return nextWithContext(state, nextContext);
-      }
-
-      case 'Guard': {
-        const isAllowed: boolean = Boolean(data);
-        if (isAllowed) {
-          return next(state);
+    switch (frame.type) {
+      case 'SequenceFrame': {
+        if (transition.type === 'Execute') {
+          const nextFrame = call(
+            frame.action.sequence[frame.index],
+            frame,
+            prevFrame,
+            transition.context,
+          );
+          return execute(nextFrame, {type: 'Execute', context: frame.context}, frame);
+        } else if (transition.type === 'Next') {
+          if (frame.index < frame.action.sequence.length - 1) {
+            const nextFrame = {
+              parent: frame,
+              prev: prevFrame,
+              type: 'SequenceFrame',
+              action: frame.action,
+              context: transition.context,
+              index: frame.index + 1,
+            };
+            return execute(
+              nextFrame,
+              {type: 'Execute', context: nextFrame.context},
+              prevFrame,
+            );
+          } else {
+            return returnFrame(transition, prevFrame);
+          }
         } else {
-          return bail(state);
+          return returnFrame(transition, prevFrame);
         }
       }
-
-      case 'Sequence': {
-        let nextState = {...state};
-        for (const childAction of action.sequence) {
-          nextState = {
-            ...nextState,
-            prev: nextState,
-            action: childAction,
-          };
-          const next: StateTransition = await step(nextState);
-          if (next.type === 'Next') {
-            nextState = next.state;
-            continue;
+      case 'ChoiceFrame': {
+        if (transition.type === 'Execute') {
+          const nextFrame = call(
+            frame.action.choice[frame.index],
+            frame,
+            prevFrame,
+            transition.context,
+          );
+          return execute(nextFrame, {type: 'Execute', context: frame.context}, frame);
+        } else if (transition.type === 'Bail') {
+          if (frame.index < frame.action.choice.length - 1) {
+            const nextFrame = {
+              parent: frame,
+              prev: prevFrame,
+              type: 'ChoiceFrame',
+              action: frame.action,
+              context: frame.context,
+              index: frame.index + 1,
+            };
+            return execute(
+              nextFrame,
+              {type: 'Execute', context: nextFrame.context},
+              prevFrame,
+            );
           } else {
-            return next;
+            return returnFrame(transition, prevFrame);
           }
+        } else {
+          return returnFrame(transition, prevFrame);
         }
-        return next(nextState);
       }
-
-      case 'Choice': {
-        for (const childAction of action.choice) {
-          const scopedState = {
-            ...state,
-            prev: state,
-            bail: 'allow',
-            action: childAction,
-          };
-          const next: StateTransition = await step(scopedState);
-          if (next.type === 'Bail') {
-            continue;
-          } else {
-            return next;
+      case 'SimpleFrame':
+        switch (action.type) {
+          case 'View': {
+            if (transition.type === 'Execute') {
+              const f = frame;
+              const data = await fetchData(frame);
+              return new Promise(resolve => {
+                const onContext = context => {
+                  const nextContext = {...f.context, ...context};
+                  const nextFrame = {...f, context: nextContext};
+                  resolve(execute(f, {type: 'Next', context: nextContext}, nextFrame));
+                };
+                waitForUserInput(f, data, onContext, action.render);
+              });
+            } else {
+              return returnFrame(transition, prevFrame);
+            }
           }
-        }
-        return next(state);
-      }
 
+          case 'Process': {
+            if (transition.type === 'Execute') {
+              const data = await fetchData(frame);
+              const context = await action.execute(frame.context, data);
+              const nextContext = {...frame.context, ...context};
+              return returnFrame({type: 'Next', context: nextContext}, prevFrame);
+            } else {
+              return returnFrame(transition, prevFrame);
+            }
+          }
+
+          case 'Guard': {
+            if (transition.type === 'Execute') {
+              const data = await fetchData(frame);
+              if (await action.allowed(context, data)) {
+                return returnFrame({type: 'Next', context: frame.context}, prevFrame);
+              } else {
+                return returnFrame({type: 'Bail'}, prevFrame);
+              }
+            } else {
+              return returnFrame(transition, prevFrame);
+            }
+          }
+          default:
+            invariant(false, 'Unknown action: %s', action.type);
+        }
       default:
-        invariant(false, 'Unknown action: %s', action.type);
+        invariant(false, 'Unknown frame: %s', frame.type);
     }
   }
 
-  const state: State = {
-    prev: null,
-    action: initialAction,
-    context: initialContext || {},
-    bail: 'ignore',
-  };
+  const frame: Frame = call(initialAction, null, null, initialContext || {});
 
   return {
-    state,
-    run(state: State) {
-      return step(state);
+    frame,
+    run(frame: Frame) {
+      return execute(frame, {type: 'Execute', context: frame.context}, null);
     },
   };
 }
 
-function contextConformsTo(context: Context, shape: ContextTypeShape) {
+function contextConformsTo(context: W.Context, shape: W.ContextTypeShape) {
   for (const key in shape) {
     const value = context[key];
     if (value == null) {
@@ -248,7 +290,22 @@ function contextConformsTo(context: Context, shape: ContextTypeShape) {
   return true;
 }
 
-function getContextRequirements(action: Action) {
+function call(action: W.Action, parent: ?Frame, prev: ?Frame, context: W.Context): Frame {
+  switch (action.type) {
+    case 'View':
+    case 'Process':
+    case 'Guard':
+      return {type: 'SimpleFrame', action, parent, prev, context};
+    case 'Sequence':
+      return {type: 'SequenceFrame', action, parent, prev, context, index: 0};
+    case 'Choice':
+      return {type: 'ChoiceFrame', action, parent, prev, context, index: 0};
+    default:
+      invariant(false, 'Unknown action: %s', action.type);
+  }
+}
+
+function getContextRequirements(action: W.Action) {
   switch (action.type) {
     case 'View':
     case 'Process':

@@ -13,15 +13,29 @@ type Props = {
 };
 
 type State = {
-  state: WE.State,
+  frame: WE.Frame,
   data: W.Data,
   continueWithContext: W.Context => void,
   render: (W.Context, W.Data, (W.Context) => void) => React.Element<*>,
 };
 
-function getStateTrace(state: WE.State) {
+function getFrameStack(state: WE.Frame) {
   const trace = [];
-  let c: WE.State = state;
+  let c: WE.Frame = state;
+  while (true) {
+    trace.push(c);
+    if (c.parent != null) {
+      c = c.parent;
+    } else {
+      break;
+    }
+  }
+  return trace;
+}
+
+function getFrameTrace(state: WE.Frame) {
+  const trace = [];
+  let c: WE.Frame = state;
   while (true) {
     trace.push(c);
     if (c.prev != null) {
@@ -33,19 +47,19 @@ function getStateTrace(state: WE.State) {
   return trace;
 }
 
-function DebugState({state}: {state: WE.State}) {
-  const trace = getStateTrace(state).map(c => (
-    <div key={c.action.id}>
-      {c.action.id}
-      <pre>{JSON.stringify(c.context, null, 2)}</pre>
+function DebugState({frame}: {frame: WE.Frame}) {
+  const trace = getFrameStack(frame).map((f, idx) => (
+    <div key={`${f.action.id}--${idx}`}>
+      {f.action.id}
+      <pre>{JSON.stringify(f.context, null, 2)}</pre>
     </div>
   ));
   return <div>{trace}</div>;
 }
 
-function Breadcrumb({state, onState}: {state: WE.State, onState: WE.State => *}) {
+function Breadcrumb({frame, onState}: {frame: WE.Frame, onState: WE.Frame => *}) {
   const items = [];
-  for (const c of getStateTrace(state)) {
+  for (const c of getFrameTrace(frame)) {
     if (c.action.type === 'View') {
       const onClick = () => onState(c);
       items.push(
@@ -59,7 +73,7 @@ function Breadcrumb({state, onState}: {state: WE.State, onState: WE.State => *})
 }
 
 export class Workflow extends React.Component<Props, State> {
-  run: WE.State => *;
+  run: WE.Frame => *;
 
   static defaultProps = {
     initialContext: {},
@@ -67,7 +81,7 @@ export class Workflow extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props);
-    const {run, state} = WE.run({
+    const {run, frame} = WE.run({
       initialAction: this.props.initialAction,
       initialContext: this.props.initialContext,
       waitForUserInput: this.waitForUserInput,
@@ -75,7 +89,7 @@ export class Workflow extends React.Component<Props, State> {
     });
     this.run = run;
     this.state = {
-      state,
+      frame,
       data: {},
       continueWithContext: _context => {},
       render: (context, data, onContext) => <div>loading</div>,
@@ -83,12 +97,12 @@ export class Workflow extends React.Component<Props, State> {
   }
 
   waitForUserInput = (
-    state: WE.State,
+    frame: WE.Frame,
     data: W.Data,
     continueWithContext: W.Context => void,
     render: (W.Context, W.Data, (W.Context) => void) => React.Element<*>,
   ) => {
-    this.setState({state, data, continueWithContext, render});
+    this.setState({frame, data, continueWithContext, render});
   };
 
   waitForData = async (query: W.Query<*>) => {
@@ -97,30 +111,27 @@ export class Workflow extends React.Component<Props, State> {
     return data.data;
   };
 
-  onState = (state: WE.State) => {
+  onState = (state: WE.Frame) => {
     this.run(state);
   };
 
   render() {
     const {debugState} = this.props;
-    const {state, data, continueWithContext, render} = this.state;
+    const {frame, data, continueWithContext, render} = this.state;
     return (
       <div>
-        {state == null && <div>Loading...</div>}
-        {state != null && (
-          <div>
-            {debugState != null && debugState && <DebugState state={state} />}
-            <Breadcrumb state={state} onState={this.onState} />
-            <div key={state.action.id}>
-              {render(state.context, data, continueWithContext)}
-            </div>
+        <div>
+          {debugState != null && debugState && <DebugState frame={frame} />}
+          <Breadcrumb frame={frame} onState={this.onState} />
+          <div key={frame.action.id}>
+            {render(frame.context, data, continueWithContext)}
           </div>
-        )}
+        </div>
       </div>
     );
   }
 
   componentDidMount() {
-    this.run(this.state.state);
+    this.run(this.state.frame);
   }
 }
