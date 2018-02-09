@@ -88,6 +88,25 @@ export type Type =
   | ListType
   | RecordType;
 
+export type TypeImage =
+  | StringType
+  | IntegerType
+  | BooleanType
+  | DateType
+  | DateTimeType
+  | EntityTypeImage
+  | ListTypeImage;
+
+export type EntityTypeImage = {
+  type: 'EntityType',
+  name: string,
+};
+
+export type ListTypeImage = {
+  type: 'ListType',
+  child: TypeImage,
+};
+
 /**
  * Typed value.
  */

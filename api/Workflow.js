@@ -13,12 +13,12 @@ export type Context = {[name: string]: mixed};
 /**
  * A pattern over the context, describes a subset of context keys and values.
  */
-export type ContextType = {[name: string]: t.Type};
+export type ContextType = {[name: string]: t.TypeImage};
 
 /**
  * A pattern over the context, describes a subset of context keys and values.
  */
-export type ContextTypeShape = {[name: string]: t.Type};
+export type ContextTypeShape = {[name: string]: t.TypeImage};
 
 /**
  * A query which results in a Data.

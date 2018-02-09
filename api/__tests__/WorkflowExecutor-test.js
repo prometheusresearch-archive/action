@@ -52,7 +52,7 @@ function view(params): Action {
     requires: params.requires || {},
     provides: {},
     query(context) {
-      return {};
+      return '';
     },
     render(context, data, onContext) {
       if (params.onContext != null) {
