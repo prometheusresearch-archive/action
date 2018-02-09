@@ -85,7 +85,7 @@ export default class App extends Component<{}, State> {
         <p className="App-intro">
           To get started, edit <code>src/App.js</code> and save to reload.
         </p>
-        <Workflow initialAction={workflow} />
+        <Workflow initialAction={workflow} debugState={true} />
       </div>
     );
   }

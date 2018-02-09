@@ -14,7 +14,7 @@ export type Config = {
   initialAction: Action,
   initialContext?: Context,
   waitForUserInput: (
-    Context,
+    State,
     Data,
     (Context) => void,
     (Context, Data, (Context) => void) => React.Element<*>,
@@ -46,6 +46,11 @@ type Noop = {
   type: 'Noop',
 };
 
+export type Executor = {
+  state: State,
+  run(state: State): Promise<*>,
+};
+
 function bail(state: State): StateTransition {
   switch (state.bail) {
     case 'allow':
@@ -65,14 +70,14 @@ function nextWithContext(state: State, context: Context): StateTransition {
   return {type: 'Next', state: {...state, context}};
 }
 
-export async function run({
+export function run({
   initialAction,
   initialContext,
   waitForUserInput,
   waitForData,
   onState,
   onTransition,
-}: Config) {
+}: Config): Executor {
   async function fetchData(state: State) {
     function findQuery(state: State) {
       const {action, context} = state;
@@ -137,7 +142,7 @@ export async function run({
             state = {...state, bail: 'ignore'};
             resolve(nextWithContext(state, context));
           };
-          waitForUserInput(state.context, data, onContext, action.render);
+          waitForUserInput(state, data, onContext, action.render);
         });
       }
 
@@ -158,7 +163,11 @@ export async function run({
       case 'Sequence': {
         let nextState = {...state};
         for (const childAction of action.sequence) {
-          nextState = {...nextState, action: childAction};
+          nextState = {
+            ...nextState,
+            prev: nextState,
+            action: childAction,
+          };
           const next: StateTransition = await step(nextState);
           if (next.type === 'Next') {
             nextState = next.state;
@@ -172,7 +181,12 @@ export async function run({
 
       case 'Choice': {
         for (const childAction of action.choice) {
-          const scopedState = {...state, bail: 'allow', action: childAction};
+          const scopedState = {
+            ...state,
+            prev: state,
+            bail: 'allow',
+            action: childAction,
+          };
           const next: StateTransition = await step(scopedState);
           if (next.type === 'Bail') {
             continue;
@@ -195,7 +209,12 @@ export async function run({
     bail: 'ignore',
   };
 
-  return await step(state);
+  return {
+    state,
+    run(state: State) {
+      return step(state);
+    },
+  };
 }
 
 function contextConformsTo(context: Context, shape: ContextTypeShape) {

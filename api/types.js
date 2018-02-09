@@ -2,7 +2,7 @@
  * @flow
  */
 
-import * as PgStructure from 'pg-structure';
+import type {Relation as PgRelation, Table as PgTable} from 'pg-structure';
 import * as React from 'react';
 
 /**
@@ -55,7 +55,7 @@ export type Relation = {
   name: string,
 
   // TODO: need db-specific type instead
-  relation: PgStructure.Relation,
+  relation: PgRelation,
 };
 
 export type Field = Attribute | Relation;
@@ -75,7 +75,7 @@ export type EntityType = {
   },
 
   // TODO: need db-specific type instead
-  table: PgStructure.Table,
+  table: PgTable,
 };
 
 export type Type =

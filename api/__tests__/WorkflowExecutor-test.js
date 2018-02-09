@@ -23,9 +23,9 @@ async function runAndCaptureTrace({
     trace.push({event: 'transition', type: transition.type});
   }
 
-  async function waitForUserInput(context, data, onContext, render) {
-    trace.push({event: 'render', context});
-    render(context, data, onContext);
+  async function waitForUserInput(state, data, onContext, render) {
+    trace.push({event: 'render', context: state.context});
+    render(state.context, data, onContext);
   }
 
   function waitForData(query) {
