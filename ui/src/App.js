@@ -2,53 +2,29 @@
  * @flow
  */
 
-import React, {Component} from 'react';
-import logo from './logo.svg';
 import './App.css';
+
+import React, {Component} from 'react';
 import type {Action} from 'api/Workflow';
+import {View} from 'react-native-web';
 import {Workflow} from './Workflow.js';
+import * as Pick from './Pick.js';
 
 type State = {
   data: mixed,
 };
 
-const pickIndividual: Action = {
-  type: 'View',
+const pickIndividual: Action = Pick.configure({
   id: 'pickIndividual',
-
-  requires: {},
-  provides: {
-    individual: {type: 'EntityType', name: 'individual', fields: {}},
-  },
-
-  query(context) {
-    return `individual__list {id,code,sex}`;
-  },
-
-  render(context, data, onContext) {
-    const items = data.individual__list.map(individual => {
-      const onClick = id => () => {
-        onContext({individual: {id, __type: 'individual'}});
-      };
-      return (
-        <div key={individual.code} onClick={onClick(individual.id)}>
-          {individual.code},
-          {individual.sex}
-        </div>
-      );
-    });
-    return (
-      <div>
-        <h3>Pick Individual</h3>
-        <div>{items}</div>
-      </div>
-    );
-  },
-};
+  title: 'Pick Individual',
+  entityName: 'individual',
+  fields: ['id', 'code', 'sex'],
+});
 
 const viewMale: Action = {
   type: 'View',
   id: 'viewMale',
+  title: 'View Male',
 
   requires: {
     individual: {type: 'EntityType', name: 'individual'},
@@ -62,7 +38,6 @@ const viewMale: Action = {
   render(context, data, onContext) {
     return (
       <div>
-        <h3>View Male</h3>
         <pre>{JSON.stringify(data.individual, null, 2)}</pre>
       </div>
     );
@@ -72,6 +47,7 @@ const viewMale: Action = {
 const viewFemale: Action = {
   type: 'View',
   id: 'viewFemale',
+  title: 'View Female',
 
   requires: {
     individual: {type: 'EntityType', name: 'individual'},
@@ -85,7 +61,6 @@ const viewFemale: Action = {
   render(context, data, onContext) {
     return (
       <div>
-        <h3>View Female</h3>
         <pre>{JSON.stringify(data.individual, null, 2)}</pre>
       </div>
     );
@@ -131,16 +106,9 @@ const workflow = seq(pickIndividual, choice(seq(ifMale, viewMale), viewFemale));
 export default class App extends Component<{}, State> {
   render() {
     return (
-      <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h1 className="App-title">Welcome to React</h1>
-        </header>
-        <p className="App-intro">
-          To get started, edit <code>src/App.js</code> and save to reload.
-        </p>
-        <Workflow initialAction={workflow} debugState={true} />
-      </div>
+      <View style={{flex: 1, height: '100%'}}>
+        <Workflow initialAction={workflow} />
+      </View>
     );
   }
 }

@@ -37,6 +37,7 @@ export type Data = mixed;
 export type View<Data> = $ReadOnly<{
   type: 'View',
   id: string,
+  title?: string,
 
   requires: ContextTypeShape,
   provides: ContextTypeShape,

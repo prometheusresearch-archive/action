@@ -6,6 +6,7 @@
     "api": "*",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
+    "react-native-web": "^0.4.0",
     "react-scripts": "1.1.0"
   },
   "proxy": "http://localhost:3001",

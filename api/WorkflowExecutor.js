@@ -15,6 +15,7 @@ export type Config = {
   initialContext?: W.Context,
   waitForUserInput: (
     Frame,
+    Array<Frame>,
     W.Data,
     (W.Context) => void,
     (W.Context, W.Data, (W.Context) => void) => React.Element<*>,
@@ -113,6 +114,95 @@ export function run({
     }
   }
 
+  async function speculate(rootFrame: Frame, prevFrame: ?Frame): Promise<Array<Frame>> {
+    async function speculateImpl(
+      frame: Frame,
+      prevFrame: ?Frame,
+    ): Promise<?Array<Frame>> {
+      function returnFrame(prev) {
+        if (frame.parent != null) {
+          return speculateImpl(frame.parent, prev);
+        } else {
+          return [];
+        }
+      }
+
+      debug('speculateImpl', `action=${frame.action.id}`, {
+        action: frame.action,
+        context: frame.context,
+        frame,
+        prevFrame,
+      });
+
+      const {context, action} = frame;
+
+      if (!contextConformsTo(context, getContextRequirements(action))) {
+        return returnFrame(prevFrame);
+      }
+
+      switch (frame.type) {
+        case 'SequenceFrame': {
+          for (const nextAction of frame.action.sequence) {
+            const nextFrame = call(
+              frame.action.sequence[frame.index],
+              frame,
+              prevFrame,
+              frame.context,
+            );
+            const result = await speculateImpl(nextFrame, prevFrame);
+            if (result == null) {
+              return null;
+            } else if (result.length !== 0) {
+              return result;
+            }
+          }
+          return returnFrame(prevFrame);
+        }
+        case 'ChoiceFrame': {
+          const results = [];
+          for (const nextAction of frame.action.choice) {
+            const nextFrame = call(
+              frame.action.choice[frame.index],
+              frame,
+              prevFrame,
+              frame.context,
+            );
+            const result = await speculateImpl(nextFrame, prevFrame);
+            if (result != null) {
+              results.push(...result);
+            }
+          }
+          return results;
+        }
+        case 'SimpleFrame':
+          switch (action.type) {
+            case 'View': {
+              return frame.action.id === rootFrame.action.id ? [] : [frame];
+            }
+
+            case 'Process': {
+              return null;
+            }
+
+            case 'Guard': {
+              const data = await fetchData(frame);
+              if (await action.allowed(context, data)) {
+                return returnFrame(prevFrame);
+              } else {
+                return null;
+              }
+            }
+            default:
+              invariant(false, 'Unknown action: %s', action.type);
+          }
+        default:
+          invariant(false, 'Unknown frame: %s', frame.type);
+      }
+    }
+    const res = await speculateImpl(rootFrame, prevFrame);
+    return res || [];
+  }
+
   async function execute(frame: Frame, transition: StateTransition, prevFrame: ?Frame) {
     function returnFrame(transition, prev) {
       if (frame.parent != null) {
@@ -205,13 +295,16 @@ export function run({
             if (transition.type === 'Execute') {
               const f = frame;
               const data = await fetchData(frame);
+              const next = await speculate(frame, prevFrame);
               return new Promise(resolve => {
                 const onContext = context => {
                   const nextContext = {...f.context, ...context};
                   const nextFrame = {...f, context: nextContext};
-                  resolve(execute(f, {type: 'Next', context: nextContext}, nextFrame));
+                  resolve(
+                    execute(nextFrame, {type: 'Next', context: nextContext}, nextFrame),
+                  );
                 };
-                waitForUserInput(f, data, onContext, action.render);
+                waitForUserInput(f, next, data, onContext, action.render);
               });
             } else {
               return returnFrame(transition, prevFrame);
