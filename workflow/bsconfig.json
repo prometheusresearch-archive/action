@@ -1,0 +1,15 @@
+{
+  "name": "Workflow",
+  "namespace": true,
+  "sources": [
+    "src"
+  ],
+  "package-specs": {
+    "module": "commonjs",
+    "in-source": true
+  },
+  "suffix": ".bs.js",
+  "ppx-flags": [
+    "./ppx_let"
+  ]
+}

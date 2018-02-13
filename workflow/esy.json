@@ -1,0 +1,16 @@
+{
+  "name": "workflow-esy",
+  "version": "1.0.0",
+  "description": "",
+  "esy": {},
+  "devDependencies": {
+    "@opam/merlin": "*",
+    "bs-platform": "^2.2.0",
+    "ocaml": "~4.2.0"
+  },
+  "author": "Andrey Popp <8mayday@gmail.com> (http://andreypopp.com/)",
+  "license": "MIT",
+  "dependencies": {
+    "@opam/ppx_let": "^113.33.3"
+  }
+}
