@@ -30,7 +30,11 @@ function Breadcrumb({
     );
   });
 
-  buttons.push(<Text style={{padding: 10, fontWeight: '600'}}>{ui.title}</Text>);
+  buttons.push(
+    <Text key="current" style={{padding: 10, fontWeight: '600'}}>
+      {ui.title}
+    </Text>,
+  );
 
   return <View style={{flexDirection: 'row'}}>{buttons}</View>;
 }

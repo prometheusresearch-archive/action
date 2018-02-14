@@ -257,6 +257,29 @@ module Frame = struct
     let info = { info with context; } in
     info, pos
 
+  let rec nextInSequence (frame : t) =
+    let {parent; _}, _ = frame in
+    match parent, frame with
+    | _, (info, SequenceFrame (_cur::next)) ->
+      let frame = info, SequenceFrame next in
+      Some frame
+    | Some parent, _ ->
+      let parent = updateContext (context frame) parent in
+      nextInSequence parent
+    | None, _ ->
+      None
+
+  let rec nextInChoice (frame : t) =
+    let {parent; _}, _ = frame in
+    match parent, frame with
+    | _, (info, ChoiceFrame (_cur::next)) ->
+      let frame = info, ChoiceFrame next in
+      Some frame
+    | Some parent, _ ->
+      nextInChoice parent
+    | None, _ ->
+      None
+
 end
 
 module Execution = struct
@@ -281,28 +304,6 @@ module Execution = struct
     | None -> Promise.return DataSet.empty
     | Some query -> config.waitForData query
 
-
-  let rec nextInSequence ~config (frame : Frame.t) =
-    let {Frame. parent; _}, _ = frame in
-    match parent, frame with
-    | _, (info, Frame.SequenceFrame (_cur::next)) ->
-      let frame = info, Frame.SequenceFrame next in
-      Some frame
-    | Some parent, _ ->
-      let parent = Frame.updateContext (Frame.context frame) parent in
-      nextInSequence ~config parent
-    | None, _ -> None
-
-  let rec nextInChoice ~config (frame : Frame.t) =
-    let {Frame. parent; _}, _ = frame in
-    match parent, frame with
-    | Some parent, (_, Frame.ChoiceFrame []) ->
-      nextInSequence ~config parent
-    | _, (info, Frame.ChoiceFrame (_cur::next)) ->
-      let frame = info, Frame.ChoiceFrame next in
-      Some frame
-    | Some parent, _ -> nextInChoice ~config parent
-    | None, _ -> None
 
   (*
   let speculate (exec : t) =
@@ -403,12 +404,12 @@ module Execution = struct
         bailOf ~prev frame
 
     and bailOf ~prev frame =
-      match nextInChoice ~config frame with
+      match Frame.nextInChoice frame with
       | Some frame -> runToInteraction ~prev frame
       | None -> return (None, frame)
 
     and nextOf ~prev frame =
-      match nextInSequence ~config frame with
+      match Frame.nextInSequence frame with
       | Some frame -> runToInteraction ~prev frame
       | None -> return (None, frame)
 
@@ -425,7 +426,7 @@ module Execution = struct
       | `Next context->
         currentFrame
         |> Frame.updateContext context
-        |> nextInSequence ~config
+        |> Frame.nextInSequence
     in
 
     match frame with
