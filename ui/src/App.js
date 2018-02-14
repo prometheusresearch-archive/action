@@ -114,12 +114,59 @@ const ifFemale = Workflow.guard({
   },
 });
 
+const querySiteForIndividual = Workflow.query({
+  requires: {
+    individual: Workflow.entityType('individual'),
+  },
+
+  provides: {
+    site: Workflow.entityType('site'),
+  },
+
+  query(context) {
+    return `individual(id: ${context.individual.value.id}) {site{id}}`;
+  },
+
+  update(context, data) {
+    const site = Workflow.entity('site', {id: data.individual.site.id});
+    return {...context, site};
+  },
+});
+
+const viewSite = Workflow.interaction({
+  requires: {
+    site: Workflow.entityType('site'),
+  },
+
+  provides: {},
+
+  query(context) {
+    console.log(context);
+    return `site(id: ${context.site.value.id}) {code,title}`;
+  },
+
+  ui: {
+    title: 'View Site',
+    render(context, data, onContext) {
+      return (
+        <div>
+          <pre>{JSON.stringify(data.site, null, 2)}</pre>
+        </div>
+      );
+    },
+  },
+});
+
 const workflow = Workflow.sequence([
   Workflow.action(pickIndividual),
   Workflow.choice([
     Workflow.sequence([Workflow.action(ifMale), Workflow.action(viewMale)]),
     Workflow.sequence([Workflow.action(ifFemale), Workflow.action(viewFemale)]),
-    Workflow.action(viewIndividual),
+    Workflow.sequence([
+      Workflow.action(viewIndividual),
+      Workflow.action(querySiteForIndividual),
+      Workflow.action(viewSite),
+    ]),
   ]),
 ]);
 

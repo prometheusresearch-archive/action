@@ -136,6 +136,7 @@ module Action = struct
     requires : Context.Shape.t;
     provides : Context.Shape.t;
     query : Context.t -> Query.t;
+    update : Context.t -> DataSet.t -> Context.t;
   } [@@bs.deriving jsConverter]
 
   type mutation = {
@@ -336,7 +337,18 @@ module Execution = struct
 
       | _, Frame.ActionFrame { action = Action.Mutation _; _} -> return []
 
-      | _, Frame.ActionFrame { action = Action.Query _; _ } -> failwith "Query is not implemented"
+      | _, Frame.ActionFrame {
+          action = Action.Query { requires; update; _ } as action;
+          _
+        } ->
+        if Context.matches context requires
+        then (
+          let%bind data = fetch ~context ~config action in
+          let context = update context data in
+          let frame = Frame.updateContext context frame in
+          nextOf frame
+        )
+        else return []
 
       | _, Frame.ActionFrame { action = Action.Interaction { requires; ui; _ }; _} ->
         if Context.matches context requires
@@ -396,8 +408,21 @@ module Execution = struct
         )
         else bailOf ~prev frame
 
-      | _, Frame.ActionFrame { action = Action.Query _; _ } -> failwith "Query is not implemented"
-      | _, Frame.ActionFrame { action = Action.Mutation _; _ } -> failwith "Mutation is not implemented"
+      | _, Frame.ActionFrame {
+          action = Action.Query { requires; update; _ } as action;
+          _
+        } ->
+        if Context.matches context requires
+        then (
+          let%bind data = fetch ~context ~config action in
+          let context = update context data in
+          let frame = Frame.updateContext context frame in
+          nextOf ~prev frame
+        ) else
+          bailOf ~prev frame
+
+      | _, Frame.ActionFrame { action = Action.Mutation _; _ } ->
+        failwith "Mutation is not implemented"
 
       | _, Frame.ChoiceFrame (cur::_rest) ->
         let frame = Frame.make ?prev ~context ~parent:frame cur in
@@ -478,6 +503,16 @@ module JS = struct
       check;
     }
 
+  let query params =
+    let update context data = (params##update context data) in
+    Action.Query {
+      Action.
+      requires = params##requires;
+      provides = params##provides;
+      query = params##query;
+      update = update;
+    }
+
   let action action =
     Node.Action action
 
@@ -503,7 +538,6 @@ module JS = struct
     in
     currentFrame
     |> collectPrevFrames []
-    |> List.rev
     |> Array.of_list
 
   let next ~config currentFrame =

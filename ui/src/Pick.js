@@ -17,7 +17,7 @@ export function configure(config: Config) {
   return Workflow.interaction({
     requires: {},
     provides: {
-      individual: Workflow.entityType('individual'),
+      [config.entityName]: Workflow.entityType(config.entityName),
     },
     query(context) {
       const fields = config.fields.join(', ');
@@ -52,7 +52,7 @@ function Component(props: Props) {
     const onPress = id => () => {
       const nextContext = {
         ...props.context,
-        [props.config.entityName]: Workflow.entity('individual', {id}),
+        [props.config.entityName]: Workflow.entity(props.config.entityName, {id}),
       };
       props.onContext(nextContext);
     };

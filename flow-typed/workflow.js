@@ -38,6 +38,14 @@ declare module 'workflow' {
   };
   declare export function guard(GuardConfig): Action<*>;
 
+  declare type QueryConfig = {
+    requires: ContextShape,
+    provides: ContextShape,
+    query: Context => Query,
+    update: (Context, DataSet) => Context,
+  };
+  declare export function query(QueryConfig): Action<*>;
+
   declare export function action<UI>(Action<UI>): Workflow<UI>;
   declare export function sequence(Array<Workflow<UI>>): Workflow<UI>;
   declare export function choice(Array<Workflow<UI>>): Workflow<UI>;
