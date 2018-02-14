@@ -1,6 +1,13 @@
-watch:
-	esy ./node_modules/.bin/bsb -w
-
 bootstrap:
-	esy build
-	ln -s $$(esy ocamlfind query ppx_let)/ppx ./ppx_let
+	@esy install
+	@esy build
+	@$(MAKE) ppx_let
+
+ppx_let:
+	ln -s $$(esy ocamlfind query ppx_let)/ppx $(@)
+
+build:
+	esy ./node_modules/.bin/bsb -make-world
+
+watch:
+	esy ./node_modules/.bin/bsb -make-world -w
