@@ -3,26 +3,70 @@
  */
 
 declare module 'workflow' {
-  declare export opaque type Action<+UI>;
-  declare export opaque type Workflow<+UI>;
+  /***************************************************************
+   * Core types to model UI state and application data.
+   ***************************************************************/
 
-  declare export opaque type ContextType;
+  /**
+   * ContextShape describes the context value at some point in time.
+   *
+   * It can be either used to describe what is required from the context or to
+   * validate what's being inserted into the context.
+   */
   declare export type ContextShape = {[name: string]: ContextType};
+  declare export opaque type ContextType;
 
-  declare export type ContextValue = {value: any, type: ContextType};
-  declare export type Context = {[name: string]: ContextValue};
-
-  declare export type Query = string;
-  declare export type DataSet = {[name: string]: any};
-
-  declare export function number(number): ContextValue;
-  declare export function string(string): ContextValue;
-  declare export function entity(string, mixed): ContextValue;
-
+  /**
+   * Utility functions to produce context type specifications.
+   */
   declare export var numberType: ContextType;
   declare export var stringType: ContextType;
   declare export function entityType(string): ContextType;
 
+  /**
+   * Context represents a type bag of k-v pairs.
+   *
+   * Actions are being composed by specifying their expectation for the context
+   * values.
+   */
+  declare export type Context = {[name: string]: ContextValue};
+  declare export opaque type ContextValue;
+
+  /**
+   * Utility functions to produce context values annotated with types.
+   */
+  declare export function number(number): ContextValue;
+  declare export function string(string): ContextValue;
+  declare export function entity(string, mixed): ContextValue;
+
+  /**
+   * GraphQL query.
+   *
+   * TODO: For now it is represented as a string but in the future we might want
+   * to accept some kind of AST for that.
+   */
+  declare export type Query = string;
+
+  /**
+   * DataSet fetched by the workflow engine.
+   */
+  declare export type DataSet = {[name: string]: any};
+
+  /***************************************************************
+   * Action configuration
+   ***************************************************************/
+
+  /**
+   * Primitive actions are presented by this type.
+   *
+   * There are several kinds of primitives actions which can be constructed by
+   * functions below.
+   */
+  declare export opaque type Action<+UI>;
+
+  /**
+   * Interactions are UI screens which expect some UI input.
+   */
   declare type InteractionConfig<UI> = {
     requires: ContextShape,
     provides: ContextShape,
@@ -32,6 +76,10 @@ declare module 'workflow' {
   };
   declare export function interaction<UI>(InteractionConfig<UI>): Action<UI>;
 
+  /**
+   * Guards allow to cut branches of the workflow by checking for some specific
+   * condition.
+   */
   declare type GuardConfig = {
     requires: ContextShape,
     query: Context => Query,
@@ -39,6 +87,9 @@ declare module 'workflow' {
   };
   declare export function guard(GuardConfig): Action<*>;
 
+  /**
+   * Queries allow to update context with some data fetched from the database.
+   */
   declare type QueryConfig = {
     requires: ContextShape,
     provides: ContextShape,
@@ -47,9 +98,40 @@ declare module 'workflow' {
   };
   declare export function query(QueryConfig): Action<*>;
 
+  /***************************************************************
+   * Workflow configuration
+   ***************************************************************/
+
+  /**
+   * Workflow is a composition of primives actions which represent some control
+   * flow.
+   */
+  declare export opaque type Workflow<+UI>;
+
+  /**
+   * Make workflow out of a primitive action.
+   */
   declare export function action<UI>(Action<UI>): Workflow<UI>;
+
+  /**
+   * Sequential composition of actions.
+   *
+   * Actions are being executed one by one.
+   */
   declare export function sequence<UI>(Array<Workflow<UI>>): Workflow<UI>;
+
+  /**
+   * Parallel composition of actions.
+   *
+   * User can proceed with any action of the provided.
+   */
   declare export function choice<UI>(Array<Workflow<UI>>): Workflow<UI>;
+
+  /***************************************************************
+   * Execution API
+   *
+   * This API should be used by implementors of workflow UIs.
+   ***************************************************************/
 
   declare export opaque type Frame<UI>;
 
@@ -79,6 +161,7 @@ declare module 'workflow' {
     config: Config,
     frame: Frame<UI>,
   ): Promise<{info: ?Info<UI>, frame: Frame<UI>}>;
+
   declare export function nextToInteraction<UI>(
     config: Config,
     context: Context,
