@@ -8,35 +8,39 @@ import {Text, ScrollView, View, TouchableOpacity} from 'react-native-web';
 
 type Config = {
   id: string,
-  title: string,
   entityName: string,
   fields: Array<string>,
+  renderTitle?: (Workflow.Context, ?Workflow.DataSet) => React.Element<*>,
 };
 
-export function configure(config: Config) {
+export function configure(config: Config): Workflow.Action<*> {
+  const ui = {
+    renderTitle(context, data) {
+      if (config.renderTitle) {
+        return config.renderTitle(context, data);
+      } else {
+        return <Text>Pick {config.entityName}</Text>;
+      }
+    },
+    render(context, data, onContext) {
+      return (
+        <Component config={config} context={context} data={data} onContext={onContext} />
+      );
+    },
+  };
+  const query = context => {
+    const fields = config.fields.join(', ');
+    return `${config.entityName}__list {${fields}}`;
+  };
+  const queryTitle = _context => null;
   return Workflow.interaction({
     requires: {},
     provides: {
       [config.entityName]: Workflow.entityType(config.entityName),
     },
-    query(context) {
-      const fields = config.fields.join(', ');
-      return `${config.entityName}__list {${fields}}`;
-    },
-    ui: {
-      type: 'View',
-      title: config.title,
-      render(context, data, onContext) {
-        return (
-          <Component
-            config={config}
-            context={context}
-            data={data}
-            onContext={onContext}
-          />
-        );
-      },
-    },
+    query,
+    queryTitle,
+    ui,
   });
 }
 

@@ -7,18 +7,18 @@ import * as W from 'workflow';
 import {View, Button, Text, TouchableOpacity} from 'react-native-web';
 
 function Breadcrumb({
-  ui,
+  current,
   trace,
   onClick,
 }: {
-  ui: UI,
-  trace: Array<{ui: UI, frame: W.Frame<UI>}>,
-  onClick: ({ui: UI, frame: W.Frame<UI>}) => *,
+  current: W.LimitedInfo<UI>,
+  trace: Array<W.LimitedInfo<UI>>,
+  onClick: (W.LimitedInfo<UI>) => *,
 }) {
   const items = [];
   for (const item of trace) {
     const onPress = item.frame != null ? () => onClick(item) : null;
-    items.push({title: item.ui.title, onPress});
+    items.push({title: item.ui.renderTitle(item.context, item.dataTitle), onPress});
   }
 
   const buttons = items.map((item, idx) => {
@@ -32,7 +32,7 @@ function Breadcrumb({
 
   buttons.push(
     <Text key="current" style={{padding: 10, fontWeight: '600'}}>
-      {ui.title}
+      {current.ui.renderTitle(current.context, current.dataTitle)}
     </Text>,
   );
 
@@ -43,13 +43,14 @@ function Next({
   next,
   onClick,
 }: {
-  next: Array<{ui: UI, frame: W.Frame<UI>}>,
-  onClick: ({ui: UI, frame: W.Frame<UI>}) => *,
+  next: Array<W.LimitedInfo<UI>>,
+  onClick: (W.LimitedInfo<UI>) => *,
 }) {
   const items = [];
   for (const item of next) {
     const onPress = item.frame != null ? () => onClick(item) : null;
-    items.push({title: item.ui.title, onPress});
+    const title = item.ui.renderTitle(item.context, item.dataTitle);
+    items.push({title, onPress});
   }
 
   const buttons = items.map((item, idx) => {
@@ -65,12 +66,12 @@ function Next({
 }
 
 export type UI = {
-  title: string,
-  render(
+  +renderTitle: (context: W.Context, data: ?W.DataSet) => React.Element<*>,
+  +render: (
     context: W.Context,
     data: W.DataSet,
     onContext: (W.Context) => *,
-  ): React.Element<*>,
+  ) => React.Element<*>,
 };
 
 type Props = {
@@ -111,8 +112,8 @@ export class Workflow extends React.Component<Props, State> {
     }
   };
 
-  onBreadcrumbClick = async ({ui, frame: nextFrame}: {ui: UI, frame: W.Frame<UI>}) => {
-    const {info, frame} = await W.runToInteraction(this.config, nextFrame);
+  onBreadcrumbClick = async (p: W.LimitedInfo<UI>) => {
+    const {info, frame} = await W.runToInteraction(this.config, p.frame);
     if (info != null) {
       this.setState({info, frame});
     }
@@ -126,7 +127,7 @@ export class Workflow extends React.Component<Props, State> {
   }
 
   render() {
-    const {info} = this.state;
+    const {info, frame} = this.state;
     if (info == null) {
       return (
         <View style={{flex: 1, padding: 10}}>
@@ -134,12 +135,16 @@ export class Workflow extends React.Component<Props, State> {
         </View>
       );
     }
-    const {context, data, ui, prev, next} = info;
-    const title = ui.title;
+    const {context, data, dataTitle, ui, prev, next} = info;
+    const title = ui.renderTitle(context, dataTitle);
     return (
       <View style={{flex: 1}}>
         <View>
-          <Breadcrumb ui={ui} trace={prev} onClick={this.onBreadcrumbClick} />
+          <Breadcrumb
+            current={{ui, dataTitle, context, frame}}
+            trace={prev}
+            onClick={this.onBreadcrumbClick}
+          />
         </View>
         <View>
           <Next next={next} onClick={this.onBreadcrumbClick} />

@@ -21,6 +21,32 @@ type Params = {
   db: Db.Db,
 };
 
+const entityMetaField = {
+  type: new gqlType.GraphQLObjectType({
+    name: '_EntityMeta',
+    fields: {
+      title: {type: new gqlType.GraphQLNonNull(gqlType.GraphQLString)},
+    },
+  }),
+  resolve(data) {
+    const meta = {};
+
+    const FIELDS_AS_TITLE = ['title', 'name', 'code'];
+    for (const name of FIELDS_AS_TITLE) {
+      if (data[name] != null && typeof data[name] != 'object') {
+        meta.title = String(data[name]);
+        break;
+      }
+    }
+
+    if (meta.title == null) {
+      meta.title = String(data.id);
+    }
+
+    return meta;
+  },
+};
+
 export function create(params: Params) {
   function makeLoaderBySingleColumn(table, column) {
     return new DataLoader(async vals => {
@@ -128,8 +154,12 @@ export function create(params: Params) {
         };
         // TODO: add fieldName__list field for sequences
       }
+
+      fields._meta = entityMetaField;
+
       return fields;
     };
+
     return new gql.GraphQLObjectType({name: entity.name, fields});
   }
 

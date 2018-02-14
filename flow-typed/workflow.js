@@ -3,8 +3,8 @@
  */
 
 declare module 'workflow' {
-  declare export opaque type Action<UI>;
-  declare export opaque type Workflow<UI>;
+  declare export opaque type Action<+UI>;
+  declare export opaque type Workflow<+UI>;
 
   declare export opaque type ContextType;
   declare export type ContextShape = {[name: string]: ContextType};
@@ -27,6 +27,7 @@ declare module 'workflow' {
     requires: ContextShape,
     provides: ContextShape,
     query: Context => Query,
+    queryTitle: Context => ?Query,
     ui: UI,
   };
   declare export function interaction<UI>(InteractionConfig<UI>): Action<UI>;
@@ -47,8 +48,8 @@ declare module 'workflow' {
   declare export function query(QueryConfig): Action<*>;
 
   declare export function action<UI>(Action<UI>): Workflow<UI>;
-  declare export function sequence(Array<Workflow<UI>>): Workflow<UI>;
-  declare export function choice(Array<Workflow<UI>>): Workflow<UI>;
+  declare export function sequence<UI>(Array<Workflow<UI>>): Workflow<UI>;
+  declare export function choice<UI>(Array<Workflow<UI>>): Workflow<UI>;
 
   declare export opaque type Frame<UI>;
 
@@ -56,12 +57,20 @@ declare module 'workflow' {
     waitForData: Query => Promise<DataSet>,
   };
 
+  declare export type LimitedInfo<UI> = {
+    context: Context,
+    dataTitle: ?DataSet,
+    ui: UI,
+    frame: Frame<UI>,
+  };
+
   declare export type Info<UI> = {
     context: Context,
-    data: Data,
+    data: DataSet,
+    dataTitle: DataSet,
     ui: UI,
-    prev: Array<{ui: UI, frame: Frame<UI>}>,
-    next: Array<{ui: UI, frame: Frame<UI>}>,
+    prev: Array<LimitedInfo<UI>>,
+    next: Array<LimitedInfo<UI>>,
   };
 
   declare export function init<UI>(Workflow<UI>): Frame<UI>;

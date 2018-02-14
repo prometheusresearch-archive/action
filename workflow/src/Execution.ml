@@ -1,5 +1,11 @@
-module Query = struct
+module Query : sig
   type t
+
+  val ofString : string -> t
+end = struct
+  type t = string
+
+  let ofString query = query
 end
 
 module UI = struct
@@ -129,6 +135,7 @@ module Action = struct
     requires : Context.Shape.t;
     provides : Context.Shape.t;
     query : Context.t -> Query.t;
+    queryTitle : Context.t -> Query.t option;
     ui : UI.t;
   } [@@bs.deriving jsConverter]
 
@@ -304,6 +311,17 @@ module Execution = struct
     | None -> Promise.return DataSet.empty
     | Some query -> config.waitForData query
 
+  let fetchTitle ~config ~context (action : Action.t) =
+    let query action =
+      match action with
+      | Action.Interaction { queryTitle; _ } ->
+        queryTitle context
+      | Action.Query _
+      | Action.Guard _
+      | Action.Mutation _ -> None
+    in match query action with
+    | None -> Promise.return DataSet.empty
+    | Some query -> config.waitForData query
 
   let speculate ~config (currentFrame : Frame.t) =
     let open Promise.Syntax in
@@ -352,7 +370,7 @@ module Execution = struct
 
       | _, Frame.ActionFrame { action = Action.Interaction { requires; ui; _ }; _} ->
         if Context.matches context requires
-        then return [(ui, frame)]
+        then return [(ui, frame, context)]
         else return []
 
       | {Frame. context; _}, Frame.ActionFrame {
@@ -391,8 +409,10 @@ module Execution = struct
         } ->
         if Context.matches context requires
         then
-          let%bind data = fetch ~context ~config action in
-          return (Some (context, data, interaction), frame)
+          let%bind data = fetch ~context ~config action
+          and dataTitle = fetchTitle ~context ~config action
+          in
+          return (Some (context, (data, dataTitle), interaction), frame)
         else bailOf ~prev frame
       | _, Frame.ActionFrame {
           action = Action.Guard { requires; check; _ } as action;
@@ -486,11 +506,15 @@ module JS = struct
   let entityType = Context.ContextType.JS.entity
 
   let interaction params =
+    let queryTitle context =
+      Js.Nullable.to_opt (params##queryTitle context)
+    in
     Action.Interaction {
       Action.
       requires = params##requires;
       provides = params##provides;
       query = params##query;
+      queryTitle;
       ui = params##ui;
     }
 
@@ -526,26 +550,36 @@ module JS = struct
 
   let init = Execution.init
 
-  let trace currentFrame =
+  let trace ~config currentFrame =
+    let open Promise.Syntax in
     let rec collectPrevFrames acc frame =
       match frame with
-      | _, Frame.ActionFrame { prev = Some (Action.Interaction {ui;_}, prevFrame); _ } ->
-        let r = [%bs.obj { ui; frame = prevFrame }] in
+      | _, Frame.ActionFrame { prev = Some (Action.Interaction {ui;_} as action, prevFrame); _ } ->
+        let context = Frame.context prevFrame in
+        let%bind dataTitle = Execution.fetchTitle ~config ~context action in
+        let r = [%bs.obj {
+          ui;
+          frame = prevFrame;
+          context;
+          dataTitle;
+        }] in
         collectPrevFrames (r::acc) prevFrame
       | { Frame. parent = Some parentFrame }, _ ->
         collectPrevFrames acc parentFrame
-      | _ -> acc
+      | _ -> return acc
     in
-    currentFrame
-    |> collectPrevFrames []
-    |> Array.of_list
+    let%bind trace = collectPrevFrames [] currentFrame in
+    return (Array.of_list trace)
 
   let next ~config currentFrame =
     let open Promise.Syntax in
     let%bind items = Execution.speculate ~config currentFrame in
     return (
       items
-      |> List.map (fun (ui, frame) -> [%bs.obj {ui; frame}])
+      |> List.map (fun (ui, frame, context) -> [%bs.obj {
+          ui; frame; context;
+          dataTitle = Js.Nullable.null
+        }])
       |> Array.of_list
     )
 
@@ -553,13 +587,16 @@ module JS = struct
     let open Promise.Syntax in
     let config = { Execution. waitForData = config##waitForData } in
     match%bind Execution.run ~config ~action:`This currentFrame with
-    | Some (context, data, interaction), frame ->
-      let%bind next = next ~config frame in
+    | Some (context, (data, dataTitle), interaction), frame ->
+      let%bind next = next ~config frame
+      and prev = trace ~config frame
+      in
       let info = (Js.Nullable.return [%bs.obj {
         context;
         data;
+        dataTitle;
         ui = interaction.ui;
-        prev = trace frame;
+        prev;
         next;
       }]) in
       return [%bs.obj {frame; info}]
@@ -570,13 +607,16 @@ module JS = struct
     let open Promise.Syntax in
     let config = { Execution. waitForData = config##waitForData } in
     match%bind Execution.run ~config ~action:(`Next context) currentFrame with
-    | Some (context, data, interaction), frame ->
-      let%bind next = next ~config frame in
+    | Some (context, (data, dataTitle), interaction), frame ->
+      let%bind next = next ~config frame
+      and prev = trace ~config frame
+      in
       let info = Js.Nullable.return [%bs.obj {
         context;
         data;
+        dataTitle;
         ui = interaction.ui;
-        prev = trace frame;
+        prev;
         next;
       }] in
       return [%bs.obj {frame; info}]

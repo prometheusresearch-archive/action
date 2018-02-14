@@ -5,85 +5,52 @@
 import './App.css';
 
 import React, {Component} from 'react';
-import {View} from 'react-native-web';
+import {View, Text} from 'react-native-web';
 import {Workflow as WorkflowUI} from './Workflow.js';
-import * as Pick from './Pick.js';
+import * as PickAction from './Pick.js';
+import * as ViewAction from './View.js';
 import * as Workflow from 'workflow';
 
 type State = {
   data: mixed,
 };
-const pickIndividual = Pick.configure({
+
+const individual = Workflow.entityType('individual');
+const site = Workflow.entityType('site');
+
+const pickIndividual = PickAction.configure({
   id: 'pickIndividual',
   title: 'Pick Individual',
   entityName: 'individual',
   fields: ['id', 'code', 'sex'],
 });
 
-const viewMale = Workflow.interaction({
-  requires: {
-    individual: Workflow.entityType('individual'),
-  },
-  provides: {},
-  query(context) {
-    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
-  },
-  ui: {
-    id: 'viewMale',
-    title: 'View Male',
-
-    render(context, data, onContext) {
-      return (
-        <div>
-          <pre>{JSON.stringify(data.individual, null, 2)}</pre>
-        </div>
-      );
-    },
-  },
+const viewMale = ViewAction.configure({
+  entityName: 'individual',
+  id: 'viewMale',
+  renderTitle: () => <Text>View Male</Text>,
+  fields: ['id', 'code', 'sex'],
 });
 
-const viewFemale = Workflow.interaction({
-  requires: {
-    individual: Workflow.entityType('individual'),
-  },
-  provides: {},
-  query(context) {
-    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
-  },
-  ui: {
-    id: 'viewFemale',
-    title: 'View Female',
-
-    render(context, data, onContext) {
-      return (
-        <div>
-          <pre>{JSON.stringify(data.individual, null, 2)}</pre>
-        </div>
-      );
-    },
-  },
+const viewFemale = ViewAction.configure({
+  entityName: 'individual',
+  id: 'viewFemale',
+  renderTitle: () => <Text>View Female</Text>,
+  fields: ['id', 'code', 'sex'],
 });
 
-const viewIndividual = Workflow.interaction({
-  requires: {
-    individual: Workflow.entityType('individual'),
-  },
-  provides: {},
-  query(context) {
-    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
-  },
-  ui: {
-    id: 'viewIndividual',
-    title: 'View Individual',
+const viewIndividual = ViewAction.configure({
+  entityName: 'individual',
+  id: 'viewIndividual',
+  title: 'View Individual',
+  fields: ['id', 'code', 'sex'],
+});
 
-    render(context, data, onContext) {
-      return (
-        <div>
-          <pre>{JSON.stringify(data.individual, null, 2)}</pre>
-        </div>
-      );
-    },
-  },
+const viewSite = ViewAction.configure({
+  entityName: 'site',
+  id: 'viewSite',
+  title: 'View Site',
+  fields: ['id', 'code', 'title'],
 });
 
 const ifMale = Workflow.guard({
@@ -101,9 +68,7 @@ const ifMale = Workflow.guard({
 });
 
 const ifFemale = Workflow.guard({
-  requires: {
-    individual: Workflow.entityType('individual'),
-  },
+  requires: {individual},
 
   query(context) {
     return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
@@ -115,13 +80,8 @@ const ifFemale = Workflow.guard({
 });
 
 const querySiteForIndividual = Workflow.query({
-  requires: {
-    individual: Workflow.entityType('individual'),
-  },
-
-  provides: {
-    site: Workflow.entityType('site'),
-  },
+  requires: {individual},
+  provides: {site},
 
   query(context) {
     return `individual(id: ${context.individual.value.id}) {site{id}}`;
@@ -133,42 +93,23 @@ const querySiteForIndividual = Workflow.query({
   },
 });
 
-const viewSite = Workflow.interaction({
-  requires: {
-    site: Workflow.entityType('site'),
-  },
-
-  provides: {},
-
-  query(context) {
-    console.log(context);
-    return `site(id: ${context.site.value.id}) {code,title}`;
-  },
-
-  ui: {
-    title: 'View Site',
-    render(context, data, onContext) {
-      return (
-        <div>
-          <pre>{JSON.stringify(data.site, null, 2)}</pre>
-        </div>
-      );
-    },
-  },
-});
-
-const workflow = Workflow.sequence([
-  Workflow.action(pickIndividual),
-  Workflow.choice([
-    Workflow.sequence([Workflow.action(ifMale), Workflow.action(viewMale)]),
-    Workflow.sequence([Workflow.action(ifFemale), Workflow.action(viewFemale)]),
-    Workflow.sequence([
-      Workflow.action(viewIndividual),
-      Workflow.action(querySiteForIndividual),
-      Workflow.action(viewSite),
+function createWorkflow() {
+  const {sequence, choice, action} = Workflow;
+  return sequence([
+    action(pickIndividual),
+    choice([
+      sequence([
+        action(viewIndividual),
+        action(querySiteForIndividual),
+        action(viewSite),
+      ]),
+      sequence([action(ifMale), action(viewMale)]),
+      sequence([action(ifFemale), action(viewFemale)]),
     ]),
-  ]),
-]);
+  ]);
+}
+
+const workflow = createWorkflow();
 
 export default class App extends Component<{}, State> {
   render() {
