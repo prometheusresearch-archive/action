@@ -52,7 +52,8 @@ declare module 'workflow' {
     context: Context,
     data: Data,
     ui: UI,
-    trace: Array<{ui: UI, frame: Frame<UI>}>,
+    prev: Array<{ui: UI, frame: Frame<UI>}>,
+    next: Array<{ui: UI, frame: Frame<UI>}>,
   };
 
   declare export function init<UI>(Workflow<UI>): Frame<UI>;
@@ -66,6 +67,4 @@ declare module 'workflow' {
     context: Context,
     frame: Frame<UI>,
   ): Promise<{info: ?Info<UI>, frame: Frame<UI>}>;
-
-  declare export function trace<UI>(Frame<UI>): Array<{ui: UI, frame: Frame<UI>}>;
 }

@@ -39,20 +39,30 @@ function Breadcrumb({
   return <View style={{flexDirection: 'row'}}>{buttons}</View>;
 }
 
-// function Next({frames, onFrame}: {frames: Array<WE.Frame>, onFrame: WE.Frame => *}) {
-//   const items = [];
-//   for (const c of frames) {
-//     if (c.action.type === 'View') {
-//       const onClick = () => onFrame(c);
-//       items.push(
-//         <div key={c.action.id} onClick={onClick}>
-//           {c.action.id}
-//         </div>,
-//       );
-//     }
-//   }
-//   return <div>{items}</div>;
-// }
+function Next({
+  next,
+  onClick,
+}: {
+  next: Array<{ui: UI, frame: W.Frame<UI>}>,
+  onClick: ({ui: UI, frame: W.Frame<UI>}) => *,
+}) {
+  const items = [];
+  for (const item of next) {
+    const onPress = item.frame != null ? () => onClick(item) : null;
+    items.push({title: item.ui.title, onPress});
+  }
+
+  const buttons = items.map((item, idx) => {
+    const style = {padding: 10, fontWeight: '200'};
+    return (
+      <TouchableOpacity key={idx} onPress={item.onPress}>
+        <Text style={style}>{item.title}</Text>
+      </TouchableOpacity>
+    );
+  });
+
+  return <View style={{flexDirection: 'row'}}>{buttons}</View>;
+}
 
 export type UI = {
   title: string,
@@ -102,7 +112,6 @@ export class Workflow extends React.Component<Props, State> {
   };
 
   onBreadcrumbClick = async ({ui, frame: nextFrame}: {ui: UI, frame: W.Frame<UI>}) => {
-    console.log('onBreadcrumbClick', ui, nextFrame);
     const {info, frame} = await W.runToInteraction(this.config, nextFrame);
     if (info != null) {
       this.setState({info, frame});
@@ -125,13 +134,15 @@ export class Workflow extends React.Component<Props, State> {
         </View>
       );
     }
-    console.log('INFO', info);
-    const {context, data, ui, trace} = info;
+    const {context, data, ui, prev, next} = info;
     const title = ui.title;
     return (
       <View style={{flex: 1}}>
         <View>
-          <Breadcrumb ui={ui} trace={trace} onClick={this.onBreadcrumbClick} />
+          <Breadcrumb ui={ui} trace={prev} onClick={this.onBreadcrumbClick} />
+        </View>
+        <View>
+          <Next next={next} onClick={this.onBreadcrumbClick} />
         </View>
         <View style={{padding: 10, flex: 1}}>
           <View style={{paddingBottom: 10}}>

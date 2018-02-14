@@ -13,7 +13,6 @@ import * as Workflow from 'workflow';
 type State = {
   data: mixed,
 };
-
 const pickIndividual = Pick.configure({
   id: 'pickIndividual',
   title: 'Pick Individual',
@@ -30,7 +29,6 @@ const viewMale = Workflow.interaction({
     return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
   },
   ui: {
-    type: 'View',
     id: 'viewMale',
     title: 'View Male',
 
@@ -53,9 +51,30 @@ const viewFemale = Workflow.interaction({
     return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
   },
   ui: {
-    type: 'View',
     id: 'viewFemale',
     title: 'View Female',
+
+    render(context, data, onContext) {
+      return (
+        <div>
+          <pre>{JSON.stringify(data.individual, null, 2)}</pre>
+        </div>
+      );
+    },
+  },
+});
+
+const viewIndividual = Workflow.interaction({
+  requires: {
+    individual: Workflow.entityType('individual'),
+  },
+  provides: {},
+  query(context) {
+    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
+  },
+  ui: {
+    id: 'viewIndividual',
+    title: 'View Individual',
 
     render(context, data, onContext) {
       return (
@@ -81,11 +100,26 @@ const ifMale = Workflow.guard({
   },
 });
 
+const ifFemale = Workflow.guard({
+  requires: {
+    individual: Workflow.entityType('individual'),
+  },
+
+  query(context) {
+    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
+  },
+
+  check(context, data) {
+    return data.individual.sex === 'female';
+  },
+});
+
 const workflow = Workflow.sequence([
   Workflow.action(pickIndividual),
   Workflow.choice([
     Workflow.sequence([Workflow.action(ifMale), Workflow.action(viewMale)]),
-    Workflow.action(viewFemale),
+    Workflow.sequence([Workflow.action(ifFemale), Workflow.action(viewFemale)]),
+    Workflow.action(viewIndividual),
   ]),
 ]);
 

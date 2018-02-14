@@ -161,11 +161,11 @@ module Action = struct
     | Interaction v ->
       js [%bs.obj {action = "Interaction"; interaction = js (interactionToJs v)}]
     | Query v ->
-      js [%bs.obj {action = "Interaction"; query = js (queryToJs v)}]
+      js [%bs.obj {action = "Query"; query = js (queryToJs v)}]
     | Mutation v ->
-      js [%bs.obj {action = "Interaction"; mutation = js (mutationToJs v)}]
+      js [%bs.obj {action = "Mutation"; mutation = js (mutationToJs v)}]
     | Guard v ->
-      js [%bs.obj {action = "Interaction"; guard = js (guardToJs v)}]
+      js [%bs.obj {action = "Guard"; guard = js (guardToJs v)}]
 
 end
 
@@ -291,13 +291,12 @@ module Execution = struct
   let init workflow =
     Frame.make workflow
 
-  let fetch (action : Action.t) (frame : Frame.t) (config : config) =
+  let fetch ~config ~context (action : Action.t) =
     let query action =
       match action with
       | Action.Interaction { query; _ }
       | Action.Query { query; _ }
       | Action.Guard { query; _ } ->
-        let context = Frame.context frame in
         Some (query context)
       | Action.Mutation _ -> None
     in match query action with
@@ -305,27 +304,31 @@ module Execution = struct
     | Some query -> config.waitForData query
 
 
-  (*
-  let speculate (exec : t) =
+  let speculate ~config (currentFrame : Frame.t) =
     let open Promise.Syntax in
-    let {frame; _} = exec in
 
-    let rec aux frame =
+    let prev = match currentFrame with
+    | (_,Frame.ActionFrame { action; _ }) -> Some (action, currentFrame)
+    | (_,Frame.SequenceFrame _)
+    | (_,Frame.ChoiceFrame _) -> None
+    in
+
+    let rec speculateToInteraction frame =
+      let context = Frame.context frame in
       match frame with
-
       | _, Frame.SequenceFrame [] ->
         return []
       | _, Frame.SequenceFrame (action::_rest) ->
-        let frame = Frame.make ~parent:frame action in
-        aux frame
+        let frame = Frame.make ?prev ~context ~parent:frame action in
+        speculateToInteraction frame
 
       | _, Frame.ChoiceFrame [] ->
         return []
       | _, Frame.ChoiceFrame actions ->
         let%bind results =
           let f action =
-            let frame = Frame.make ~parent:frame action in
-            aux frame
+            let frame = Frame.make ?prev ~context ~parent:frame action in
+            speculateToInteraction frame
           in
           Promise.all (ListLabels.map ~f actions)
         in
@@ -335,9 +338,9 @@ module Execution = struct
 
       | _, Frame.ActionFrame { action = Action.Query _; _ } -> failwith "Query is not implemented"
 
-      | {Frame. context; _}, Frame.ActionFrame { action = Action.Interaction { requires; _ }; _} ->
+      | _, Frame.ActionFrame { action = Action.Interaction { requires; ui; _ }; _} ->
         if Context.matches context requires
-        then return [frame]
+        then return [(ui, frame)]
         else return []
 
       | {Frame. context; _}, Frame.ActionFrame {
@@ -345,7 +348,7 @@ module Execution = struct
         } ->
         if Context.matches context requires
         then (
-          let%bind data = fetch action frame exec in
+          let%bind data = fetch ~context ~config action in
           let allowed = check context data in
           if allowed
           then nextOf frame
@@ -353,12 +356,11 @@ module Execution = struct
         )
         else return []
 
-    and nextOf frame = match nextInSequence frame with
+    and nextOf frame = match Frame.nextInSequence frame with
     | None -> return []
-    | Some frame -> aux frame
+    | Some frame -> speculateToInteraction frame
 
-    in nextOf frame
-  *)
+    in nextOf currentFrame
 
   let run ~action ~config (currentFrame : Frame.t) =
     let open Promise.Syntax in
@@ -377,7 +379,7 @@ module Execution = struct
         } ->
         if Context.matches context requires
         then
-          let%bind data = fetch action frame config in
+          let%bind data = fetch ~context ~config action in
           return (Some (context, data, interaction), frame)
         else bailOf ~prev frame
       | _, Frame.ActionFrame {
@@ -386,7 +388,7 @@ module Execution = struct
         } ->
         if Context.matches context requires
         then (
-          let%bind data = fetch action frame config in
+          let%bind data = fetch ~context ~config action in
           let allowed = check context data in
           if allowed
           then nextOf ~prev frame
@@ -415,18 +417,21 @@ module Execution = struct
 
     in
 
+    let frame = match action with
+      | `This -> currentFrame
+      | `Next context->
+        Frame.updateContext context currentFrame
+    in
+
     let prev = match currentFrame with
-    | (_,Frame.ActionFrame { action; _ }) -> Some (action, currentFrame)
+    | (_,Frame.ActionFrame { action; _ }) -> Some (action, frame)
     | (_,Frame.SequenceFrame _)
     | (_,Frame.ChoiceFrame _) -> None
     in
 
     let frame = match action with
-      | `This -> Some currentFrame
-      | `Next context->
-        currentFrame
-        |> Frame.updateContext context
-        |> Frame.nextInSequence
+      | `This -> Some frame
+      | `Next _ -> Frame.nextInSequence frame
     in
 
     match frame with
@@ -501,16 +506,27 @@ module JS = struct
     |> List.rev
     |> Array.of_list
 
+  let next ~config currentFrame =
+    let open Promise.Syntax in
+    let%bind items = Execution.speculate ~config currentFrame in
+    return (
+      items
+      |> List.map (fun (ui, frame) -> [%bs.obj {ui; frame}])
+      |> Array.of_list
+    )
+
   let runToInteraction config currentFrame =
     let open Promise.Syntax in
     let config = { Execution. waitForData = config##waitForData } in
     match%bind Execution.run ~config ~action:`This currentFrame with
     | Some (context, data, interaction), frame ->
+      let%bind next = next ~config frame in
       let info = (Js.Nullable.return [%bs.obj {
         context;
         data;
         ui = interaction.ui;
-        trace = trace frame;
+        prev = trace frame;
+        next;
       }]) in
       return [%bs.obj {frame; info}]
     | None, frame ->
@@ -521,11 +537,13 @@ module JS = struct
     let config = { Execution. waitForData = config##waitForData } in
     match%bind Execution.run ~config ~action:(`Next context) currentFrame with
     | Some (context, data, interaction), frame ->
+      let%bind next = next ~config frame in
       let info = Js.Nullable.return [%bs.obj {
         context;
         data;
         ui = interaction.ui;
-        trace = trace frame;
+        prev = trace frame;
+        next;
       }] in
       return [%bs.obj {frame; info}]
     | None, frame ->

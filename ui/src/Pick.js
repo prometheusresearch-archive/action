@@ -58,7 +58,7 @@ function Component(props: Props) {
     };
     const isSelected =
       props.context[props.config.entityName] != null &&
-      props.context[props.config.entityName].id === row.id;
+      props.context[props.config.entityName].value.id === row.id;
     const style = isSelected ? {fontWeight: '600'} : {fontWeight: '200'};
     return (
       <TouchableOpacity key={row.code} onPress={onPress(row.id)}>
