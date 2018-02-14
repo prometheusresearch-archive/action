@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import type {Action} from 'api/Workflow';
+import * as Workflow from 'workflow';
 import {Text, ScrollView, View, TouchableOpacity} from 'react-native-web';
 
 type Config = {
@@ -14,41 +14,47 @@ type Config = {
 };
 
 export function configure(config: Config) {
-  const action: Action = {
-    type: 'View',
-    id: config.id,
-    title: config.title,
-
+  return Workflow.interaction({
     requires: {},
     provides: {
-      row: {type: 'EntityType', name: config.entityName, fields: {}},
+      individual: Workflow.entityType('individual'),
     },
-
     query(context) {
       const fields = config.fields.join(', ');
       return `${config.entityName}__list {${fields}}`;
     },
-
-    render(context, data, onContext) {
-      return (
-        <Component config={config} context={context} data={data} onContext={onContext} />
-      );
+    ui: {
+      type: 'View',
+      title: config.title,
+      render(context, data, onContext) {
+        return (
+          <Component
+            config={config}
+            context={context}
+            data={data}
+            onContext={onContext}
+          />
+        );
+      },
     },
-  };
-  return action;
+  });
 }
 
 type Props = {
-  data: any,
-  context: any,
-  onContext: Function,
+  data: Workflow.DataSet,
+  context: Workflow.Context,
+  onContext: Workflow.Context => *,
   config: Config,
 };
 
 function Component(props: Props) {
   const items = props.data[`${props.config.entityName}__list`].map(row => {
     const onPress = id => () => {
-      props.onContext({[props.config.entityName]: {id, __type: props.config.entityName}});
+      const nextContext = {
+        ...props.context,
+        [props.config.entityName]: Workflow.entity('individual', {id}),
+      };
+      props.onContext(nextContext);
     };
     const isSelected =
       props.context[props.config.entityName] != null &&

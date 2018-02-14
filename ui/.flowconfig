@@ -2,6 +2,7 @@
 
 [include]
 ../node_modules/**/*
+../api
 
 [libs]
 ../flow-typed

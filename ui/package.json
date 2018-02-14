@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "api": "*",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
     "react-native-web": "^0.4.0",

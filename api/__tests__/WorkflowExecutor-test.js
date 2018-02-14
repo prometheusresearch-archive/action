@@ -1,5 +1,5 @@
 /**
- * @flow
+ * @noflow
  */
 
 import * as React from 'react';
