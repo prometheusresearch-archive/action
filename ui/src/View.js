@@ -13,11 +13,10 @@ type Config = {
   renderTitle?: (Workflow.Context, ?Workflow.DataSet) => React.Element<*>,
 };
 
-export function configure(config: Config): Workflow.Action<*> {
+export function configure(config: Config): Workflow.Workflow<*> {
   const ui = {
     id: config.id,
     renderTitle(context, data) {
-      console.log(context, data);
       if (config.renderTitle) {
         return config.renderTitle(context, data);
       } else if (data != null) {

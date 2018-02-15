@@ -94,17 +94,13 @@ const querySiteForIndividual = Workflow.query({
 });
 
 function createWorkflow() {
-  const {sequence, choice, action} = Workflow;
+  const {sequence, choice} = Workflow;
   return sequence([
-    action(pickIndividual),
+    pickIndividual,
     choice([
-      sequence([
-        action(viewIndividual),
-        action(querySiteForIndividual),
-        action(viewSite),
-      ]),
-      sequence([action(ifMale), action(viewMale)]),
-      sequence([action(ifFemale), action(viewFemale)]),
+      sequence([viewIndividual, querySiteForIndividual, viewSite]),
+      sequence([ifMale, viewMale]),
+      sequence([ifFemale, viewFemale]),
     ]),
   ]);
 }

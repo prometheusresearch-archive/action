@@ -53,16 +53,14 @@ declare module 'workflow' {
   declare export type DataSet = {[name: string]: any};
 
   /***************************************************************
-   * Action configuration
+   * Workflow configuration
    ***************************************************************/
 
   /**
-   * Primitive actions are presented by this type.
-   *
-   * There are several kinds of primitives actions which can be constructed by
-   * functions below.
+   * Workflow is a composition of actions which represents some control
+   * flow.
    */
-  declare export opaque type Action<+UI>;
+  declare export opaque type Workflow<+UI>;
 
   /**
    * Interactions are UI screens which expect some UI input.
@@ -80,7 +78,7 @@ declare module 'workflow' {
     queryTitle: Context => ?Query,
     ui: UI,
   };
-  declare export function interaction<UI>(InteractionConfig<UI>): Action<UI>;
+  declare export function interaction<UI>(InteractionConfig<UI>): Workflow<UI>;
 
   /**
    * Guards allow to cut branches of the workflow by checking for some specific
@@ -91,7 +89,7 @@ declare module 'workflow' {
     query: Context => Query,
     check: (Context, DataSet) => boolean,
   };
-  declare export function guard(GuardConfig): Action<*>;
+  declare export function guard(GuardConfig): Workflow<*>;
 
   /**
    * Queries allow to update context with some data fetched from the database.
@@ -102,22 +100,7 @@ declare module 'workflow' {
     query: Context => Query,
     update: (Context, DataSet) => Context,
   };
-  declare export function query(QueryConfig): Action<*>;
-
-  /***************************************************************
-   * Workflow configuration
-   ***************************************************************/
-
-  /**
-   * Workflow is a composition of primives actions which represent some control
-   * flow.
-   */
-  declare export opaque type Workflow<+UI>;
-
-  /**
-   * Make workflow out of a primitive action.
-   */
-  declare export function action<UI>(Action<UI>): Workflow<UI>;
+  declare export function query(QueryConfig): Workflow<*>;
 
   /**
    * Sequential composition of actions.
@@ -145,32 +128,26 @@ declare module 'workflow' {
     waitForData: Query => Promise<DataSet>,
   };
 
-  declare export type LimitedInfo<UI> = {
-    context: Context,
+  declare export type Interaction<UI> = {
     ui: UI,
-    frame: Frame<UI>,
+    context: Context,
+    data: ?DataSet,
     dataTitle: ?DataSet,
+    frame: Frame<UI>,
+    prev: Array<Interaction<UI>>,
+    next: ?Array<Interaction<UI>>,
+    alternatives: ?Array<Interaction<UI>>,
   };
-
-  declare export type Info<UI> = {
-    context: Context,
-    data: DataSet,
-    dataTitle: DataSet,
-    ui: UI,
-    prev: Array<LimitedInfo<UI>>,
-    next: Array<LimitedInfo<UI>>,
-  };
-
   declare export function init<UI>(Workflow<UI>): Frame<UI>;
 
   declare export function runToInteraction<UI>(
     config: Config,
     frame: Frame<UI>,
-  ): Promise<{info: ?Info<UI>, frame: Frame<UI>}>;
+  ): Promise<{interaction: ?Interaction<UI>, frame: Frame<UI>}>;
 
   declare export function nextToInteraction<UI>(
     config: Config,
     context: Context,
     frame: Frame<UI>,
-  ): Promise<{info: ?Info<UI>, frame: Frame<UI>}>;
+  ): Promise<{interaction: ?Interaction<UI>, frame: Frame<UI>}>;
 }
