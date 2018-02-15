@@ -68,8 +68,14 @@ declare module 'workflow' {
    * Interactions are UI screens which expect some UI input.
    */
   declare type InteractionConfig<UI> = {
+    /**
+     * What's required from context. If those requirements are not satisifed
+     * then the action won't be run.
+     */
     requires: ContextShape,
+
     provides: ContextShape,
+
     query: Context => Query,
     queryTitle: Context => ?Query,
     ui: UI,
@@ -141,9 +147,9 @@ declare module 'workflow' {
 
   declare export type LimitedInfo<UI> = {
     context: Context,
-    dataTitle: ?DataSet,
     ui: UI,
     frame: Frame<UI>,
+    dataTitle: ?DataSet,
   };
 
   declare export type Info<UI> = {
