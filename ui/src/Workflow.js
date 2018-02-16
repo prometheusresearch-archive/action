@@ -95,16 +95,16 @@ export class Workflow extends React.Component<Props, State> {
               />
             </View>
           )}
-        {next != null &&
-          next.length > 0 && (
-            <View>
-              <NextToolbar next={next} onClick={this.onBreadcrumbClick} />
-            </View>
-          )}
         <View style={{padding: 10, flex: 1}}>
           <View style={{paddingBottom: 10}}>
             <Text style={{fontWeight: '600', fontSize: 18}}>{title}</Text>
           </View>
+          {next != null &&
+            next.length > 0 && (
+              <View>
+                <NextToolbar next={next} onClick={this.onBreadcrumbClick} />
+              </View>
+            )}
           <View style={{flex: 1}}>{ui.render(context, data, this.onContext)}</View>
         </View>
       </View>

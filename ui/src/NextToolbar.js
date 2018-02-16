@@ -31,9 +31,6 @@ export function NextToolbar({
 
   return (
     <View style={{flexDirection: 'row', padding: 10}}>
-      <View>
-        <Text>Next: </Text>
-      </View>
       <View style={{flexDirection: 'row'}}>{buttons}</View>
     </View>
   );
