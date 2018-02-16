@@ -16,3 +16,12 @@ Composable workflows for relational data.
 - `workflow`
 
   Workflow execution engine decoupled from the UI.
+
+## Development
+
+```
+% make bootstrap
+% make -C workflow build
+% make ui/serve-dev
+% make api/serve-dev
+```

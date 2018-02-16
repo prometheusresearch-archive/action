@@ -2,6 +2,7 @@ bootstrap:
 	@esy install
 	@esy build
 	@$(MAKE) ppx_let
+	@$(MAKE) build
 
 ppx_let:
 	ln -s $$(esy ocamlfind query ppx_let)/ppx $(@)
