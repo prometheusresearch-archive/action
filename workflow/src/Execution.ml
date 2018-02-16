@@ -220,22 +220,23 @@ end
 
 module Frame = struct
 
-  type t = (info * pos)
+  type t = (frameInfo * frameKind)
 
-  and pos =
+  and frameKind =
     | SequenceFrame of Node.t list
     | ChoiceFrame of Node.t list
     | InteractionFrame of interactionInfo
     | ProcessFrame of Process.t
+    | RootFrame of Node.t
 
   and interactionInfo = {
     interaction : Interaction.t;
     data : DataSet.t option;
     dataTitle : DataSet.t option;
-    prev : (interactionInfo * t) option;
   }
 
-  and info = {
+  and frameInfo = {
+    prev : (interactionInfo option * t) option;
     parent : t option;
     context : Context.t;
   }
@@ -246,7 +247,7 @@ module Frame = struct
       ?(context=Context.empty)
       (node : Node.t)
     =
-    let info = {parent; context} in
+      let info = {prev; parent; context} in
     let frame = lazy (match node with
       | Node.Sequence actions ->
         info, SequenceFrame actions
@@ -259,7 +260,6 @@ module Frame = struct
           interaction;
           data = None;
           dataTitle = None;
-          prev;
         }
     ) in Lazy.force frame
 
@@ -296,27 +296,23 @@ module Frame = struct
       None
 
   let rec inspectInteractionFrame v =
-    let interactionFrameAndFrameToJs (info, frame) =
-      [%bs.obj {
-        frame = inspect frame;
-        info = inspectInteractionFrame info;
-      }]
-    in
     [%bs.obj {
       interaction = Interaction.inspect v.interaction;
       data = Inspect.option Inspect.make v.data;
-      prev = Inspect.option interactionFrameAndFrameToJs v.prev;
     }]
 
-  and inspectInfo v =
-    let parent = match v.parent with
-    | Some parent ->
-      Js.Nullable.return (inspect parent)
-    | None -> Js.Nullable.null
+  and inspectFrameInfo v =
+    let prev (info, frame) =
+      [%bs.obj {
+        interaction = Inspect.option inspectInteractionFrame info;
+        frame = inspect frame;
+      }]
     in
-    [%bs.obj {parent}]
+    let parent = Inspect.option inspect v.parent in
+    let prev = Inspect.option prev v.prev in
+    [%bs.obj {parent; prev}]
 
-  and inspectPos = function
+  and inspectFrameKind = function
   | SequenceFrame v ->
     let v = Inspect.(list Node.inspect v) in
     Inspect.make [%bs.obj {frame = "SequenceFrame"; sequence = Inspect.make v }]
@@ -327,9 +323,11 @@ module Frame = struct
     Inspect.make [%bs.obj {frame = "ProcessFrame"; action = Inspect.make (Process.inspect v) }]
   | InteractionFrame v ->
     Inspect.make [%bs.obj {frame = "InteractionFrame"; action = Inspect.make (inspectInteractionFrame v) }]
+  | RootFrame v ->
+    Inspect.make [%bs.obj {frame = "RootFrame"; start = Inspect.make (Node.inspect v) }]
 
   and inspect (info, pos) =
-    [%bs.obj {info = inspectInfo info; pos = inspectPos pos}]
+    [%bs.obj {info = inspectFrameInfo info; pos = inspectFrameKind pos}]
 
 end
 
@@ -340,11 +338,13 @@ module Execution = struct
   }
 
   let init workflow =
-    Frame.make workflow
+    let info = {Frame. context = Context.empty; parent = None; prev = None} in
+    info, Frame.RootFrame workflow
 
   let fetchFrameData ~config (frame : Frame.t) =
     let query = match frame with
       | _, Frame.SequenceFrame _
+      | _, Frame.RootFrame _
       | _, Frame.ChoiceFrame _ -> None
       | _, Frame.InteractionFrame { interaction = { query; _ }; }
       | _, Frame.ProcessFrame (Process.Query { query; _ })
@@ -362,25 +362,30 @@ module Execution = struct
     | None -> Promise.return DataSet.empty
     | Some query -> config.waitForData query
 
-  let interactionPointerOfFrame frame =
+  let asPrevFrameInfo frame =
     match frame with
-    | _, Frame.InteractionFrame info -> Some (info, frame)
+    | _, Frame.InteractionFrame info -> Some (Some info, frame)
     | _, Frame.ProcessFrame _
     | _, Frame.SequenceFrame _
-    | _, Frame.ChoiceFrame _ -> None
+    | _, Frame.RootFrame _
+    | _, Frame.ChoiceFrame _ -> Some (None, frame)
 
   let next ~config (currentFrame : Frame.t) =
     let open Promise.Syntax in
 
-    let prev = interactionPointerOfFrame currentFrame in
+    let prev = asPrevFrameInfo currentFrame in
 
     let rec speculateToInteraction frame =
       let context = Frame.context frame in
       match frame with
+      | _, Frame.RootFrame node ->
+        let frame = Frame.make ?prev ~context ~parent:frame node in
+        speculateToInteraction frame
+
       | _, Frame.SequenceFrame [] ->
         return []
-      | _, Frame.SequenceFrame (action::_rest) ->
-        let frame = Frame.make ?prev ~context ~parent:frame action in
+      | _, Frame.SequenceFrame (node::_rest) ->
+        let frame = Frame.make ?prev ~context ~parent:frame node in
         speculateToInteraction frame
 
       | _, Frame.ChoiceFrame [] ->
@@ -426,32 +431,55 @@ module Execution = struct
     and nextOf frame = match Frame.nextInSequence frame with
     | None -> return []
     | Some frame -> speculateToInteraction frame
-
-    in nextOf currentFrame
-
-  let alternatives ~config (currentFrame : Frame.t) =
-    match interactionPointerOfFrame currentFrame with
-    | Some ({ prev = Some (_, prevFrame) }, _frame) -> next ~config prevFrame
-    | _ -> Promise.return []
-
-  let run ~action ~config (currentFrame : Frame.t) =
-    let open Promise.Syntax in
-
-    let frame = match action with
-      | `This -> currentFrame
-      | `Next context -> Frame.updateContext context currentFrame
     in
 
-    let prev = interactionPointerOfFrame frame in
+    match currentFrame with
+    | (_,Frame.SequenceFrame _)
+    | (_,Frame.ChoiceFrame _)
+    | (_,Frame.InteractionFrame _)
+    | (_,Frame.ProcessFrame _) -> nextOf currentFrame
+    | (_,Frame.RootFrame _) -> speculateToInteraction currentFrame
 
-    let frame = match action with
-      | `This -> Some frame
-      | `Next _ -> Frame.nextInSequence frame
+  let rec alternatives ~config (currentFrame : Frame.t) =
+    Js.log (Frame.inspect currentFrame);
+    match currentFrame with
+    | {prev = Some (Some _, prevWithInteractionFrame); _}, _ ->
+      Js.log "next";
+      next ~config prevWithInteractionFrame
+    | {prev = Some (None, frame); _}, _ ->
+      Js.log "siblings";
+      Js.log (Frame.inspect frame);
+      next ~config frame
+    | {prev = None; _}, _ ->
+      Js.log "none";
+      Promise.return []
+
+  let run ?context ~config (currentFrame : Frame.t) =
+    let open Promise.Syntax in
+
+    let frame = match context with
+      | None -> currentFrame
+      | Some context -> Frame.updateContext context currentFrame
+    in
+
+    let prev = asPrevFrameInfo frame in
+
+    let frame = match context with
+    | None -> frame
+    | Some _ -> begin
+      match Frame.nextInSequence frame with
+      | None -> frame
+      | Some frame -> frame
+      end
     in
 
     let rec runToInteraction frame =
       let context = Frame.context frame in
       match frame with
+
+      | _, Frame.RootFrame node ->
+        let frame = Frame.make ?prev ~context ~parent:frame node in
+        runToInteraction frame
 
       | _, Frame.SequenceFrame (cur::_rest) ->
         let frame = Frame.make ?prev ~context ~parent:frame cur in
@@ -516,16 +544,7 @@ module Execution = struct
 
     in
 
-    match frame with
-    | Some frame ->
-      let%bind res, nextFrame = match action with
-      | `This ->
-        runToInteraction frame
-      | `Next context ->
-        let frame = Frame.updateContext context currentFrame in
-        nextOf frame
-      in return (res, nextFrame)
-    | None -> return (None, currentFrame)
+    runToInteraction frame
 
 end
 
@@ -592,15 +611,17 @@ module JS = struct
         context = Frame.context frame;
         data = Inspect.option Inspect.id info.data;
         dataTitle = Inspect.option Inspect.id info.dataTitle;
-        prev = info.prev |> prev |> List.rev |> interactionFrameListToJs;
+        prev = frame |> unwindPrev |> List.rev |> interactionFrameListToJs;
         next = Inspect.option interactionFrameListToJs next;
         alternatives = Inspect.option interactionFrameListToJs alternatives;
         frame;
       }]
-    and prev = function
-      | Some (info, frame) ->
-        let rest = prev info.prev in
+    and unwindPrev ({Frame. prev; _}, _) = match prev with
+      | Some (Some info, frame) ->
+        let rest = unwindPrev frame in
         (info, frame)::rest
+      | Some (None, frame) ->
+        unwindPrev frame
       | None -> []
     in
     match interaction with
@@ -615,15 +636,18 @@ module JS = struct
   let runToInteraction config currentFrame =
     let open Promise.Syntax in
     let config = { Execution. waitForData = config##waitForData } in
-    let%bind interaction, frame = Execution.run ~config ~action:`This currentFrame in
+    let%bind interaction, frame = Execution.run ~config currentFrame in
     let%bind next = Execution.next ~config frame in
     let%bind alternatives = Execution.alternatives ~config frame in
+    Js.log alternatives;
     return (resultToJs ~next ~alternatives interaction frame)
 
   let nextToInteraction config context currentFrame =
     let open Promise.Syntax in
     let config = { Execution. waitForData = config##waitForData } in
-    let%bind interaction, frame = Execution.run ~config ~action:(`Next context) currentFrame in
+    let%bind interaction, frame =
+      Execution.run ~config ~context currentFrame
+    in
     let%bind next = Execution.next ~config frame in
     let%bind alternatives = Execution.alternatives ~config frame in
     return (resultToJs ~next ~alternatives interaction frame)

@@ -16,6 +16,13 @@ type State = {
 const individual = Workflow.entityType('individual');
 const site = Workflow.entityType('site');
 
+const pickSite = PickAction.configure({
+  id: 'pickSite',
+  title: 'Pick site',
+  entityName: 'site',
+  fields: ['id', 'code', 'title'],
+});
+
 const pickIndividual = PickAction.configure({
   id: 'pickIndividual',
   title: 'Pick Individual',
@@ -93,13 +100,16 @@ const querySiteForIndividual = Workflow.query({
 
 function createWorkflow() {
   const {sequence, choice} = Workflow;
-  return sequence([
-    pickIndividual,
-    choice([
-      sequence([viewIndividual, querySiteForIndividual, viewSite]),
-      sequence([ifMale, viewMale]),
-      sequence([ifFemale, viewFemale]),
+  return choice([
+    sequence([
+      pickIndividual,
+      choice([
+        sequence([viewIndividual, querySiteForIndividual, viewSite]),
+        sequence([ifMale, viewMale]),
+        sequence([ifFemale, viewFemale]),
+      ]),
     ]),
+    sequence([pickSite, viewSite]),
   ]);
 }
 

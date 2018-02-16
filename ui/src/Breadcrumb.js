@@ -34,8 +34,8 @@ export function Breadcrumb({
   });
 
   buttons.push(
-    <View>
-      <Text key="current" style={{paddingRight: 10, fontWeight: '600'}}>
+    <View key="current">
+      <Text style={{paddingRight: 10, fontWeight: '600'}}>
         {current.ui.renderTitle(current.context, current.dataTitle)}
       </Text>
     </View>,

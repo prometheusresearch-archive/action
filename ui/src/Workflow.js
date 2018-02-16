@@ -5,7 +5,7 @@
 import invariant from 'invariant';
 import * as React from 'react';
 import * as W from 'workflow';
-import {View, Button, Text, TouchableOpacity} from 'react-native-web';
+import {View, Text} from 'react-native-web';
 import {Breadcrumb} from './Breadcrumb.js';
 import {NextToolbar} from './NextToolbar.js';
 import {AlternativesToolbar} from './AlternativesToolbar.js';
@@ -64,7 +64,7 @@ export class Workflow extends React.Component<Props, State> {
   }
 
   render() {
-    const {interaction, frame} = this.state;
+    const {interaction} = this.state;
     console.log('INTERACTION', interaction);
     if (interaction == null) {
       return (

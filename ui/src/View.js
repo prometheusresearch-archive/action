@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import {Text, ScrollView, View, TouchableOpacity} from 'react-native-web';
+import {Text, View} from 'react-native-web';
 import * as Workflow from 'workflow';
 import * as types from './types.js';
 
@@ -47,7 +47,6 @@ export function configure(config: Config): types.Workflow {
     `;
   };
   const queryTitle = context => {
-    const fields = config.fields.join(', ');
     return `
       ${config.entityName}(id: ${context[config.entityName].value.id}) {
         _meta{title}
