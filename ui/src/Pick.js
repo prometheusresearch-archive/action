@@ -5,15 +5,16 @@
 import * as React from 'react';
 import * as Workflow from 'workflow';
 import {Text, ScrollView, View, TouchableOpacity} from 'react-native-web';
+import * as types from './types.js';
 
 type Config = {
   id: string,
   entityName: string,
   fields: Array<string>,
-  renderTitle?: (Workflow.Context, ?Workflow.DataSet) => React.Element<*>,
+  renderTitle?: (types.Context, ?types.DataSet) => React.Element<*>,
 };
 
-export function configure(config: Config): Workflow.Workflow<*> {
+export function configure(config: Config): types.Workflow {
   const ui = {
     id: config.id,
     renderTitle(context, data) {
@@ -46,9 +47,9 @@ export function configure(config: Config): Workflow.Workflow<*> {
 }
 
 type Props = {
-  data: Workflow.DataSet,
-  context: Workflow.Context,
-  onContext: Workflow.Context => *,
+  data: types.DataSet,
+  context: types.Context,
+  onContext: types.Context => *,
   config: Config,
 };
 

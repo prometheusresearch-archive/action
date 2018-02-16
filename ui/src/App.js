@@ -2,8 +2,6 @@
  * @flow
  */
 
-import './App.css';
-
 import React, {Component} from 'react';
 import {View, Text} from 'react-native-web';
 import {Workflow as WorkflowUI} from './Workflow.js';

@@ -6,133 +6,18 @@ import invariant from 'invariant';
 import * as React from 'react';
 import * as W from 'workflow';
 import {View, Button, Text, TouchableOpacity} from 'react-native-web';
-
-function Breadcrumb({
-  current,
-  trace,
-  onClick,
-}: {
-  current: W.Interaction<UI>,
-  trace: Array<W.Interaction<UI>>,
-  onClick: (W.Interaction<UI>) => *,
-}) {
-  const items = [];
-  for (const item of trace) {
-    const onPress = item.frame != null ? () => onClick(item) : null;
-    items.push({title: item.ui.renderTitle(item.context, item.dataTitle), onPress});
-  }
-
-  const buttons = items.map((item, idx) => {
-    const style = {paddingRight: 10, fontWeight: '200'};
-    return (
-      <TouchableOpacity key={idx} onPress={item.onPress}>
-        <Text style={style}>{item.title}</Text>
-      </TouchableOpacity>
-    );
-  });
-
-  buttons.push(
-    <Text key="current" style={{paddingRight: 10, fontWeight: '600'}}>
-      {current.ui.renderTitle(current.context, current.dataTitle)}
-    </Text>,
-  );
-
-  return (
-    <View style={{flexDirection: 'row', padding: 10}}>
-      <View>
-        <Text>Prev: </Text>
-      </View>
-      <View style={{flexDirection: 'row'}}>{buttons}</View>
-    </View>
-  );
-}
-
-function Next({
-  next,
-  onClick,
-}: {
-  next: Array<W.Interaction<UI>>,
-  onClick: (W.Interaction<UI>) => *,
-}) {
-  const items = [];
-  for (const item of next) {
-    const onPress = item.frame != null ? () => onClick(item) : null;
-    const title = item.ui.renderTitle(item.context, item.dataTitle);
-    items.push({title, onPress});
-  }
-
-  const buttons = items.map((item, idx) => {
-    const style = {paddingRight: 10, fontWeight: '200'};
-    return (
-      <TouchableOpacity key={idx} onPress={item.onPress}>
-        <Text style={style}>{item.title}</Text>
-      </TouchableOpacity>
-    );
-  });
-
-  return (
-    <View style={{flexDirection: 'row', padding: 10}}>
-      <View>
-        <Text>Next: </Text>
-      </View>
-      <View style={{flexDirection: 'row'}}>{buttons}</View>
-    </View>
-  );
-}
-
-function Alternatives({
-  current,
-  alternatives,
-  onClick,
-}: {
-  current: W.Interaction<UI>,
-  alternatives: Array<W.Interaction<UI>>,
-  onClick: (W.Interaction<UI>) => *,
-}) {
-  const items = [];
-  for (const item of alternatives) {
-    const onPress = item.frame != null ? () => onClick(item) : null;
-    const title = item.ui.renderTitle(item.context, item.dataTitle);
-    const active = current.ui.id === item.ui.id;
-    items.push({title, onPress, active});
-  }
-
-  const buttons = items.map((item, idx) => {
-    const style = {paddingRight: 10, fontWeight: item.active ? '600' : '200'};
-    return (
-      <TouchableOpacity key={idx} onPress={item.onPress}>
-        <Text style={style}>{item.title}</Text>
-      </TouchableOpacity>
-    );
-  });
-
-  return (
-    <View style={{flexDirection: 'row', padding: 10}}>
-      <View>
-        <Text>Alternatives: </Text>
-      </View>
-      <View style={{flexDirection: 'row'}}>{buttons}</View>
-    </View>
-  );
-}
-
-export type UI = {
-  +id: string,
-  +renderTitle: (context: W.Context, data: ?W.DataSet) => React.Element<*>,
-  +render: (
-    context: W.Context,
-    data: W.DataSet,
-    onContext: (W.Context) => *,
-  ) => React.Element<*>,
-};
+import {Breadcrumb} from './Breadcrumb.js';
+import {NextToolbar} from './NextToolbar.js';
+import {AlternativesToolbar} from './AlternativesToolbar.js';
+import * as types from './types.js';
 
 type Props = {
-  workflow: W.Workflow<UI>,
+  workflow: types.Workflow,
 };
 
 type State = {
-  frame: W.Frame<UI>,
-  interaction: ?W.Interaction<UI>,
+  frame: types.Frame,
+  interaction: ?types.Interaction,
 };
 
 export class Workflow extends React.Component<Props, State> {
@@ -164,7 +49,7 @@ export class Workflow extends React.Component<Props, State> {
     }
   };
 
-  onBreadcrumbClick = async (p: W.Interaction<UI>) => {
+  onBreadcrumbClick = async (p: types.Interaction) => {
     const {interaction, frame} = await W.runToInteraction(this.config, p.frame);
     if (interaction != null) {
       this.setState({interaction, frame});
@@ -203,7 +88,7 @@ export class Workflow extends React.Component<Props, State> {
         {alternatives != null &&
           alternatives.length > 0 && (
             <View>
-              <Alternatives
+              <AlternativesToolbar
                 current={interaction}
                 alternatives={alternatives}
                 onClick={this.onBreadcrumbClick}
@@ -213,7 +98,7 @@ export class Workflow extends React.Component<Props, State> {
         {next != null &&
           next.length > 0 && (
             <View>
-              <Next next={next} onClick={this.onBreadcrumbClick} />
+              <NextToolbar next={next} onClick={this.onBreadcrumbClick} />
             </View>
           )}
         <View style={{padding: 10, flex: 1}}>
