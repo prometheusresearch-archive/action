@@ -30,7 +30,7 @@ declare module 'workflow' {
    * values.
    */
   declare export type Context = {[name: string]: ContextValue};
-  declare export opaque type ContextValue;
+  declare export type ContextValue = {value: any, type: ContextType};
 
   /**
    * Utility functions to produce context values annotated with types.

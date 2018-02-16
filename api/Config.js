@@ -3,7 +3,7 @@
  */
 
 const invariant = require('invariant');
-const yaml = require('js-yaml');
+const yaml = require('yaml-js');
 
 import * as t from './types.js';
 import * as Universe from './Universe.js';
@@ -28,7 +28,7 @@ export async function configureOf(
 
   // TODO: validate instead
   // flowlint unclear-type:off
-  const struct: Config = (yaml.safeLoad(data): any);
+  const struct: Config = (yaml.load(data): any);
 
   // Create a fresh universe per workflow.
   const ownUniv = Universe.fresh(univ);

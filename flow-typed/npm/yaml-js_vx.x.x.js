@@ -18,6 +18,7 @@ declare module 'yaml-js' {
   declare export type Node = BaseNode;
 
   declare export function compose(string): Node;
+  declare export function load(string): Node;
 }
 
 declare module 'yaml-js/lib/nodes' {

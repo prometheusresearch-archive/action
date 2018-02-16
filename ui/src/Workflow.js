@@ -2,6 +2,7 @@
  * @flow
  */
 
+import invariant from 'invariant';
 import * as React from 'react';
 import * as W from 'workflow';
 import {View, Button, Text, TouchableOpacity} from 'react-native-web';
@@ -188,6 +189,7 @@ export class Workflow extends React.Component<Props, State> {
       );
     }
     const {context, data, dataTitle, ui, prev, next, alternatives} = interaction;
+    invariant(data != null, 'Data was not loaded');
     const title = ui.renderTitle(context, dataTitle);
     return (
       <View style={{flex: 1}}>
