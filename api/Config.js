@@ -8,6 +8,7 @@ const yaml = require('yaml-js');
 import * as t from './types.js';
 import * as Universe from './Universe.js';
 import * as fs from './lib/fs';
+import * as Workflow from './Workflow.js';
 
 type Config = {
   entity?: {[name: string]: EntityConfig},
@@ -71,15 +72,9 @@ export async function configureOf(
     }
   }
 
-  const workflow = {};
+  //const node = yaml.compose(data);
+  //const workflow = Workflow.parseWorkflow(node);
+  //console.log(workflow);
 
-  // Read actions config.
-  // TODO: validate
-  if (struct.workflow != null) {
-    for (const name in struct.workflow) {
-      workflow[name] = struct.workflow[name];
-    }
-  }
-
-  return {univ: ownUniv, workflow};
+  return {univ: ownUniv, workflow: {}};
 }

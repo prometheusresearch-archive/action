@@ -101,5 +101,8 @@ const allowCrossOrigin: express.Middleware = (
   next();
 };
 
-serveWorkflow(settings);
+serveWorkflow(settings).catch(err => {
+  console.log(err.stack);
+  process.exit(1);
+});
 //query(settings, process.argv[2]);

@@ -14,36 +14,37 @@
  */
 
 declare module 'yaml-js' {
-  import type {Node as BaseNode} from 'yaml-js/lib/nodes';
-  declare export type Node = BaseNode;
-
+  import type {Node} from 'yaml-js/lib/nodes';
   declare export function compose(string): Node;
   declare export function load(string): Node;
 }
 
 declare module 'yaml-js/lib/nodes' {
-  declare export type Node = MappingNode | SequenceNode | ScalarNode;
-
   declare export type Mark = {
     line: number,
     column: number,
   };
 
-  declare export class MappingNode {
+  declare export class Node {
+    start_mark: Mark;
+    end_mark: Mark;
+  }
+
+  declare export class MappingNode extends Node {
     tag: 'tag:yaml.org,2002:map';
     value: Array<[Node, Node]>;
     start_mark: Mark;
     end_mark: Mark;
   }
 
-  declare export class SequenceNode {
+  declare export class SequenceNode extends Node {
     tag: 'tag:yaml.org,2002:seq';
     value: Array<Node>;
     start_mark: Mark;
     end_mark: Mark;
   }
 
-  declare export class ScalarNode {
+  declare export class ScalarNode extends Node {
     tag: string;
     value: string;
     start_mark: Mark;

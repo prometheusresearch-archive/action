@@ -11,13 +11,9 @@ entity:
 workflow:
 
   start:
-  - pick-or-make-individual:
-    - view-individual
-    - edit-individual
-
-  pick-or-make-individual:
   - pick-individual
-  - make-individual
+  - make-individual:
+    - start
 
   pick-individual:
     type: pick

@@ -1,0 +1,158 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`complex actions 1`] = `
+Object {
+  "workflow": Object {
+    "make-individual": Object {
+      "action": Object {
+        "type": "make",
+      },
+      "type": "Action",
+    },
+    "pick-individual": Object {
+      "action": Object {
+        "type": "pick",
+      },
+      "type": "Action",
+    },
+    "pick-make-individual": Object {
+      "choice": Array [
+        Object {
+          "ref": "pick-individual",
+          "type": "ActionRef",
+        },
+        Object {
+          "ref": "make-individual",
+          "type": "ActionRef",
+        },
+      ],
+      "type": "Choice",
+    },
+    "start": Object {
+      "choice": Array [
+        Object {
+          "sequence": Array [
+            Object {
+              "ref": "pick-make-individual",
+              "type": "ActionRef",
+            },
+            Object {
+              "ref": "view-individual",
+              "type": "ActionRef",
+            },
+          ],
+          "type": "Sequence",
+        },
+        Object {
+          "ref": "make-individual",
+          "type": "ActionRef",
+        },
+      ],
+      "type": "Choice",
+    },
+    "view-individual": Object {
+      "action": Object {
+        "type": "view",
+      },
+      "type": "Action",
+    },
+  },
+}
+`;
+
+exports[`deep sequence opt 1`] = `
+Object {
+  "workflow": Object {
+    "make-individual": Object {
+      "action": Object {
+        "type": "make",
+      },
+      "type": "Action",
+    },
+    "pick-individual": Object {
+      "action": Object {
+        "type": "pick",
+      },
+      "type": "Action",
+    },
+    "start": Object {
+      "sequence": Array [
+        Object {
+          "ref": "pick-individual",
+          "type": "ActionRef",
+        },
+        Object {
+          "ref": "view-individual",
+          "type": "ActionRef",
+        },
+        Object {
+          "ref": "make-individual",
+          "type": "ActionRef",
+        },
+      ],
+      "type": "Sequence",
+    },
+    "view-individual": Object {
+      "action": Object {
+        "type": "view",
+      },
+      "type": "Action",
+    },
+  },
+}
+`;
+
+exports[`recursive actions 1`] = `
+Object {
+  "workflow": Object {
+    "edit-individual": Object {
+      "action": Object {
+        "type": "make",
+      },
+      "type": "Action",
+    },
+    "pick-individual": Object {
+      "action": Object {
+        "type": "pick",
+      },
+      "type": "Action",
+    },
+    "start": Object {
+      "sequence": Array [
+        Object {
+          "ref": "pick-individual",
+          "type": "ActionRef",
+        },
+        Object {
+          "ref": "edit-individual",
+          "type": "ActionRef",
+        },
+        Object {
+          "ref": "start",
+          "type": "ActionRef",
+        },
+      ],
+      "type": "Sequence",
+    },
+  },
+}
+`;
+
+exports[`simple actions 1`] = `
+Object {
+  "workflow": Object {
+    "make-individual": Object {
+      "action": Object {
+        "type": "make",
+      },
+      "type": "Action",
+    },
+    "pick-individual": Object {
+      "action": Object {
+        "type": "pick",
+      },
+      "type": "Action",
+    },
+  },
+}
+`;
