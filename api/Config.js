@@ -8,11 +8,11 @@ const yaml = require('yaml-js');
 import * as t from './types.js';
 import * as Universe from './Universe.js';
 import * as fs from './lib/fs';
-import * as Workflow from './Workflow.js';
+import * as ConfigWorkflow from './ConfigWorkflow.js';
 
 type Config = {
   entity?: {[name: string]: EntityConfig},
-  workflow?: {[name: string]: t.ActionConfig},
+  workflow: ConfigWorkflow.Workflow,
 };
 
 type EntityConfig = {
@@ -24,7 +24,7 @@ type EntityConfig = {
 export async function configureOf(
   univ: t.Universe,
   filename: string,
-): Promise<t.Workflow> {
+): Promise<{workflow: ConfigWorkflow.Workflow, univ: t.Universe}> {
   const data = await fs.readFile(filename);
 
   // TODO: validate instead
@@ -72,9 +72,8 @@ export async function configureOf(
     }
   }
 
-  //const node = yaml.compose(data);
-  //const workflow = Workflow.parseWorkflow(node);
-  //console.log(workflow);
+  const node = yaml.compose(data);
+  const workflow = ConfigWorkflow.parse(node).workflow;
 
-  return {univ: ownUniv, workflow: {}};
+  return {univ: ownUniv, workflow};
 }

@@ -1,0 +1,185 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`complex actions 1`] = `
+Object {
+  "workflow": Object {
+    "nodes": Object {
+      "make-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "make",
+        },
+        "type": "WorkflowAction",
+      },
+      "pick-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "pick",
+        },
+        "type": "WorkflowAction",
+      },
+      "pick-make-individual": Object {
+        "choice": Array [
+          Object {
+            "ref": "pick-individual",
+            "type": "WorkflowRef",
+          },
+          Object {
+            "ref": "make-individual",
+            "type": "WorkflowRef",
+          },
+        ],
+        "type": "WorkflowChoice",
+      },
+      "start": Object {
+        "choice": Array [
+          Object {
+            "sequence": Array [
+              Object {
+                "ref": "pick-make-individual",
+                "type": "WorkflowRef",
+              },
+              Object {
+                "ref": "view-individual",
+                "type": "WorkflowRef",
+              },
+            ],
+            "type": "WorkflowSequence",
+          },
+          Object {
+            "ref": "make-individual",
+            "type": "WorkflowRef",
+          },
+        ],
+        "type": "WorkflowChoice",
+      },
+      "view-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "view",
+        },
+        "type": "WorkflowAction",
+      },
+    },
+    "start": Object {
+      "ref": "start",
+      "type": "WorkflowRef",
+    },
+  },
+}
+`;
+
+exports[`deep sequence opt 1`] = `
+Object {
+  "workflow": Object {
+    "nodes": Object {
+      "make-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "make",
+        },
+        "type": "WorkflowAction",
+      },
+      "pick-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "pick",
+        },
+        "type": "WorkflowAction",
+      },
+      "start": Object {
+        "sequence": Array [
+          Object {
+            "ref": "pick-individual",
+            "type": "WorkflowRef",
+          },
+          Object {
+            "ref": "view-individual",
+            "type": "WorkflowRef",
+          },
+          Object {
+            "ref": "make-individual",
+            "type": "WorkflowRef",
+          },
+        ],
+        "type": "WorkflowSequence",
+      },
+      "view-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "view",
+        },
+        "type": "WorkflowAction",
+      },
+    },
+    "start": Object {
+      "ref": "start",
+      "type": "WorkflowRef",
+    },
+  },
+}
+`;
+
+exports[`recursive actions 1`] = `
+Object {
+  "workflow": Object {
+    "nodes": Object {
+      "edit-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "make",
+        },
+        "type": "WorkflowAction",
+      },
+      "pick-individual": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "pick",
+        },
+        "type": "WorkflowAction",
+      },
+      "start": Object {
+        "sequence": Array [
+          Object {
+            "ref": "pick-individual",
+            "type": "WorkflowRef",
+          },
+          Object {
+            "ref": "edit-individual",
+            "type": "WorkflowRef",
+          },
+          Object {
+            "ref": "start",
+            "type": "WorkflowRef",
+          },
+        ],
+        "type": "WorkflowSequence",
+      },
+    },
+    "start": Object {
+      "ref": "start",
+      "type": "WorkflowRef",
+    },
+  },
+}
+`;
+
+exports[`simple actions 1`] = `
+Object {
+  "workflow": Object {
+    "nodes": Object {
+      "start": Object {
+        "action": Object {
+          "entity": "individual",
+          "type": "pick",
+        },
+        "type": "WorkflowAction",
+      },
+    },
+    "start": Object {
+      "ref": "start",
+      "type": "WorkflowRef",
+    },
+  },
+}
+`;

@@ -273,9 +273,7 @@ export function create(params: Params) {
     return resolve;
   }
 
-  const query = new gql.GraphQLObjectType({name: 'query', fields});
-  const schema = new gql.GraphQLSchema({query});
-  return schema;
+  return fields;
 }
 
 function typeToGraphQLType(type: t.Type) {

@@ -11,14 +11,40 @@ entity:
 workflow:
 
   start:
-  - pick-individual
-  - make-individual:
-    - start
+  - pick-individual:
+    - view-individual
+    - if-male:
+      - view-male
+    - site-for-individual:
+      - view-site
+
 
   pick-individual:
     type: pick
     entity: individual
 
-  make-individual:
-    type: make
+  view-individual:
+    type: view
     entity: individual
+
+  view-male:
+    type: view
+    entity: individual
+
+  view-site:
+    type: view
+    entity: site
+
+  if-male:
+    type: guard
+    require:
+    - individual
+    query:
+      SELECT sex = 'male' as result FROM individual WHERE id = $individual
+
+  site-for-individual:
+    type: query
+    require:
+    - individual
+    query:
+      site: select site_id as result FROM individual WHERE id = $individual

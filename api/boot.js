@@ -14,6 +14,7 @@ import * as Universe from './Universe.js';
 import * as ReflectDB from './ReflectUniverse.js';
 import * as Config from './Config.js';
 import * as Fetch from './Fetch.js';
+import * as FetchWorkflow from './FetchWorkflow.js';
 import * as Db from './Db.js';
 
 loudRejection();
@@ -32,7 +33,16 @@ async function loadWorkflow(db: Db.Db, settings: Settings) {
   const univ = Universe.create();
   await ReflectDB.reflect(univ, db.client);
   const workflow = await Config.configureOf(univ, settings.workflowConfig);
-  const graphqlSchema = Fetch.create({univ: workflow.univ, db});
+  const dataFields = Fetch.create({univ: workflow.univ, db});
+  const workflowFields = FetchWorkflow.create({workflow: workflow.workflow, db});
+  const query = new gql.GraphQLObjectType({
+    name: 'query',
+    fields: {
+      ...dataFields,
+      ...workflowFields,
+    },
+  });
+  const graphqlSchema = new gql.GraphQLSchema({query});
   return {graphqlSchema, workflow, univ};
 }
 

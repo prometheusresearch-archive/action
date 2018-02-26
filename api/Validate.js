@@ -114,6 +114,20 @@ export function string<Ctx: {}>(): Parser<string, Ctx> {
   });
 }
 
+export function constant<Ctx: {}>(value: string): Parser<string, Ctx> {
+  return createParser({
+    parse(pos, node) {
+      if (node instanceof ScalarNode && node.tag === 'tag:yaml.org,2002:str') {
+        if (node.value !== value) {
+          throw new ParseError(`expected "${value}"`, pos);
+        }
+        return node.value;
+      }
+      throw new ParseError('expected string', pos);
+    },
+  });
+}
+
 type ObjParserToValue<Ctx: {}, I> = $ObjMap<I, <V>(Parser<V, Ctx>) => V>;
 
 export function record<Ctx: {}, F: *, V: ObjParserToValue<Ctx, F>>(
@@ -224,7 +238,7 @@ type Match<Ctx: {}> = {
   match(pos: Position<Ctx>, node: Node): boolean,
 };
 
-type Case<Ctx: {}, V> = [Match<Ctx>, Parser<V, Ctx>];
+type Case<Ctx: {}, V> = [Match<Ctx> | true, Parser<V, Ctx>];
 
 type SwitchCase2<Ctx: {}, A, B> = (Case<Ctx, A>, Case<Ctx, B>) => Parser<A | B, Ctx>;
 type SwitchCase3<Ctx: {}, A, B, C> = (
@@ -243,7 +257,9 @@ function switchCaseImpl(...cases): Parser<*, *> {
   return createParser({
     parse(pos, node: Node) {
       for (const [match, parser] of cases) {
-        if (match.match(pos, node)) {
+        if (match === true) {
+          return parser.parse(pos, node);
+        } else if (match.match(pos, node)) {
           return parser.parse(pos, node);
         }
       }
@@ -296,7 +312,7 @@ export function lazy<V, Ctx: {}, NCtx: {}>(): Parser<Lazy<V, NCtx>, Ctx> {
   });
 }
 
-function getMappingNodeValueNodeByKey(key: string, node: Node) {
+export function getMappingNodeValueNodeByKey(key: string, node: Node) {
   if (node instanceof MappingNode) {
     for (const [keyNode, valueNode] of node.value) {
       if (

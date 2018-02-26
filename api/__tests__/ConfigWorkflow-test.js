@@ -2,17 +2,14 @@
  * @flow
  */
 
-import * as W from '../Workflow.js';
+import * as W from '../ConfigWorkflow.js';
 import outdent from 'outdent';
 
 test('simple actions', function() {
   const w = W.parseString(outdent`
     workflow:
-      pick-individual:
+      start:
         type: pick
-        entity: individual
-      make-individual:
-        type: make
         entity: individual
   `);
   expect(w).toMatchSnapshot();
