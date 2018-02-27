@@ -16,6 +16,12 @@ type State = {
 const individual = Workflow.entityType('individual');
 const site = Workflow.entityType('site');
 
+/**
+ * pickSite:
+ *   type: pick
+ *   entity: site
+ *   fields: [id, code, title]
+ */
 const pickSite = PickAction.configure({
   id: 'pickSite',
   title: 'Pick site',
@@ -23,6 +29,12 @@ const pickSite = PickAction.configure({
   fields: ['id', 'code', 'title'],
 });
 
+/**
+ * pickIndividual:
+ *   type: pick
+ *   entity: individual
+ *   fields: [id, code, sex]
+ */
 const pickIndividual = PickAction.configure({
   id: 'pickIndividual',
   title: 'Pick Individual',
@@ -30,6 +42,12 @@ const pickIndividual = PickAction.configure({
   fields: ['id', 'code', 'sex'],
 });
 
+/**
+ * viewMale:
+ *   type: view
+ *   entity: individual
+ *   fields: [id, code, sex]
+ */
 const viewMale = ViewAction.configure({
   entityName: 'individual',
   id: 'viewMale',
@@ -37,6 +55,12 @@ const viewMale = ViewAction.configure({
   fields: ['id', 'code', 'sex'],
 });
 
+/**
+ * viewFemale:
+ *   type: view
+ *   entity: individual
+ *   fields: [id, code, sex]
+ */
 const viewFemale = ViewAction.configure({
   entityName: 'individual',
   id: 'viewFemale',
@@ -44,6 +68,12 @@ const viewFemale = ViewAction.configure({
   fields: ['id', 'code', 'sex'],
 });
 
+/**
+ * viewIndividual:
+ *   type: view
+ *   entity: individual
+ *   fields: [id, code, sex]
+ */
 const viewIndividual = ViewAction.configure({
   entityName: 'individual',
   id: 'viewIndividual',
@@ -51,6 +81,18 @@ const viewIndividual = ViewAction.configure({
   fields: ['id', 'code', 'sex'],
 });
 
+/**
+ * viewSite:
+ *   type: view
+ *   entity: site
+ *   fields: [id, code, title]
+ *
+ * TODO: idea - nested model
+ * viewEnrolledIndividual:
+ *   type: view
+ *   entity: study.study_enrollment.individiual
+ *   fields: [id, code, title]
+ */
 const viewSite = ViewAction.configure({
   entityName: 'site',
   id: 'viewSite',
@@ -58,6 +100,13 @@ const viewSite = ViewAction.configure({
   fields: ['id', 'code', 'title'],
 });
 
+/**
+ * ifMale:
+ *   type: guard
+ *   require:
+ *   - individual
+ *   query: individual:find(id=$individual).sex = 'male'
+ */
 const ifMale = Workflow.guard({
   requires: {
     individual: Workflow.entityType('individual'),
@@ -72,6 +121,13 @@ const ifMale = Workflow.guard({
   },
 });
 
+/**
+ * ifFemale:
+ *   type: guard
+ *   require:
+ *   - individual
+ *   query: individual:find(id=$individual).sex = 'female'
+ */
 const ifFemale = Workflow.guard({
   requires: {individual},
 
@@ -84,6 +140,13 @@ const ifFemale = Workflow.guard({
   },
 });
 
+/**
+ * querySiteForIndividual:
+ *   type: query
+ *   require:
+ *   - individual
+ *   site: individual:find(id=$individual).site.id
+ */
 const querySiteForIndividual = Workflow.query({
   requires: {individual},
   provides: {site},
@@ -98,6 +161,19 @@ const querySiteForIndividual = Workflow.query({
   },
 });
 
+/**
+ * start:
+ * - pickIndividual:
+ *   - viewIndividual:
+ *     - querySiteForIndividual:
+ *       - viewSite
+ *   - ifMale:
+ *     - viewMale
+ *   - ifFemale:
+ *     - viewFemale
+ * - pickSite:
+ *   - viewSite
+ */
 function createWorkflow() {
   const {sequence, choice} = Workflow;
   return choice([

@@ -78,7 +78,10 @@ export class Workflow extends React.Component<Props, State> {
     const title = ui.renderTitle(context, dataTitle);
     return (
       <View style={{flex: 1}}>
-        <View>
+        <View style={{flexDirection: 'row'}}>
+          <View style={{padding: 10}}>
+            <Text>BREADCRUMBS: </Text>
+          </View>
           <Breadcrumb
             current={interaction}
             trace={prev}
@@ -87,7 +90,10 @@ export class Workflow extends React.Component<Props, State> {
         </View>
         {alternatives != null &&
           alternatives.length > 0 && (
-            <View>
+            <View style={{flexDirection: 'row'}}>
+              <View style={{padding: 10}}>
+                <Text>ALTERNATIVES: </Text>
+              </View>
               <AlternativesToolbar
                 current={interaction}
                 alternatives={alternatives}
@@ -101,7 +107,10 @@ export class Workflow extends React.Component<Props, State> {
           </View>
           {next != null &&
             next.length > 0 && (
-              <View>
+              <View style={{flexDirection: 'row'}}>
+                <View style={{padding: 10}}>
+                  <Text>NEXT: </Text>
+                </View>
                 <NextToolbar next={next} onClick={this.onBreadcrumbClick} />
               </View>
             )}
