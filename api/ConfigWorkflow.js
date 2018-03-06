@@ -109,7 +109,14 @@ const parseWorkflowNodeOrAction: Parser<t.WorkflowNodeOrAction> = switchCase(
   [true, parseWorkflowNode],
 );
 
-const parseWorkflow: ParserBase<t.Workflow> = mapping(lazy()).refine(
+const parseActionId: ParserBase<string> = string().refine((pos, value) => {
+  if (/^[a-zA-Z_]+$/g.exec(value) == null) {
+    pos.error(`invalid action id: ${value}`);
+  }
+  return value;
+});
+
+const parseWorkflow: ParserBase<t.Workflow> = mapping(lazy(), parseActionId).refine(
   (ctx, rules, node) => {
     function createActionReference(ref: string) {
       const rule = rules[ref];

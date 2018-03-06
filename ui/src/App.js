@@ -110,12 +110,14 @@ function configureWorkflow(workflow: apiTypes.Workflow): t.Workflow {
             }
             const query = [];
             for (const {type} of action.query) {
-              query.push(`${action.id}__${type.name}(${args.join(', ')})`);
+              query.push(`${type.name}`);
             }
             return `
               _workflow {
                 values {
-                  ${query.join(', ')}
+                  ${action.id}(${args.join(', ')}) {
+                    ${query.join(', ')}
+                  }
                 }
               }
             `;
@@ -124,9 +126,8 @@ function configureWorkflow(workflow: apiTypes.Workflow): t.Workflow {
           update(context, data) {
             const update = {};
             for (const {type} of action.query) {
-              const dataKey = `${action.id}__${type.name}`;
               update[type.name] = Workflow.entity(type.type, {
-                id: data._workflow.values[dataKey],
+                id: data._workflow.values[action.id][type.name],
               });
             }
             return {...context, ...update};

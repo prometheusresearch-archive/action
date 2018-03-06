@@ -205,13 +205,14 @@ export function mappingGeneral<Ctx: {}, K, V, R>({
 
 export function mapping<Ctx: {}, V>(
   childParser: Parser<V, Ctx>,
+  keyParser?: Parser<string, Ctx> = string(),
 ): Parser<{[key: string]: V}, Ctx> {
   return createParser({
     parse(pos: Position<Ctx>, node) {
       if (node instanceof MappingNode) {
         const result = {};
         for (const [keyNode, valueNode] of node.value) {
-          const key = string().parse(pos, keyNode);
+          const key = keyParser.parse(pos, keyNode);
           const valuePos = pos.when(`parsing key ${key}`);
           const value = childParser.parse(valuePos, valueNode);
           result[key] = value;

@@ -11,41 +11,41 @@ entity:
 workflow:
 
   start:
-  - pick-individual:
-    - view-individual
-    - site-for-individual:
-      - view-site
-    - if-male:
-      - view-male
+  - pickIndividual:
+    - viewIndividual
+    - siteForIndividual:
+      - viewSite
+    - ifMale:
+      - viewMale
 
-  pick-individual:
+  pickIndividual:
     type: pick
     entity: individual
     fields: [id, code, sex]
 
-  view-individual:
+  viewIndividual:
     type: view
     entity: individual
     fields: [id, code, sex]
 
-  view-male:
+  viewMale:
     type: view
     entity: individual
     fields: [id, code, sex]
 
-  view-site:
+  viewSite:
     type: view
     entity: site
     fields: [id, code, title]
 
-  if-male:
+  ifMale:
     type: guard
     require:
     - individual
     query:
       SELECT sex = 'male' as result FROM individual WHERE id = $individual
 
-  site-for-individual:
+  siteForIndividual:
     type: query
     require:
     - individual

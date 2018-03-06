@@ -18,69 +18,16 @@ type Params = {
   db: Db.Db,
 };
 
-export function create({db, workflow}: Params) {
-  function createFieldForGuard(action) {
-    const args = {};
-    for (const req of action.require) {
-      args[req.name] = {
-        type: new gqlType.GraphQLNonNull(gqlType.GraphQLString),
-      };
-    }
-    const field = {
-      type: gqlType.GraphQLBoolean,
-      resolve: async (_root, args) => {
-        const {query, values} = compileQuery(action.query, args);
-        const result = await db.query(query, values);
-        const row = result.rows[0];
-        if (row == null) {
-          return false;
-        } else {
-          return row.result;
-        }
-      },
-      args,
-    };
-    return {[action.id]: field};
-  }
-
-  function createFieldForQuery(action) {
-    const args = {};
-    for (const req of action.require) {
-      args[req.name] = {
-        type: new gqlType.GraphQLNonNull(gqlType.GraphQLString),
-      };
-    }
-    const fields = {};
-
-    for (const {type, query} of action.query) {
-      fields[action.id + '__' + type.name] = {
-        type: gqlType.GraphQLString,
-        resolve: async (_root, args) => {
-          const compiled = compileQuery(query, args);
-          const result = await db.query(compiled.query, compiled.values);
-          const row = result.rows[0];
-          if (row == null) {
-            return null;
-          } else {
-            return row.result;
-          }
-        },
-        args,
-      };
-    }
-    return fields;
-  }
-
+export function create(params: Params) {
+  const {db, workflow} = params;
   let fields = {};
   traverseAction(workflow, action => {
     if (action.type === 'GuardAction') {
-      fields = {...fields, ...createFieldForGuard(action)};
+      fields[action.id] = createFieldForGuard(params, action);
     } else if (action.type === 'QueryAction') {
-      fields = {...fields, ...createFieldForQuery(action)};
+      fields[action.id] = createFieldForQuery(params, action);
     }
   });
-
-  const emptyObjectFunction = () => ({});
 
   // FIXME: shouldn't be polymorphic
   const values =
@@ -112,6 +59,65 @@ export function create({db, workflow}: Params) {
   };
 }
 
+function createFieldForGuard({db}: Params, action: t.GuardAction) {
+  const args = {};
+  for (const req of action.require) {
+    args[req.name] = {
+      type: new gqlType.GraphQLNonNull(gqlType.GraphQLString),
+    };
+  }
+  const field = {
+    type: gqlType.GraphQLBoolean,
+    resolve: async (_root, args) => {
+      const {query, values} = compileQuery(action.query, args);
+      const result = await db.query(query, values);
+      const row = result.rows[0];
+      if (row == null) {
+        return false;
+      } else {
+        return row.result;
+      }
+    },
+    args,
+  };
+  return field;
+}
+
+function createFieldForQuery({db}: Params, action: t.QueryAction) {
+  const args = {};
+  for (const req of action.require) {
+    args[req.name] = {
+      type: new gqlType.GraphQLNonNull(gqlType.GraphQLString),
+    };
+  }
+
+  const fields = {};
+  for (const {type, query} of action.query) {
+    fields[type.name] = {
+      type: gqlType.GraphQLString,
+      resolve: async root => {
+        const compiled = compileQuery(query, root.args);
+        const result = await db.query(compiled.query, compiled.values);
+        const row = result.rows[0];
+        if (row == null) {
+          return null;
+        } else {
+          return row.result;
+        }
+      },
+    };
+  }
+
+  return {
+    resolve: (_, args) => ({args}),
+    args,
+    type: new gqlType.GraphQLObjectType({
+      name: action.id,
+      fields,
+    }),
+  };
+}
+
 function compileQuery(query, args) {
   let idx = 0;
   const values = [];
@@ -130,3 +136,5 @@ const RawType = new gqlType.GraphQLScalarType({
     return value;
   },
 });
+
+const emptyObjectFunction = () => ({});
