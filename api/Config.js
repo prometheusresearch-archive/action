@@ -12,7 +12,7 @@ import * as ConfigWorkflow from './ConfigWorkflow.js';
 
 type Config = {
   entity?: {[name: string]: EntityConfig},
-  workflow: ConfigWorkflow.Workflow,
+  workflow: t.Workflow,
 };
 
 type EntityConfig = {
@@ -24,7 +24,7 @@ type EntityConfig = {
 export async function configureOf(
   univ: t.Universe,
   filename: string,
-): Promise<{workflow: ConfigWorkflow.Workflow, univ: t.Universe}> {
+): Promise<{workflow: t.Workflow, univ: t.Universe}> {
   const data = await fs.readFile(filename);
 
   // TODO: validate instead

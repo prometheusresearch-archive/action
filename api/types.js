@@ -3,7 +3,6 @@
  */
 
 import type {Relation as PgRelation, Table as PgTable} from 'pg-structure';
-import * as React from 'react';
 
 /**
  * Universe is a collection of entities present in an application.
@@ -107,113 +106,84 @@ export type ListTypeImage = {
   child: TypeImage,
 };
 
-/**
- * Typed value.
- */
-export type Value = SimpleValue | EntityValue;
+export type Action = QueryAction | GuardAction | PickAction | ViewAction | MakeAction;
 
-export type SimpleValue = {
-  type: Type,
-  value: mixed,
+export type ContextShape = Array<{name: string, type: string}>;
+
+export type GuardAction = {
+  type: 'GuardAction',
+  id: string,
+  require: ContextShape,
+  query: string,
 };
 
-export opaque type EntityID = string;
-
-export type EntityValue = {
-  type: EntityType,
-  id: EntityID,
-  fields: {[name: string]: Value},
+export type MakeAction = {
+  type: 'MakeAction',
+  id: string,
+  entity: string,
 };
 
-/**
- * A stack of sets of values.
- */
-type Context = {
-  prev: ?Context,
-  bindings: {[name: string]: Value},
+export type ViewAction = {
+  type: 'ViewAction',
+  id: string,
+  entity: string,
+  title: string,
+  fields: Array<string>,
 };
 
-type ActionProps = {
-  context: Context,
+export type EditAction = {
+  type: 'EditAction',
+  id: string,
+  entity: string,
 };
 
-/**
- * Action is something which performs state transitions.
- */
-type Action = UserAction | ProcessAction;
-
-/**
- * User actions perform state transitions through user input.
- */
-type UserAction = {
-  requires: Array<[string, Type]>,
-  render(props: ActionProps): React.Element<*>,
+export type PickAction = {
+  type: 'PickAction',
+  id: string,
+  entity: string,
+  title: string,
+  fields: Array<string>,
 };
 
-/**
- * Process actions perform state transition through automated processes.
- */
-type ProcessAction = {
-  requires: Array<[string, Type]>,
-  perform(props: ActionProps): Promise<StateTransition>,
+export type QueryAction = {
+  type: 'QueryAction',
+  id: string,
+  require: ContextShape,
+  query: Array<{
+    type: {type: string, name: string},
+    query: string,
+  }>,
 };
 
-/**
- * State of the workflow is the current action is the stack of current action
- * and current context.
- */
-type State = {
-  prev: ?State,
-  context: Context,
+export type WorkflowSequence = {
+  type: 'WorkflowSequence',
+  sequence: Array<WorkflowNode>,
+};
+
+export type WorkflowChoice = {
+  type: 'WorkflowChoice',
+  choice: Array<WorkflowNode>,
+};
+
+export type WorkflowAction = {
+  type: 'WorkflowAction',
   action: Action,
 };
 
-type StateTransition = RunAction | SetContextValue | UpdateEntity;
-
-type RunAction = {
-  type: 'RunAction',
-  action: Action,
+export type WorkflowRef = {
+  type: 'WorkflowRef',
+  ref: string,
 };
 
-type SetContextValue = {
-  type: 'SetContextValue',
-  key: string,
-  value: Value,
-};
+export type WorkflowNode =
+  | WorkflowAction
+  | WorkflowRef
+  | WorkflowSequence
+  | WorkflowChoice;
 
-type UpdateEntity = {
-  type: 'UpdateEntity',
-  entity: EntityValue,
-};
+export type WorkflowNodeOrAction = WorkflowNode | WorkflowAction;
 
-/**
- * This is the workflow — a collection of UI actions over the universe.
- */
 export type Workflow = {
-  /*
-   * Workflow's own universe.
-   */
-  univ: Universe,
-  workflow: {
-    [name: string]: ActionConfig,
-  },
+  start: WorkflowNode,
+  nodes: {[id: string]: WorkflowNode},
 };
-
-export type ActionConfig = TerminalActionConfig | NonTerminalActionConfig;
-type NonTerminalActionConfig = Array<ActionConfig>;
-type TerminalActionConfig = {type: string};
-
-/**
- * Perform action and wait for a state transition.
- */
-declare function runAction(state: State): Promise<StateTransition>;
-
-/**
- * Perform a state transition.
- */
-declare function runTransition(state: State, transition: StateTransition): Promise<State>;
-
-/**
- * Render state into UI.
- */
-declare function render(state: State): React.Element<*>;

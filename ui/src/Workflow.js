@@ -10,6 +10,7 @@ import {Breadcrumb} from './Breadcrumb.js';
 import {NextToolbar} from './NextToolbar.js';
 import {AlternativesToolbar} from './AlternativesToolbar.js';
 import * as types from './types.js';
+import {Loading} from './Loading.js';
 
 type Props = {
   workflow: types.Workflow,
@@ -67,11 +68,7 @@ export class Workflow extends React.Component<Props, State> {
     const {interaction} = this.state;
     console.log('INTERACTION', interaction);
     if (interaction == null) {
-      return (
-        <View style={{flex: 1, padding: 10}}>
-          <Text>Loading...</Text>
-        </View>
-      );
+      return <Loading />;
     }
     const {context, data, dataTitle, ui, prev, next, alternatives} = interaction;
     invariant(data != null, 'Data was not loaded');

@@ -2,201 +2,160 @@
  * @flow
  */
 
+import invariant from 'invariant';
 import React, {Component} from 'react';
 import {View, Text} from 'react-native-web';
 import {Workflow as WorkflowUI} from './Workflow.js';
 import * as PickAction from './Pick.js';
 import * as ViewAction from './View.js';
 import * as Workflow from 'workflow';
+import * as t from './types.js';
+import {Loading} from './Loading.js';
+//import * as apiTypes from 'api/types';
 
 type State = {
-  data: mixed,
+  workflow: ?t.Workflow,
 };
 
-const individual = Workflow.entityType('individual');
-const site = Workflow.entityType('site');
-
-/**
- * pickSite:
- *   type: pick
- *   entity: site
- *   fields: [id, code, title]
- */
-const pickSite = PickAction.configure({
-  id: 'pickSite',
-  title: 'Pick site',
-  entityName: 'site',
-  fields: ['id', 'code', 'title'],
-});
-
-/**
- * pickIndividual:
- *   type: pick
- *   entity: individual
- *   fields: [id, code, sex]
- */
-const pickIndividual = PickAction.configure({
-  id: 'pickIndividual',
-  title: 'Pick Individual',
-  entityName: 'individual',
-  fields: ['id', 'code', 'sex'],
-});
-
-/**
- * viewMale:
- *   type: view
- *   entity: individual
- *   fields: [id, code, sex]
- */
-const viewMale = ViewAction.configure({
-  entityName: 'individual',
-  id: 'viewMale',
-  renderTitle: () => <Text>View Male</Text>,
-  fields: ['id', 'code', 'sex'],
-});
-
-/**
- * viewFemale:
- *   type: view
- *   entity: individual
- *   fields: [id, code, sex]
- */
-const viewFemale = ViewAction.configure({
-  entityName: 'individual',
-  id: 'viewFemale',
-  renderTitle: () => <Text>View Female</Text>,
-  fields: ['id', 'code', 'sex'],
-});
-
-/**
- * viewIndividual:
- *   type: view
- *   entity: individual
- *   fields: [id, code, sex]
- */
-const viewIndividual = ViewAction.configure({
-  entityName: 'individual',
-  id: 'viewIndividual',
-  title: 'View Individual',
-  fields: ['id', 'code', 'sex'],
-});
-
-/**
- * viewSite:
- *   type: view
- *   entity: site
- *   fields: [id, code, title]
- *
- * TODO: idea - nested model
- * viewEnrolledIndividual:
- *   type: view
- *   entity: study.study_enrollment.individiual
- *   fields: [id, code, title]
- */
-const viewSite = ViewAction.configure({
-  entityName: 'site',
-  id: 'viewSite',
-  title: 'View Site',
-  fields: ['id', 'code', 'title'],
-});
-
-/**
- * ifMale:
- *   type: guard
- *   require:
- *   - individual
- *   query: individual:find(id=$individual).sex = 'male'
- */
-const ifMale = Workflow.guard({
-  requires: {
-    individual: Workflow.entityType('individual'),
-  },
-
-  query(context) {
-    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
-  },
-
-  check(context, data) {
-    return data.individual.sex === 'male';
-  },
-});
-
-/**
- * ifFemale:
- *   type: guard
- *   require:
- *   - individual
- *   query: individual:find(id=$individual).sex = 'female'
- */
-const ifFemale = Workflow.guard({
-  requires: {individual},
-
-  query(context) {
-    return `individual(id: ${context.individual.value.id}) {id,code,sex}`;
-  },
-
-  check(context, data) {
-    return data.individual.sex === 'female';
-  },
-});
-
-/**
- * querySiteForIndividual:
- *   type: query
- *   require:
- *   - individual
- *   site: individual:find(id=$individual).site.id
- */
-const querySiteForIndividual = Workflow.query({
-  requires: {individual},
-  provides: {site},
-
-  query(context) {
-    return `individual(id: ${context.individual.value.id}) {site{id}}`;
-  },
-
-  update(context, data) {
-    const site = Workflow.entity('site', {id: data.individual.site.id});
-    return {...context, site};
-  },
-});
-
-/**
- * start:
- * - pickIndividual:
- *   - viewIndividual:
- *     - querySiteForIndividual:
- *       - viewSite
- *   - ifMale:
- *     - viewMale
- *   - ifFemale:
- *     - viewFemale
- * - pickSite:
- *   - viewSite
- */
-function createWorkflow() {
-  const {sequence, choice} = Workflow;
-  return choice([
-    sequence([
-      pickIndividual,
-      choice([
-        sequence([viewIndividual, querySiteForIndividual, viewSite]),
-        sequence([ifMale, viewMale]),
-        sequence([ifFemale, viewFemale]),
-      ]),
-    ]),
-    sequence([pickSite, viewSite]),
-  ]);
-}
-
-const workflow = createWorkflow();
-
 export default class App extends Component<{}, State> {
+  state = {
+    workflow: null,
+  };
+
   render() {
+    const {workflow} = this.state;
     return (
       <View style={{flex: 1, height: '100%'}}>
-        <WorkflowUI workflow={workflow} />
+        {workflow == null && <Loading />}
+        {workflow != null && <WorkflowUI workflow={workflow} />}
       </View>
     );
   }
+
+  async componentDidMount() {
+    const workflow = await boot({url: '/graphql'});
+    this.setState({workflow});
+  }
+}
+
+async function boot(config: {url: string}): Promise<t.Workflow> {
+  const query = `
+    _workflow {
+      workflow
+    }
+  `;
+  const resp = await fetch(`${config.url}?query=query{${query}}`);
+  const data = await resp.json();
+  const workflow: apiTypes.Workflow = data.data._workflow.workflow;
+  return configureWorkflow(workflow);
+}
+
+function configureWorkflow(workflow: apiTypes.Workflow): t.Workflow {
+  const {start, nodes} = workflow;
+
+  function configureAction(action: apiTypes.Action) {
+    switch (action.type) {
+      case 'PickAction':
+        return PickAction.configure({
+          id: action.id,
+          title: action.title,
+          entityName: action.entity,
+          fields: action.fields,
+        });
+      case 'ViewAction':
+        return ViewAction.configure({
+          id: action.id,
+          title: action.title,
+          entityName: action.entity,
+          fields: action.fields,
+        });
+      case 'GuardAction': {
+        const requires = {};
+        for (const {name, type} of action.require) {
+          requires[name] = Workflow.entityType(type);
+        }
+        return Workflow.guard({
+          requires,
+          query(context) {
+            const args = [];
+            for (const {name, type} of action.require) {
+              args.push(`${name}: "${context[name].value.id}"`);
+            }
+            return `
+              _workflow {
+                values {
+                  ${action.id}(${args.join(', ')})
+                }
+              }
+            `;
+          },
+          check(context, data) {
+            return Boolean(data._workflow.values[action.id]);
+          },
+        });
+      }
+      case 'QueryAction': {
+        const requires = {};
+        for (const {name, type} of action.require) {
+          requires[name] = Workflow.entityType(type);
+        }
+        return Workflow.query({
+          requires,
+          provides: {},
+
+          query(context) {
+            const args = [];
+            for (const {name, type} of action.require) {
+              args.push(`${name}: "${context[name].value.id}"`);
+            }
+            const query = [];
+            for (const {type} of action.query) {
+              query.push(`${action.id}__${type.name}(${args.join(', ')})`);
+            }
+            return `
+              _workflow {
+                values {
+                  ${query.join(', ')}
+                }
+              }
+            `;
+          },
+
+          update(context, data) {
+            const update = {};
+            for (const {type} of action.query) {
+              const dataKey = `${action.id}__${type.name}`;
+              update[type.name] = Workflow.entity(type.type, {
+                id: data._workflow.values[dataKey],
+              });
+            }
+            return {...context, ...update};
+          },
+        });
+      }
+      default:
+        invariant(false, 'Unknown action type: %s', action.type);
+    }
+  }
+
+  function configureNode(node: apiTypes.WorkflowNode) {
+    switch (node.type) {
+      case 'WorkflowRef':
+        return configureNode(nodes[node.ref]);
+      case 'WorkflowSequence':
+        const sequence = node.sequence.map(node => configureNode(node));
+        return Workflow.sequence(sequence);
+      case 'WorkflowChoice':
+        const choice = node.choice.map(node => configureNode(node));
+        return Workflow.choice(choice);
+      case 'WorkflowAction':
+        return configureAction(node.action);
+      default:
+        invariant(false, 'Unknown workflow type: %s', node.type);
+    }
+  }
+
+  const node = configureNode(start);
+
+  return node;
 }

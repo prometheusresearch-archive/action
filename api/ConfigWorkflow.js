@@ -26,77 +26,16 @@ import {
   getMappingNodeValueNodeByKey,
   type Parser as ParserBase,
 } from './Validate.js';
-
-export type Action = GuardAction | PickAction | ViewAction | MakeAction;
-
-export type ContextShape = Array<{name: string, type: string}>;
-
-export type GuardAction = {
-  type: 'GuardAction',
-  id: string,
-  require: ContextShape,
-  query: string,
-};
-
-export type MakeAction = {
-  type: 'MakeAction',
-  id: string,
-  entity: string,
-};
-
-export type ViewAction = {
-  type: 'ViewAction',
-  id: string,
-  entity: string,
-};
-
-export type PickAction = {
-  type: 'PickAction',
-  id: string,
-  entity: string,
-};
-
-export type WorkflowSequence = {
-  type: 'WorkflowSequence',
-  sequence: Array<WorkflowNode>,
-};
-
-export type WorkflowChoice = {
-  type: 'WorkflowChoice',
-  choice: Array<WorkflowNode>,
-};
-
-export type WorkflowAction = {
-  type: 'WorkflowAction',
-  action: Action,
-};
-
-export type WorkflowRef = {
-  type: 'WorkflowRef',
-  ref: string,
-};
-
-export type WorkflowNode =
-  | WorkflowAction
-  | WorkflowRef
-  | WorkflowSequence
-  | WorkflowChoice;
-
-export type WorkflowNodeOrAction = WorkflowNode | WorkflowAction;
-
-export type Workflow = {
-  start: WorkflowNode,
-  nodes: {[id: string]: WorkflowNode},
-};
+import * as t from './types.js';
 
 type ParserContext = {
   id: string,
-  createActionReference(string): ?WorkflowRef,
+  createActionReference(string): ?t.WorkflowRef,
 };
 
 type Parser<V> = ParserBase<V, ParserContext>;
 
-const parseAction: Parser<WorkflowAction> = lazy().refine((pos, action) => {
+const parseAction: Parser<t.WorkflowAction> = lazy().refine((pos, action) => {
   const typeNode = getMappingNodeValueNodeByKey('type', action.node);
   if (typeNode == null) {
     pos.error('missing "type" attribute');
@@ -111,15 +50,16 @@ const parseAction: Parser<WorkflowAction> = lazy().refine((pos, action) => {
       pos.error(`unknown action found "${type}"`);
       invariant(false, 'impossible');
     }
-    const parsedAction = action.parseWith({}, parseAction);
+    const id = sanitizeId(pos.context.id);
+    const parsedAction = action.parseWith({id}, parseAction);
     return {
       type: 'WorkflowAction',
-      action: {...parsedAction, id: sanitizeId(pos.context.id)},
+      action: parsedAction,
     };
   }
 });
 
-const parseActionRef: Parser<WorkflowRef> = string().refine((pos, value, node) => {
+const parseActionRef: Parser<t.WorkflowRef> = string().refine((pos, value, node) => {
   const action = pos.context.createActionReference(value);
   if (action == null) {
     throw new ParseError(`unable to resolve action ${value}`, pos);
@@ -127,8 +67,8 @@ const parseActionRef: Parser<WorkflowRef> = string().refine((pos, value, node) =
   return action;
 });
 
-const parseWorkflowNode = recursive(parseWorkflowNode => {
-  const parseChoice: Parser<WorkflowNode> = sequence(parseWorkflowNode).refine(
+const parseWorkflowNode: Parser<t.WorkflowNode> = recursive(parseWorkflowNode => {
+  const parseChoice: Parser<t.WorkflowNode> = sequence(parseWorkflowNode).refine(
     (_ctx, choice) => {
       if (choice.length === 1) {
         return choice[0];
@@ -164,41 +104,43 @@ const parseWorkflowNode = recursive(parseWorkflowNode => {
   );
 });
 
-const parseWorkflowNodeOrAction = switchCase(
+const parseWorkflowNodeOrAction: Parser<t.WorkflowNodeOrAction> = switchCase(
   [hasFieldOfType('type', string()), parseAction],
   [true, parseWorkflowNode],
 );
 
-const parseWorkflow: ParserBase<Workflow> = mapping(lazy()).refine((ctx, rules, node) => {
-  function createActionReference(ref: string) {
-    const rule = rules[ref];
-    if (rule == null) {
-      return null;
-    } else {
-      return {type: 'WorkflowRef', ref};
+const parseWorkflow: ParserBase<t.Workflow> = mapping(lazy()).refine(
+  (ctx, rules, node) => {
+    function createActionReference(ref: string) {
+      const rule = rules[ref];
+      if (rule == null) {
+        return null;
+      } else {
+        return {type: 'WorkflowRef', ref};
+      }
     }
-  }
-  function createContext(id) {
-    const context: ParserContext = {
-      id,
-      createActionReference,
+    function createContext(id) {
+      const context: ParserContext = {
+        id,
+        createActionReference,
+      };
+      return context;
+    }
+    const nodes = {};
+    for (const id in rules) {
+      nodes[id] = rules[id].parseWith(createContext(id), parseWorkflowNodeOrAction);
+    }
+    const start = createActionReference('start');
+    if (start == null) {
+      ctx.error('missing "start" workflow');
+      invariant(false, 'impossible');
+    }
+    return {
+      start,
+      nodes,
     };
-    return context;
-  }
-  const nodes = {};
-  for (const id in rules) {
-    nodes[id] = rules[id].parseWith(createContext(id), parseWorkflowNodeOrAction);
-  }
-  const start = createActionReference('start');
-  if (start == null) {
-    ctx.error('missing "start" workflow');
-    invariant(false, 'impossible');
-  }
-  return {
-    start,
-    nodes,
-  };
-});
+  },
+);
 
 const parseWorkflowFromConfig = record(
   {workflow: parseWorkflow},
@@ -213,7 +155,7 @@ export function parseString(v: string) {
   return parseStringWith({}, parseWorkflowFromConfig, v);
 }
 
-export function traverseAction(workflow: Workflow, f: Action => void) {
+export function traverseAction(workflow: t.Workflow, f: t.Action => void) {
   const {start, nodes} = workflow;
   const queue = [start];
   while (queue.length > 0) {
@@ -235,52 +177,90 @@ export function traverseAction(workflow: Workflow, f: Action => void) {
   }
 }
 
-const parseContextShape: Parser<ContextShape> = sequence(
-  switchCase(
-    [onScalar, string().refine((_pos, value) => ({name: value, type: value}))],
-    [
-      onMapping,
-      mapping(string()).refine((_pos, items) => {
-        const reqs = [];
-        for (const name in items) {
-          reqs.push({name, type: items[name]});
-        }
-        return reqs;
-      }),
-    ],
-  ),
+const parseType = switchCase(
+  [onScalar, string().refine((_pos, value) => ({name: value, type: value}))],
+  [
+    onMapping,
+    mapping(string()).refine((_pos, items) => {
+      const reqs = [];
+      for (const name in items) {
+        reqs.push({name, type: items[name]});
+      }
+      return reqs;
+    }),
+  ],
 );
 
-const parseGuard = record({
+const parseContextShape: Parser<t.ContextShape> = sequence(parseType);
+
+const parseGuard: Parser<t.GuardAction> = record({
   type: constant('guard'),
   require: parseContextShape,
   query: string(),
+}).refine((pos, data) => {
+  return {
+    ...data,
+    type: 'GuardAction',
+    id: pos.context.id,
+  };
 });
 
-const parseQuery = record({
+const parseQuery: Parser<t.QueryAction> = record({
   type: constant('query'),
   require: parseContextShape,
-  query: mapping(string()),
+  query: sequence(record({type: parseType, query: string()})),
+}).refine((pos, data) => {
+  return {
+    ...data,
+    type: 'QueryAction',
+    id: pos.context.id,
+  };
 });
 
-const parsePick = record({
+const parsePick: Parser<t.PickAction> = record({
   type: constant('pick'),
   entity: string(),
+  fields: sequence(string()),
+}).refine((pos, data) => {
+  return {
+    ...data,
+    type: 'PickAction',
+    id: pos.context.id,
+  };
 });
 
-const parseView = record({
+const parseView: Parser<t.ViewAction> = record({
   type: constant('view'),
+  fields: sequence(string()),
   entity: string(),
+}).refine((pos, data) => {
+  return {
+    ...data,
+    type: 'ViewAction',
+    id: pos.context.id,
+  };
 });
 
-const parseMake = record({
+const parseMake: Parser<t.MakeAction> = record({
   type: constant('make'),
   entity: string(),
+}).refine((pos, data) => {
+  return {
+    ...data,
+    type: 'MakeAction',
+    id: pos.context.id,
+  };
 });
 
-const parseEdit = record({
+const parseEdit: Parser<t.EditAction> = record({
   type: constant('edit'),
   entity: string(),
+}).refine((pos, data) => {
+  return {
+    ...data,
+    type: 'EditAction',
+    id: pos.context.id,
+  };
 });
 
 const parseActionByType = {

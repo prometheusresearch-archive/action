@@ -11,10 +11,10 @@ import * as t from './types.js';
 import * as gql from 'graphql';
 import * as gqlType from 'graphql/type';
 import * as Db from './Db.js';
-import {type Workflow, traverseAction} from './ConfigWorkflow.js';
+import {traverseAction} from './ConfigWorkflow.js';
 
 type Params = {
-  workflow: Workflow,
+  workflow: t.Workflow,
   db: Db.Db,
 };
 
@@ -52,12 +52,12 @@ export function create({db, workflow}: Params) {
     }
     const fields = {};
 
-    for (const name in action.query) {
-      fields[action.id + '__' + name] = {
+    for (const {type, query} of action.query) {
+      fields[action.id + '__' + type.name] = {
         type: gqlType.GraphQLString,
         resolve: async (_root, args) => {
-          const {query, values} = compileQuery(action.query[name], args);
-          const result = await db.query(query, values);
+          const compiled = compileQuery(query, args);
+          const result = await db.query(compiled.query, compiled.values);
           const row = result.rows[0];
           if (row == null) {
             return null;
@@ -73,19 +73,40 @@ export function create({db, workflow}: Params) {
 
   let fields = {};
   traverseAction(workflow, action => {
-    if (action.type === 'guard') {
+    if (action.type === 'GuardAction') {
       fields = {...fields, ...createFieldForGuard(action)};
-    } else if (action.type === 'query') {
+    } else if (action.type === 'QueryAction') {
       fields = {...fields, ...createFieldForQuery(action)};
     }
   });
 
+  const emptyObjectFunction = () => ({});
+
+  // FIXME: shouldn't be polymorphic
+  const values =
+    Object.keys(fields).length > 0
+      ? new gqlType.GraphQLObjectType({
+          name: '_workflowValues',
+          fields,
+        })
+      : RawType;
+
   return {
     _workflow: {
-      resolve: () => ({}),
+      resolve: emptyObjectFunction,
       type: new gql.GraphQLObjectType({
         name: '_workflow',
-        fields,
+        resolve: emptyObjectFunction,
+        fields: {
+          values: {
+            resolve: emptyObjectFunction,
+            type: values,
+          },
+          workflow: {
+            resolve: () => workflow,
+            type: RawType,
+          },
+        },
       }),
     },
   };
@@ -102,3 +123,10 @@ function compileQuery(query, args) {
   });
   return {query: compiledQuery, values};
 }
+
+const RawType = new gqlType.GraphQLScalarType({
+  name: 'Raw',
+  serialize(value) {
+    return value;
+  },
+});
