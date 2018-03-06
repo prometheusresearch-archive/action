@@ -151,6 +151,11 @@ export function record<Ctx: {}, F: *, V: ObjParserToValue<Ctx, F>>(
           const valuePos = pos.when(`parsing key ${key}`);
           result[key] = valueParser.parse(valuePos, valueNode);
         }
+        for (const key in fields) {
+          if (!(key in result)) {
+            throw new ParseError(`missing field ${key}`, pos);
+          }
+        }
         // $FlowFixMe: ...
         return ((result: any): V);
       }

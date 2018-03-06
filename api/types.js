@@ -113,6 +113,7 @@ export type ContextShape = Array<{name: string, type: string}>;
 export type GuardAction = {
   type: 'GuardAction',
   id: string,
+  title: string,
   require: ContextShape,
   query: string,
 };
@@ -120,6 +121,7 @@ export type GuardAction = {
 export type MakeAction = {
   type: 'MakeAction',
   id: string,
+  title: string,
   entity: string,
 };
 
@@ -135,6 +137,7 @@ export type EditAction = {
   type: 'EditAction',
   id: string,
   entity: string,
+  title: string,
 };
 
 export type PickAction = {

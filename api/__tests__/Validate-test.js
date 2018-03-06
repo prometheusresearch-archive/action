@@ -27,7 +27,7 @@ test('record', function() {
     a: v.string(),
   });
   const parse = s => v.parseStringWith({}, p, s);
-  expect(parse('{}')).toEqual({});
+  expect(() => parse('{}')).toThrowError(v.ParseError);
   expect(parse('{a: b}')).toEqual({a: 'b'});
   expect(() => parse('{a: 21}')).toThrowError(v.ParseError);
   expect(() => parse('{a: b, b: c}')).toThrowError(v.ParseError);

@@ -4,30 +4,31 @@ exports[`complex actions 1`] = `
 Object {
   "workflow": Object {
     "nodes": Object {
-      "make-individual": Object {
+      "makeIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "make_individual",
-          "type": "make",
+          "id": "makeIndividual",
+          "type": "MakeAction",
         },
         "type": "WorkflowAction",
       },
-      "pick-individual": Object {
+      "pickIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "pick_individual",
-          "type": "pick",
+          "fields": Array [],
+          "id": "pickIndividual",
+          "type": "PickAction",
         },
         "type": "WorkflowAction",
       },
-      "pick-make-individual": Object {
+      "pickMakeIndividual": Object {
         "choice": Array [
           Object {
-            "ref": "pick-individual",
+            "ref": "pickIndividual",
             "type": "WorkflowRef",
           },
           Object {
-            "ref": "make-individual",
+            "ref": "makeIndividual",
             "type": "WorkflowRef",
           },
         ],
@@ -38,28 +39,29 @@ Object {
           Object {
             "sequence": Array [
               Object {
-                "ref": "pick-make-individual",
+                "ref": "pickMakeIndividual",
                 "type": "WorkflowRef",
               },
               Object {
-                "ref": "view-individual",
+                "ref": "viewIndividual",
                 "type": "WorkflowRef",
               },
             ],
             "type": "WorkflowSequence",
           },
           Object {
-            "ref": "make-individual",
+            "ref": "makeIndividual",
             "type": "WorkflowRef",
           },
         ],
         "type": "WorkflowChoice",
       },
-      "view-individual": Object {
+      "viewIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "view_individual",
-          "type": "view",
+          "fields": Array [],
+          "id": "viewIndividual",
+          "type": "ViewAction",
         },
         "type": "WorkflowAction",
       },
@@ -76,44 +78,46 @@ exports[`deep sequence opt 1`] = `
 Object {
   "workflow": Object {
     "nodes": Object {
-      "make-individual": Object {
+      "makeIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "make_individual",
-          "type": "make",
+          "id": "makeIndividual",
+          "type": "MakeAction",
         },
         "type": "WorkflowAction",
       },
-      "pick-individual": Object {
+      "pickIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "pick_individual",
-          "type": "pick",
+          "fields": Array [],
+          "id": "pickIndividual",
+          "type": "PickAction",
         },
         "type": "WorkflowAction",
       },
       "start": Object {
         "sequence": Array [
           Object {
-            "ref": "pick-individual",
+            "ref": "pickIndividual",
             "type": "WorkflowRef",
           },
           Object {
-            "ref": "view-individual",
+            "ref": "viewIndividual",
             "type": "WorkflowRef",
           },
           Object {
-            "ref": "make-individual",
+            "ref": "makeIndividual",
             "type": "WorkflowRef",
           },
         ],
         "type": "WorkflowSequence",
       },
-      "view-individual": Object {
+      "viewIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "view_individual",
-          "type": "view",
+          "fields": Array [],
+          "id": "viewIndividual",
+          "type": "ViewAction",
         },
         "type": "WorkflowAction",
       },
@@ -130,30 +134,31 @@ exports[`recursive actions 1`] = `
 Object {
   "workflow": Object {
     "nodes": Object {
-      "edit-individual": Object {
+      "editIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "edit_individual",
-          "type": "make",
+          "id": "editIndividual",
+          "type": "MakeAction",
         },
         "type": "WorkflowAction",
       },
-      "pick-individual": Object {
+      "pickIndividual": Object {
         "action": Object {
           "entity": "individual",
-          "id": "pick_individual",
-          "type": "pick",
+          "fields": Array [],
+          "id": "pickIndividual",
+          "type": "PickAction",
         },
         "type": "WorkflowAction",
       },
       "start": Object {
         "sequence": Array [
           Object {
-            "ref": "pick-individual",
+            "ref": "pickIndividual",
             "type": "WorkflowRef",
           },
           Object {
-            "ref": "edit-individual",
+            "ref": "editIndividual",
             "type": "WorkflowRef",
           },
           Object {
@@ -179,8 +184,9 @@ Object {
       "start": Object {
         "action": Object {
           "entity": "individual",
+          "fields": Array [],
           "id": "start",
-          "type": "pick",
+          "type": "PickAction",
         },
         "type": "WorkflowAction",
       },

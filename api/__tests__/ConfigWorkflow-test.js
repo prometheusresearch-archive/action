@@ -11,6 +11,7 @@ test('simple actions', function() {
       start:
         type: pick
         entity: individual
+        fields: []
   `);
   expect(w).toMatchSnapshot();
 });
@@ -18,24 +19,26 @@ test('simple actions', function() {
 test('complex actions', function() {
   const w = W.parseString(outdent`
     workflow:
-      pick-individual:
+      pickIndividual:
         type: pick
         entity: individual
-      view-individual:
+        fields: []
+      viewIndividual:
         type: view
         entity: individual
-      make-individual:
+        fields: []
+      makeIndividual:
         type: make
         entity: individual
 
       start:
-      - pick-make-individual:
-        - view-individual
-      - make-individual
+      - pickMakeIndividual:
+        - viewIndividual
+      - makeIndividual
 
-      pick-make-individual:
-      - pick-individual
-      - make-individual
+      pickMakeIndividual:
+      - pickIndividual
+      - makeIndividual
   `);
   expect(w).toMatchSnapshot();
 });
@@ -43,20 +46,22 @@ test('complex actions', function() {
 test('deep sequence opt', function() {
   const w = W.parseString(outdent`
     workflow:
-      pick-individual:
+      pickIndividual:
         type: pick
         entity: individual
-      view-individual:
+        fields: []
+      viewIndividual:
         type: view
         entity: individual
-      make-individual:
+        fields: []
+      makeIndividual:
         type: make
         entity: individual
 
       start:
-      - pick-individual:
-        - view-individual:
-          - make-individual
+      - pickIndividual:
+        - viewIndividual:
+          - makeIndividual
   `);
   expect(w).toMatchSnapshot();
 });
@@ -64,16 +69,17 @@ test('deep sequence opt', function() {
 test('recursive actions', function() {
   const w = W.parseString(outdent`
     workflow:
-      pick-individual:
+      pickIndividual:
         type: pick
         entity: individual
-      edit-individual:
+        fields: []
+      editIndividual:
         type: make
         entity: individual
 
       start:
-      - pick-individual:
-        - edit-individual:
+      - pickIndividual:
+        - editIndividual:
           - start
   `);
   expect(w).toMatchSnapshot();
