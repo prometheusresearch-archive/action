@@ -97,6 +97,20 @@ module Value = struct
 end
 
 (**
+ * Argument is a value along with some label.
+ *)
+module Arg = struct
+  type t = {
+    name : string;
+    value : Value.t
+  }
+
+  let make name value = { name; value }
+
+end
+
+
+(**
  * Type system.
  *)
 module Type = struct
@@ -134,6 +148,9 @@ module Type = struct
     | Entity (name, _fields) -> {j|Entity($name)|j}
     | Record _fields -> "{}"
 
+  (**
+   * Combinators to define a type system.
+   *)
   module Syntax = struct
 
     let entity name fields = Entity (name, Some fields)
@@ -158,7 +175,7 @@ module Type = struct
 end
 
 (**
- * Universe is a collection of fields which are available on a void type.
+ * Universe is a collection of types which are available on a void type.
  *)
 module Universe : sig
 
@@ -198,20 +215,16 @@ end = struct
   let fields univ = univ
 end
 
-module Arg = struct
+(**
+ * This defines a query syntax parametrized by the payload.
+ *
+ * Payload can be used to store some semantic info along with a query, for
+ * example location of the query sources parsed from source files or type
+ * information.
+ *)
+module Query (P : sig type t end)= struct
 
-  type t = {
-    name : string;
-    value : Value.t
-  }
-
-  let make name value = { name; value }
-
-end
-
-module Query (V : sig type t end)= struct
-
-  type t = V.t * syntax
+  type t = P.t * syntax
 
   and syntax =
     | Void
@@ -237,9 +250,18 @@ module Query (V : sig type t end)= struct
 
 end
 
+(**
+ * Untype query.
+ *)
 module UntypedQuery = struct
-  include Query(struct type t = unit end)
 
+  include Query(struct
+    type t = unit
+  end)
+
+  (**
+   * A set of combinators to construct queries programmatically.
+   *)
   module Syntax = struct
 
     let void =
@@ -272,12 +294,19 @@ module UntypedQuery = struct
 
 end
 
+(**
+ * Query with type and cardinality information attached.
+ *)
 module TypedQuery = struct
   include Query(struct
     type t = (Cardinality.t * Type.t)
   end)
 end
 
+(**
+ * This module implements a type checking / type inferrence for query structure
+ * by turning untype queries into typed ones.
+ *)
 module Typer : sig
 
   val typeQuery : Universe.t -> UntypedQuery.t -> (TypedQuery.t, string) Result.t
@@ -386,6 +415,9 @@ end = struct
 
 end
 
+(**
+ * This is an opaque structure which defines UI.
+ *)
 module UI : sig
 
   type t
@@ -410,6 +442,12 @@ end = struct
   let typ ui = ui##typ
 end
 
+(**
+ * Query result which extends JSON type with a special UI type.
+ *
+ * It is implemented as a zero (almost) cost on top of native JS data
+ * structures.
+ *)
 module QueryResult = struct
 
   type t
@@ -449,6 +487,9 @@ module QueryResult = struct
 
 end
 
+(**
+ * Abstract interface to the database.
+ *)
 module type DATABASE = sig
 
   type t
