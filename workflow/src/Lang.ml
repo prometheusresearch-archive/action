@@ -56,6 +56,11 @@ module Cardinality = struct
     | One, Many -> Many
     | One, Opt -> Opt
     | One, One -> One
+
+  let show = function
+    | One -> "one"
+    | Opt -> "opt"
+    | Many -> "many"
 end
 
 module ValueType = struct
@@ -63,6 +68,11 @@ module ValueType = struct
     | StringTyp
     | NumberTyp
     | BoolTyp
+
+  let show = function
+    | StringTyp -> "string"
+    | NumberTyp -> "number"
+    | BoolTyp -> "bool"
 end
 
 module Value = struct
@@ -70,13 +80,19 @@ module Value = struct
     | String of string
     | Number of float
     | Bool of bool
+
+  let show = function
+    | String v -> v
+    | Number v -> string_of_float v
+    | Bool v -> string_of_bool v
 end
 
 module Type = struct
 
   type t =
     | Void
-    | UI of (string * field list option)
+    | PickUI of t
+    | ViewUI of t
     | Entity of (string * field list option)
     | Record of field list
     | Value of (ValueType.t * field list option)
@@ -99,7 +115,6 @@ module Type = struct
   }
 
   let entity name fields = Entity (name, Some fields)
-  let ui name fields = UI (name, Some fields)
 
   let has ?(card=Cardinality.One) ?args name typ =
     {
@@ -116,6 +131,14 @@ module Type = struct
   let string = Value (ValueType.StringTyp, None)
   let number = Value (ValueType.NumberTyp, None)
   let bool = Value (ValueType.BoolTyp, None)
+
+  let rec show = function
+    | Void -> "void"
+    | Value (t, _fields) -> ValueType.show t
+    | PickUI t -> let t = show t in {j|PickUI($t)|j}
+    | ViewUI t -> let t = show t in {j|ViewUI($t)|j}
+    | Entity (name, _fields) -> {j|Entity($name)|j}
+    | Record _fields -> "{}"
 end
 
 (**
@@ -166,6 +189,8 @@ module Arg = struct
     value : Value.t
   }
 
+  let make name value = { name; value }
+
 end
 
 module Query (V : sig type t end)= struct
@@ -177,6 +202,10 @@ module Query (V : sig type t end)= struct
     | Here
     | Select of (t * select)
     | Navigate of t * nav
+    | One of t
+    | First of t
+    | PickUI of t
+    | ViewUI of t
 
   and nav = {
     name : string;
@@ -211,6 +240,18 @@ module UntypedQuery = struct
 
     let field ?alias query =
       { query; alias; }
+
+    let renderPick query =
+      (), PickUI query
+
+    let renderView query =
+      (), ViewUI query
+
+    let one query =
+      (), One query
+
+    let first query =
+      (), First query
   end
 
 end
@@ -236,8 +277,28 @@ end = struct
     in
     match typ with
     | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
-    | Type.UI (_, None) -> error "cannot extract field"
-    | Type.UI (_, Some fields) -> findInFieldList fields
+    | Type.PickUI typ ->
+      begin match fieldName with
+      | "value" -> Ok {
+          Type.
+          fieldName = "value";
+          fieldArgs = None;
+          fieldTyp = typ;
+          fieldCard = Cardinality.Opt
+        }
+      | _ -> error {j|no such field on PickUI: $fieldName|j}
+      end
+    | Type.ViewUI typ ->
+      begin match fieldName with
+      | "value" -> Ok {
+          Type.
+          fieldName = "value";
+          fieldArgs = None;
+          fieldTyp = typ;
+          fieldCard = Cardinality.Opt
+        }
+      | _ -> error {j|no such field on ViewUI: $fieldName|j}
+      end
     | Type.Entity (_, None) -> error "cannot extract field"
     | Type.Entity (_, Some fields) -> findInFieldList fields
     | Type.Record fields -> findInFieldList fields
@@ -251,6 +312,30 @@ end = struct
         return ((Cardinality.One, Type.Void), TypedQuery.Void)
       | UntypedQuery.Here ->
         return (scope, TypedQuery.Here)
+      | UntypedQuery.One parent ->
+        let%bind parent = aux ~scope parent in
+        return (scope, TypedQuery.One parent)
+      | UntypedQuery.First parent ->
+        let%bind ((_, parentType), _) as parent = aux ~scope parent in
+        return ((Cardinality.Opt, parentType), TypedQuery.One parent)
+      | UntypedQuery.PickUI parent ->
+        let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
+        begin match parentCard with
+        | Cardinality.One
+        | Cardinality.Opt -> error "pick can only be rendered with queries which result in a list of entities"
+        | Cardinality.Many ->
+          return ((Cardinality.One, Type.PickUI parentType), TypedQuery.PickUI parent)
+        end
+      | UntypedQuery.ViewUI parent ->
+        let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
+        Js.log (Type.show parentType);
+        begin match parentCard with
+        | Cardinality.One
+        | Cardinality.Opt ->
+          return ((Cardinality.One, Type.ViewUI parentType), TypedQuery.ViewUI parent)
+        | Cardinality.Many ->
+          error "view can only be rendered with queries which result in nothing or a single entity"
+        end
       | UntypedQuery.Navigate (parent, navigation) ->
         let { UntypedQuery. name; args } = navigation in
         let navigation = { TypedQuery. name; args; } in
@@ -286,15 +371,74 @@ end = struct
 
 end
 
+module UI : sig
+
+  type t
+
+  val make : string -> Type.t -> TypedQuery.t -> t
+  val test : 'a -> bool
+  val query : t -> TypedQuery.t
+  val typ : t -> Type.t
+
+end = struct
+  type t = < name : string; typ: Type.t; query : TypedQuery.t > Js.t
+
+  external make : string -> Type.t -> TypedQuery.t -> t = "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
+
+  let test_ : 'a -> bool = [%bs.raw {|
+    function test(v) { return v instanceof UIRepr.UIRepr; }
+  |}]
+
+  let test x = test_ (Obj.magic x)
+
+  let query ui = ui##query
+  let typ ui = ui##typ
+end
+
+module QueryResult = struct
+
+  type t
+
+  let null : t = Obj.magic (Js.null)
+  external string : string -> t = "%identity"
+  external number : float -> t = "%identity"
+  external bool : bool -> t = "%identity"
+  external ui : UI.t -> t = "%identity"
+  external array : t array -> t = "%identity"
+  external obj : t Js.Dict.t -> t = "%identity"
+  external ofJson : Js.Json.t -> t = "%identity"
+
+  type tagged =
+    | Object of t Js.Dict.t
+    | Array of t array
+    | String of string
+    | Number of float
+    | Bool of bool
+    | UI of UI.t
+    | Null
+
+  let classify (v : t) =
+    if Js.typeof v = "string"
+    then String (Obj.magic v)
+    else if Js.typeof v = "number"
+    then Number (Obj.magic v)
+    else if Js.typeof v = "boolean"
+    then Bool (Obj.magic v)
+    else if Obj.magic v == Js.null
+    then Null
+    else if Js.Array.isArray (Obj.magic v)
+    then Array (Obj.magic v)
+    else if UI.test v
+    then UI (Obj.magic v)
+    else Object (Obj.magic v)
+
+end
+
 module type DATABASE = sig
 
   type t
 
-  module DataSet : sig
-    type t
-  end
-
-  val runQuery : t -> TypedQuery.t -> (DataSet.t, string) Result.t
+  val runQuery : t -> TypedQuery.t -> (QueryResult.t, string) Result.t
 
 end
 
@@ -313,32 +457,58 @@ end = struct
   let ofString = Js.Json.parseExn
   let ofJson dataset = dataset
 
-  module DataSet = struct
-    type t = Js.Json.t
-  end
-
   let runQuery db query =
     let open Result.Syntax in
-    let rec aux parent (_typ, query) =
-      match query with
+    let root = QueryResult.ofJson db in
+    let rec aux (parent : QueryResult.t) ((_card, typ), syn) =
+      match syn with
       | TypedQuery.Void -> return parent
       | TypedQuery.Here -> return parent
+      | TypedQuery.One query ->
+        let%bind parent = aux parent query in
+        begin match QueryResult.classify parent with
+        | QueryResult.Array items ->
+          if Array.length items = 1
+          then return (Array.get items 0)
+          else error "expected a single value but got multiple"
+        | QueryResult.Null -> error "expected a single value but got null"
+        | _ -> return parent
+        end
+      | TypedQuery.First query ->
+        let%bind parent = aux parent query in
+        begin match QueryResult.classify parent with
+        | QueryResult.Array items ->
+          if Array.length items = 1
+          then return (Array.get items 0)
+          else return QueryResult.null
+        | _ -> return parent
+        end
+      | TypedQuery.PickUI q -> return (QueryResult.ui (UI.make "pick" typ q))
+      | TypedQuery.ViewUI q -> return (QueryResult.ui (UI.make "view" typ q))
       | TypedQuery.Navigate (query, { name; args = _ }) ->
         let%bind parent = aux parent query in
         let navigate dataset =
-          match Js.Json.classify dataset with
-          | Js.Json.JSONObject obj ->
+          match QueryResult.classify dataset with
+          | QueryResult.Object obj ->
             begin match Js.Dict.get obj name with
             | Some dataset -> return dataset
             | None -> error "no such key"
             end
           | _ -> error "expected an object"
         in begin
-        match Js.Json.classify parent with
-        | Js.Json.JSONObject _ -> navigate parent
-        | Js.Json.JSONArray items ->
+        match QueryResult.classify parent with
+        | QueryResult.Object _ -> navigate parent
+        | QueryResult.Array items ->
           let%bind items = Result.Array.map ~f:navigate items in
-          return (Js.Json.array items)
+          return (QueryResult.array items)
+        | QueryResult.UI ui ->
+          let query = UI.query ui in
+          let%bind parent = aux root query in
+          begin match (UI.typ ui), QueryResult.classify parent with
+          | Type.PickUI _, QueryResult.Array items -> return (Array.get items 0)
+          | Type.ViewUI _, QueryResult.Object _ -> return parent
+          | _ -> error "PickUI returns not an array"
+          end
         | _ -> error "expected an object or an array"
         end
       | TypedQuery.Select (query, selection) ->
@@ -354,48 +524,99 @@ end = struct
             | Result.Error err -> error err
           in
           Belt.List.reduce selection (Result.Ok (0, Js.Dict.empty ())) build
-        in return (Js.Json.object_ dataset)
-    in aux db query
+        in return (QueryResult.obj dataset)
+    in aux root query
 
 end
 
 module Test = struct
 
   let univ =
-    let individual = Type.(
-      entity "individual" [
-        hasOne "name" string;
-        hasOne "site" (entity "site" [
-          hasOne "title" string;
-        ])
-      ]
-    ) in
+    let site = Type.(entity "site" [
+      hasOne "title" string;
+    ]) in
+    let individual = Type.(entity "individual" [
+      hasOne "name" string;
+      hasOne "site" site;
+    ]) in
     Universe.(
       empty
       |> hasMany "individual" individual
     )
 
   (**
-    * { individual.pick, individual.code, customField: individual.code }
+    * {
+    *   individuals: individual
+    *   individualsNames: individual.name
+    *   sites: individual.site
+    *   siteTitles: individual.site.title
+    * }
     *)
-  let query = UntypedQuery.Syntax.(
+  let getSomeData = UntypedQuery.Syntax.(
     void
     |> select [
       field ~alias:"individuals" (here |> nav "individual");
-      field ~alias:"individual names" (here |> nav "individual" |> nav "name");
+      field ~alias:"individualNames" (here |> nav "individual" |> nav "name");
       field ~alias:"sites" (here |> nav "individual" |> nav "site");
-      field ~alias:"site titles" (here |> nav "individual" |> nav "site" |> nav "title");
+      field ~alias:"siteTitles" (here |> nav "individual" |> nav "site" |> nav "title");
     ]
   )
 
-  let query2 = UntypedQuery.Syntax.(
-    void |> nav "individual" |> nav "site" |> nav "title"
+  (*
+   * individual.site.pick
+   *)
+  let renderListOfSites = UntypedQuery.Syntax.(
+    void |> nav "individual" |> nav "site" |> renderPick
+  )
+
+  (*
+   * individual.site.first.view
+   *)
+  let renderFirstSite = UntypedQuery.Syntax.(
+    void |> nav "individual" |> nav "site" |> first |> renderView
+  )
+
+  (*
+   * individual.pick.value(id: "someid").site.view
+   *)
+  let renderSiteByIndividual = UntypedQuery.Syntax.(
+    void
+    |> nav "individual"
+    |> renderPick
+    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
+    |> nav "site"
+    |> renderView
+  )
+
+  (*
+   * individual.pick.value(id: "someid")
+   *)
+  let getSelectedIndividual = UntypedQuery.Syntax.(
+    void
+    |> nav "individual"
+    |> renderPick
+    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
+  )
+
+  (*
+   * individual.pick.value(id: "someid").site.view
+   *)
+  let getSiteTitleByIndividualViaView = UntypedQuery.Syntax.(
+    void
+    |> nav "individual"
+    |> renderPick
+    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
+    |> nav "site"
+    |> renderView
+    |> nav "value"
+    |> nav "title"
   )
 
   let db = JSONDatabase.ofString {|
     {
       "individual": [
-          {
+        {
+          "id": 1,
           "name": "Andrey Popp",
           "site": {
             "title": "RexDB Site"
@@ -406,17 +627,30 @@ module Test = struct
   |}
 
   let runQuery db query =
+    Js.log "--- RUNNING QUERY ---";
     let result =
       let open Result.Syntax in
+      Js.log "TYPING...";
       let%bind query = Typer.typeQuery univ query in
-      JSONDatabase.runQuery db query
-    in match result with
-    | Ok dataset -> Js.log dataset
-    | Error err -> Js.log err
+      let (_, typ), _ = query in
+      Js.log2 "TYPE:" (Type.show typ);
+      Js.log "RUNNING...";
+      let%bind result = JSONDatabase.runQuery db query in
+      Js.log2 "RESULT:" result;
+      return ()
+    in
+    match result with
+    | Ok () -> ()
+    | Error err -> Js.log2 "ERROR:" err;
+    Js.log "--- DONE ---"
 
   let () =
     Js.log db;
-    runQuery db query;
-    runQuery db query2
+    runQuery db getSomeData;
+    runQuery db renderListOfSites;
+    runQuery db renderFirstSite;
+    runQuery db renderSiteByIndividual;
+    runQuery db getSelectedIndividual;
+    runQuery db getSiteTitleByIndividualViaView;
 
 end
