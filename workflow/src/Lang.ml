@@ -40,6 +40,9 @@ module Option = struct
   include Js.Option
 end
 
+(**
+ * Query cardinality.
+ *)
 module Cardinality = struct
   type t =
     | One
@@ -63,6 +66,9 @@ module Cardinality = struct
     | Many -> "many"
 end
 
+(**
+ * Represent available primitive value types.
+ *)
 module ValueType = struct
   type t =
     | StringTyp
@@ -75,6 +81,9 @@ module ValueType = struct
     | BoolTyp -> "bool"
 end
 
+(**
+ * Represent primitive values tagged with a type.
+ *)
 module Value = struct
   type t =
     | String of string
@@ -87,6 +96,9 @@ module Value = struct
     | Bool v -> string_of_bool v
 end
 
+(**
+ * Type system.
+ *)
 module Type = struct
 
   type t =
@@ -114,24 +126,6 @@ module Type = struct
     fieldCard : Cardinality.t;
   }
 
-  let entity name fields = Entity (name, Some fields)
-
-  let has ?(card=Cardinality.One) ?args name typ =
-    {
-      fieldName = name;
-      fieldArgs = args;
-      fieldTyp = typ;
-      fieldCard = card;
-    }
-
-  let hasOne = has ~card:Cardinality.One
-  let hasOpt = has ~card:Cardinality.Opt
-  let hasMany = has ~card:Cardinality.Many
-
-  let string = Value (ValueType.StringTyp, None)
-  let number = Value (ValueType.NumberTyp, None)
-  let bool = Value (ValueType.BoolTyp, None)
-
   let rec show = function
     | Void -> "void"
     | Value (t, _fields) -> ValueType.show t
@@ -139,6 +133,28 @@ module Type = struct
     | ViewUI t -> let t = show t in {j|ViewUI($t)|j}
     | Entity (name, _fields) -> {j|Entity($name)|j}
     | Record _fields -> "{}"
+
+  module Syntax = struct
+
+    let entity name fields = Entity (name, Some fields)
+
+    let has ?(card=Cardinality.One) ?args name typ =
+      {
+        fieldName = name;
+        fieldArgs = args;
+        fieldTyp = typ;
+        fieldCard = card;
+      }
+
+    let hasOne = has ~card:Cardinality.One
+    let hasOpt = has ~card:Cardinality.Opt
+    let hasMany = has ~card:Cardinality.Many
+
+    let string = Value (ValueType.StringTyp, None)
+    let number = Value (ValueType.NumberTyp, None)
+    let bool = Value (ValueType.BoolTyp, None)
+  end
+
 end
 
 (**
@@ -168,15 +184,15 @@ end = struct
   let empty = []
 
   let hasOne ?args name typ univ =
-    let field = Type.hasOne ?args name typ in
+    let field = Type.Syntax.hasOne ?args name typ in
     field::univ
 
   let hasOpt ?args name typ univ =
-    let field = Type.hasOpt ?args name typ in
+    let field = Type.Syntax.hasOpt ?args name typ in
     field::univ
 
   let hasMany ?args name typ univ =
-    let field = Type.hasMany ?args name typ in
+    let field = Type.Syntax.hasMany ?args name typ in
     field::univ
 
   let fields univ = univ
@@ -328,7 +344,6 @@ end = struct
         end
       | UntypedQuery.ViewUI parent ->
         let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
-        Js.log (Type.show parentType);
         begin match parentCard with
         | Cardinality.One
         | Cardinality.Opt ->
@@ -532,10 +547,10 @@ end
 module Test = struct
 
   let univ =
-    let site = Type.(entity "site" [
+    let site = Type.Syntax.(entity "site" [
       hasOne "title" string;
     ]) in
-    let individual = Type.(entity "individual" [
+    let individual = Type.Syntax.(entity "individual" [
       hasOne "name" string;
       hasOne "site" site;
     ]) in
@@ -589,16 +604,6 @@ module Test = struct
   )
 
   (*
-   * individual.pick.value(id: "someid")
-   *)
-  let getSelectedIndividual = UntypedQuery.Syntax.(
-    void
-    |> nav "individual"
-    |> renderPick
-    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
-  )
-
-  (*
    * individual.pick.value(id: "someid").site.view
    *)
   let getSiteTitleByIndividualViaView = UntypedQuery.Syntax.(
@@ -610,6 +615,16 @@ module Test = struct
     |> renderView
     |> nav "value"
     |> nav "title"
+  )
+
+  (*
+   * individual.pick.value(id: "someid").site.view
+   *)
+  let getSelectedIndividual = UntypedQuery.Syntax.(
+    void
+    |> nav "individual"
+    |> renderPick
+    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
   )
 
   let db = JSONDatabase.ofString {|
