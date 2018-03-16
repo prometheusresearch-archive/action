@@ -29,6 +29,14 @@ module Result = struct
         let%bind x = f x in
         let%bind xs = map ~f xs in
         return (x::xs)
+
+    let rec foldLeft ~f ~init:v =
+      let open Syntax in
+      function
+      | [] -> return v
+      | x::xs ->
+        let%bind v = f v x in
+        foldLeft ~f ~init:v xs
   end
 
   module Array = struct
@@ -228,7 +236,9 @@ end
  *)
 module Query (P : sig type t end)= struct
 
-  type t = P.t * syntax
+  type payload = P.t
+
+  type t = payload * syntax
 
   and syntax =
     | Void
@@ -313,7 +323,11 @@ end
  *)
 module QueryTyper : sig
 
-  val typeQuery : Universe.t -> UntypedQuery.t -> (TypedQuery.t, string) Result.t
+  val typeQuery :
+    ?scope : TypedQuery.payload
+    -> univ:Universe.t
+    -> UntypedQuery.t
+    -> (TypedQuery.t, string) Result.t
 
 end = struct
 
@@ -321,7 +335,7 @@ end = struct
     let open Result.Syntax in
     let findInFieldList fields =
       match Belt.List.getBy fields (fun field -> field.Type.fieldName = fieldName) with
-      | None -> error "no such field"
+      | None -> error {j|no such field: $fieldName|j}
       | Some field -> Ok field
     in
     match typ with
@@ -353,7 +367,9 @@ end = struct
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ -> error "cannot extract field"
 
-  let typeQuery univ query =
+  let rootScope = Cardinality.One, Type.Void
+
+  let typeQuery ?(scope=rootScope) ~univ query =
     let rec aux ~scope ((), query) =
       let open Result.Syntax in
       match query with
@@ -415,7 +431,7 @@ end = struct
         in
         let typ = Type.Record fields in
         return ((parentCard, typ), TypedQuery.Select (parent, selection))
-    in aux ~scope:(Cardinality.One, Type.Void) query
+    in aux ~scope query
 
 end
 
@@ -592,61 +608,99 @@ end
 (**
  * Monadic structure on top queries which represent transition between screens.
  *)
-module Workflow = struct
+module Workflow (Q : sig type t end) = struct
 
-  module Syntax = struct
-
-    type t =
-      (** Render concrete query to a screen *)
-      | Render of UntypedQuery.t
-      (** Define how to transition from one screen to another screen *)
-      | Next of (t * (UntypedQuery.t -> t))
-      (** Define how to transition from one screen to a list of possible screens *)
-      | Choice of (t * (UntypedQuery.t -> t list ))
-
-    let render q = Render q
-
-    let next path w = Next (w, path)
-
-    let choice paths w = Choice (w, paths)
-
-  end
-
+  type q = Q.t
   type t =
-    | Screen of (TypedQuery.t * t list)
-
-  let compile univ (w : Syntax.t) =
-    let open Result.Syntax in
-    let rec aux ~continue w = match w with
-    | Syntax.Render q ->
-      let%bind ((_, typ), _) as tq = QueryTyper.typeQuery univ q in
-      begin match typ with
-      | Type.Void
-      | Type.Entity _
-      | Type.Record _
-      | Type.Value _ ->
-        (* TODO: Decide if we want to live data values into UI automatically *)
-        error "workflow can only be defined on UI values"
-      | Type.PickScreen _
-      | Type.ViewScreen _ ->
-        let%bind next = continue q in
-        return (Screen (tq, next))
-      end
-    | Syntax.Next (parent, next) ->
-      let continue q =
-        let%bind next = aux ~continue (next q) in
-        return [next]
-      in
-      aux ~continue parent
-    | Syntax.Choice (parent, next) ->
-      let continue q =
-        q |> next |> Result.List.map ~f:(aux ~continue)
-      in
-      aux ~continue parent
-    in
-    aux ~continue:(fun _q -> return []) w
+    (** Render concrete query to a screen *)
+    | Render of q
+    (** Define how to transition from one screen to another screen *)
+    | Next of (t * t list)
 
 end
+
+module UntypedWorkflow = struct
+  include Workflow(struct
+    type t = UntypedQuery.t
+  end)
+
+  module Syntax = struct
+    let render q = Render q
+    let next path w = Next (w, path)
+  end
+end
+
+module TypedWorkflow = struct
+  include Workflow(struct
+    type t = TypedQuery.t
+  end)
+end
+
+module WorkflowTyper = struct
+
+  let rootScope = Cardinality.One, Type.Void
+
+  let typeWorkflow ~univ w =
+    let open Result.Syntax in
+    let rec aux ~scope w =
+      match w with
+      | UntypedWorkflow.Render q ->
+        let%bind ((_, typ) as scope, _) as q = QueryTyper.typeQuery ~univ ~scope q in
+        begin match typ with
+        | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
+          error "workflow can only be defined on UI values"
+        | Type.PickScreen _ | Type.ViewScreen _ ->
+          return (TypedWorkflow.Render q, scope)
+        end
+      | UntypedWorkflow.Next (first, next) ->
+        let%bind first, scope = aux ~scope first in
+        let%bind next, _ =
+          let f (next, scope) w =
+            let%bind w, _ = aux ~scope w in
+            return (w::next, scope)
+          in
+          Result.List.foldLeft ~f ~init:([], scope) next
+        in
+        return (TypedWorkflow.Next (first, next), scope)
+    in
+    let%bind tw, _ = aux w ~scope:rootScope in
+    return tw
+
+end
+
+  (* type t = *)
+  (*   | Screen of (TypedQuery.t * t list) *)
+
+  (* let compile univ (w : Syntax.t) = *)
+  (*   let open Result.Syntax in *)
+  (*   let rec aux ~continue w = match w with *)
+  (*   | Syntax.Render q -> *)
+  (*     let%bind ((_, typ), _) as tq = QueryTyper.typeQuery univ q in *)
+  (*     begin match typ with *)
+  (*     | Type.Void *)
+  (*     | Type.Entity _ *)
+  (*     | Type.Record _ *)
+  (*     | Type.Value _ -> *)
+  (*       (1* TODO: Decide if we want to live data values into UI automatically *1) *)
+  (*       error "workflow can only be defined on UI values" *)
+  (*     | Type.PickScreen _ *)
+  (*     | Type.ViewScreen _ -> *)
+  (*       let%bind next = continue q in *)
+  (*       return (Screen (tq, next)) *)
+  (*     end *)
+  (*   | Syntax.Next (parent, next) -> *)
+  (*     let continue q = *)
+  (*       let%bind next = aux ~continue (next q) in *)
+  (*       return [next] *)
+  (*     in *)
+  (*     aux ~continue parent *)
+  (*   | Syntax.Choice (parent, next) -> *)
+  (*     let continue q = *)
+  (*       q |> next |> Result.List.map ~f:(aux ~continue) *)
+  (*     in *)
+  (*     aux ~continue parent *)
+  (*   in *)
+  (*   aux ~continue:(fun _q -> return []) w *)
 
 module Test = struct
 
@@ -745,23 +799,31 @@ module Test = struct
     }
   |}
 
-  let pickAndViewIndividual =
-    let open Workflow.Syntax in
+  let pickAndViewIndividualWorkflow =
+    let open UntypedWorkflow.Syntax in
     let open UntypedQuery.Syntax in
-    let workflow =
-      render (void |> nav "individual" |> pickScreen)
-      |> choice (fun q -> [
-          render (q |> viewScreen);
-          render (q |> nav "site" |> viewScreen);
-        ])
-    in Workflow.compile univ workflow
+
+    let pickIndividual = here |> nav "individual" |> pickScreen in
+
+    let view = (here |> viewScreen) in
+
+    let viewSite = (here |> nav "value" |> nav "site" |> viewScreen) in
+
+    render pickIndividual |> next [
+      render view;
+      render viewSite;
+    ]
+
+  let runResult result = match result with
+    | Result.Ok () -> ()
+    | Result.Error err -> Js.log2 "ERROR:" err
 
   let runQuery db query =
     Js.log "--- RUNNING QUERY ---";
     let result =
       let open Result.Syntax in
       Js.log "TYPING...";
-      let%bind query = QueryTyper.typeQuery univ query in
+      let%bind query = QueryTyper.typeQuery ~univ query in
       let (_, typ), _ = query in
       Js.log2 "TYPE:" (Type.show typ);
       Js.log "RUNNING...";
@@ -769,10 +831,12 @@ module Test = struct
       Js.log2 "RESULT:" result;
       return ()
     in
-    match result with
-    | Ok () -> ()
-    | Error err -> Js.log2 "ERROR:" err;
+    runResult result;
     Js.log "--- DONE ---"
+
+  let typeWorkflow w =
+    Js.log "TYPING WORKFLOW...";
+    runResult (Result.ignore (WorkflowTyper.typeWorkflow ~univ w))
 
   let () =
     Js.log db;
@@ -782,5 +846,6 @@ module Test = struct
     runQuery db renderSiteByIndividual;
     runQuery db getSelectedIndividual;
     runQuery db getSiteTitleByIndividualViaView;
+    typeWorkflow pickAndViewIndividualWorkflow;
 
 end
