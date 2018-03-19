@@ -273,6 +273,7 @@ module Query (P : sig type t end)= struct
     | Navigate of t * nav
     | One of t
     | First of t
+    | Bind of (t * t)
     | PickScreen of t
     | ViewScreen of t
 
@@ -313,6 +314,9 @@ module UntypedQuery = struct
     let nav ?args name parent =
       (), Navigate (parent, { name; args; })
 
+    let bind q parent =
+      (), Bind (parent, q)
+
     let select fields parent =
       (), Select (parent, fields)
 
@@ -341,6 +345,8 @@ module TypedQuery = struct
   include Query(struct
     type t = CType.t
   end)
+
+  let void = (Card.One, Type.Void), Void
 end
 
 (**
@@ -401,6 +407,11 @@ end = struct
         return ((Card.One, Type.Void), TypedQuery.Void)
       | UntypedQuery.Here ->
         return (scope, TypedQuery.Here)
+      | UntypedQuery.Bind (parent, q) ->
+        let%bind ((prevCard, _) as scope, _) as parent = aux ~scope parent in
+        let%bind ((card, typ), _) as q = aux ~scope q in
+        let scope = Card.merge prevCard card, typ in
+        return (scope, TypedQuery.Bind (parent, q))
       | UntypedQuery.One parent ->
         let%bind parent = aux ~scope parent in
         return (scope, TypedQuery.One parent)
@@ -567,28 +578,32 @@ end = struct
   let runQuery db query =
     let open Result.Syntax in
     let root = QueryResult.ofJson db in
-    let rec aux (parent : QueryResult.t) ((_card, typ), syn) =
+    let rec aux ~(value : QueryResult.t) ((_card, typ), syn) =
       match syn with
-      | TypedQuery.Void -> return parent
-      | TypedQuery.Here -> return parent
+      | TypedQuery.Void -> return root
+      | TypedQuery.Here -> return value
+      | TypedQuery.Bind (query, next) ->
+        let%bind value = aux ~value query in
+        let%bind value = aux ~value next in
+        return value
       | TypedQuery.One query ->
-        let%bind parent = aux parent query in
-        begin match QueryResult.classify parent with
+        let%bind value = aux ~value query in
+        begin match QueryResult.classify value with
         | QueryResult.Array items ->
           if Array.length items = 1
           then return (Array.get items 0)
           else error "expected a single value but got multiple"
         | QueryResult.Null -> error "expected a single value but got null"
-        | _ -> return parent
+        | _ -> return value
         end
       | TypedQuery.First query ->
-        let%bind parent = aux parent query in
-        begin match QueryResult.classify parent with
+        let%bind value = aux ~value query in
+        begin match QueryResult.classify value with
         | QueryResult.Array items ->
           if Array.length items = 1
           then return (Array.get items 0)
           else return QueryResult.null
-        | _ -> return parent
+        | _ -> return value
         end
       | TypedQuery.PickScreen q ->
         let%bind uiTyp = Type.extractUi typ in
@@ -597,38 +612,41 @@ end = struct
         let%bind uiTyp = Type.extractUi typ in
         return (QueryResult.ui (UI.make ~name:"view" ~uiTyp q))
       | TypedQuery.Navigate (query, { name; args = _ }) ->
-        let%bind parent = aux parent query in
-        let navigate dataset =
+        let prevValue = value in
+        let%bind value = aux ~value query in
+        let navigate name dataset =
           match QueryResult.classify dataset with
           | QueryResult.Object obj ->
             begin match Js.Dict.get obj name with
             | Some dataset -> return dataset
-            | None -> error "no such key"
+            | None -> error {j|no such key: $name|j}
             end
           | _ -> error "expected an object"
         in begin
-        match QueryResult.classify parent with
-        | QueryResult.Object _ -> navigate parent
-        | QueryResult.Array items ->
-          let%bind items = Result.Array.map ~f:navigate items in
+        match QueryResult.classify value, name with
+        | QueryResult.Object _, name -> navigate name value
+        | QueryResult.Array items, name  ->
+          let%bind items = Result.Array.map ~f:(navigate name) items in
           return (QueryResult.array items)
-        | QueryResult.UI ui ->
+        | QueryResult.UI ui, name ->
           let query = UI.query ui in
-          let%bind parent = aux root query in
-          begin match (UI.typ ui), QueryResult.classify parent with
-          | Type.PickScreen _, QueryResult.Array items -> return (Array.get items 0)
-          | Type.ViewScreen _, QueryResult.Object _ -> return parent
-          | _ -> error "PickScreen returns not an array"
+          let%bind value = aux ~value:prevValue query in
+          begin match (UI.typ ui), name, QueryResult.classify value with
+          | Type.PickScreen _, "value", QueryResult.Array items ->
+            return (Array.get items 0)
+          | Type.ViewScreen _, "value", QueryResult.Object _ ->
+            return value
+          | _, name, _ -> error {j|no such key: $name|j}
           end
         | _ -> error "expected an object or an array"
         end
       | TypedQuery.Select (query, selection) ->
-        let%bind parent = aux parent query in
+        let%bind value = aux ~value query in
         let%bind _, dataset =
           let build state { TypedQuery. alias; query; } =
             match state with
             | Result.Ok (idx, dataset) ->
-              let%bind selectionValue = aux parent query in
+              let%bind selectionValue = aux ~value query in
               let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
               Js.Dict.set dataset selectionAlias selectionValue;
               return (idx + 1, dataset)
@@ -636,7 +654,7 @@ end = struct
           in
           Belt.List.reduce selection (Result.Ok (0, Js.Dict.empty ())) build
         in return (QueryResult.obj dataset)
-    in aux root query
+    in aux ~value:root query
 
 end
 
@@ -710,26 +728,38 @@ module WorkflowRunnner (Db : DATABASE) : sig
 
   type t
 
-  val make : ?parent : t -> Db.t -> TypedWorkflow.t -> t
+  val make :
+    ?parent : t
+    -> ?query : TypedQuery.t
+    -> Db.t
+    -> TypedWorkflow.t
+    -> t
+
   val render : t -> ((t * UI.t), string) Result.t
   val next : t -> t list
 
 end = struct
 
   type t = {
+    query : TypedQuery.t;
     workflow : TypedWorkflow.t;
     db : Db.t;
     parent : t option;
   }
 
-  let make ?parent db workflow = {db; workflow; parent}
+  let make ?parent ?(query=TypedQuery.void) db workflow = {
+    query;
+    db;
+    workflow;
+    parent;
+  }
 
   let rec render state =
     let open Result.Syntax in
-    let {workflow; db; _} = state in
+    let {workflow; db; query; _} = state in
     match workflow with
     | TypedWorkflow.Next (first, _next) ->
-      let state = make ~parent:state db first in
+      let state = make ~parent:state ~query db first in
       render state
     | TypedWorkflow.Render q ->
       let%bind res = Db.runQuery db q in
@@ -825,6 +855,26 @@ module Test = struct
   (*
    * individual.pick.value(id: "someid").site.view
    *)
+  let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
+    void
+    |> nav "individual"
+    |> pickScreen
+    |> bind (
+      here
+      |> nav ~args:[Arg.number "id" 1.] "value"
+      |> nav "site"
+      |> viewScreen
+      |> nav "value"
+      |> bind (
+        here
+        |> nav "title"
+      )
+    )
+  )
+
+  (*
+   * individual.pick.value(id: "someid").site.view
+   *)
   let getSelectedIndividual = UntypedQuery.Syntax.(
     void
     |> nav "individual"
@@ -900,6 +950,7 @@ module Test = struct
     runQuery db renderSiteByIndividual;
     runQuery db getSelectedIndividual;
     runQuery db getSiteTitleByIndividualViaView;
+    runQuery db getSiteTitleByIndividualViaViewViaBind;
     typeWorkflow pickAndViewIndividualWorkflow;
 
 end
