@@ -666,8 +666,7 @@ module WorkflowTyper = struct
   let typeWorkflow ~univ w =
     let open Result.Syntax in
     let rec aux ~scope w =
-      match w with
-      | UntypedWorkflow.Render q ->
+      match w with | UntypedWorkflow.Render q ->
         let%bind ((_, typ), _) as q = QueryTyper.typeQuery ~univ ~scope q in
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
@@ -695,39 +694,48 @@ module WorkflowTyper = struct
 
 end
 
-  (* type t = *)
-  (*   | Screen of (TypedQuery.t * t list) *)
+module WorkflowRunnner (Db : DATABASE) : sig
 
-  (* let compile univ (w : Syntax.t) = *)
-  (*   let open Result.Syntax in *)
-  (*   let rec aux ~continue w = match w with *)
-  (*   | Syntax.Render q -> *)
-  (*     let%bind ((_, typ), _) as tq = QueryTyper.typeQuery univ q in *)
-  (*     begin match typ with *)
-  (*     | Type.Void *)
-  (*     | Type.Entity _ *)
-  (*     | Type.Record _ *)
-  (*     | Type.Value _ -> *)
-  (*       (1* TODO: Decide if we want to live data values into UI automatically *1) *)
-  (*       error "workflow can only be defined on UI values" *)
-  (*     | Type.PickScreen _ *)
-  (*     | Type.ViewScreen _ -> *)
-  (*       let%bind next = continue q in *)
-  (*       return (Screen (tq, next)) *)
-  (*     end *)
-  (*   | Syntax.Next (parent, next) -> *)
-  (*     let continue q = *)
-  (*       let%bind next = aux ~continue (next q) in *)
-  (*       return [next] *)
-  (*     in *)
-  (*     aux ~continue parent *)
-  (*   | Syntax.Choice (parent, next) -> *)
-  (*     let continue q = *)
-  (*       q |> next |> Result.List.map ~f:(aux ~continue) *)
-  (*     in *)
-  (*     aux ~continue parent *)
-  (*   in *)
-  (*   aux ~continue:(fun _q -> return []) w *)
+  type t
+
+  val make : ?parent : t -> Db.t -> TypedWorkflow.t -> t
+  val render : t -> ((t * UI.t), string) Result.t
+  val next : t -> t list
+
+end = struct
+
+  type t = {
+    workflow : TypedWorkflow.t;
+    db : Db.t;
+    parent : t option;
+  }
+
+  let make ?parent db workflow = {db; workflow; parent}
+
+  let rec render state =
+    let open Result.Syntax in
+    let {workflow; db; _} = state in
+    match workflow with
+    | TypedWorkflow.Next (first, _next) ->
+      let state = make ~parent:state db first in
+      render state
+    | TypedWorkflow.Render q ->
+      let%bind res = Db.runQuery db q in
+      match QueryResult.classify res with
+      | QueryResult.UI ui -> return (state, ui)
+      | _ -> error "expected UI, got data"
+
+  let rec next state =
+    let {workflow; db; parent} = state in
+    match workflow, parent with
+    | TypedWorkflow.Render _, Some parent -> next parent
+    | TypedWorkflow.Render _, None -> []
+    | TypedWorkflow.Next (_first, []), Some parent -> next parent
+    | TypedWorkflow.Next (_first, next), _ ->
+      let f w = make ~parent:state db w in
+      List.map f next
+
+end
 
 module Test = struct
 
@@ -875,4 +883,88 @@ module Test = struct
     runQuery db getSiteTitleByIndividualViaView;
     typeWorkflow pickAndViewIndividualWorkflow;
 
+end
+
+module JsResult : sig
+  type 'v t = <
+    error : string Js.Nullable.t;
+    result : 'v Js.Nullable.t;
+  > Js.t
+
+  val ofResult : ('v, string) Result.t -> 'v t
+
+end = struct
+
+  type 'v t = <
+    error : string Js.Nullable.t;
+    result : 'v Js.Nullable.t;
+  > Js.t
+
+  let ofResult = function
+    | Result.Ok v -> [%bs.obj { result = Js.Nullable.return v; error = Js.Nullable.null }]
+    | Result.Error error -> [%bs.obj { result = Js.Nullable.null; error = Js.Nullable.return error; }]
+
+end
+
+(**
+ * JS API
+ *)
+module JsApi : sig
+
+  type workflow
+  type db
+  type ui
+  type state
+  type query
+
+  val db : db
+  val workflow : workflow
+
+  val init : < db : db; workflow : workflow > Js.t -> state JsResult.t
+  val render : state -> (state * ui) JsResult.t
+  val next : state -> state list
+
+  val getQuery : ui -> query
+  val runQuery : query -> QueryResult.t JsResult.t
+
+end = struct
+  module WorkflowRunnner = WorkflowRunnner(JSONDatabase)
+
+  type workflow = UntypedWorkflow.t
+  type db = JSONDatabase.t
+  type ui = UI.t
+  type state = WorkflowRunnner.t
+  type query = TypedQuery.t
+
+  let univ = Test.univ
+  let db = Test.db
+
+  let workflow =
+    let open UntypedWorkflow.Syntax in
+    let open UntypedQuery.Syntax in
+
+    let pickIndividual = here |> nav "individual" |> pickScreen in
+
+    let view = here |> viewScreen in
+
+    let viewSite = here |> nav "site" |> viewScreen in
+
+    render pickIndividual |> next [
+      render view;
+      render viewSite;
+    ]
+
+  let init params =
+    let v =
+      let open Result.Syntax in
+      let%bind w = WorkflowTyper.typeWorkflow ~univ params##workflow in
+      let state = WorkflowRunnner.make params##db w in
+      return state
+    in JsResult.ofResult v
+
+  let next = WorkflowRunnner.next
+  let render state = JsResult.ofResult (WorkflowRunnner.render state)
+
+  let getQuery ui = UI.query ui
+  let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
 end
