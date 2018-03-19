@@ -55,7 +55,7 @@ end
 (**
  * Query cardinality.
  *)
-module Cardinality = struct
+module Card = struct
   type t =
     | One
     | Opt
@@ -94,33 +94,43 @@ module ValueType = struct
 end
 
 (**
- * Represent primitive values tagged with a type.
+ * Argument is a value along with some label.
  *)
-module Value = struct
-  type t =
+module Arg : sig
+
+  type t = {
+    name : string;
+    value : value;
+  }
+
+  and value =
     | String of string
     | Number of float
     | Bool of bool
 
-  let show = function
-    | String v -> v
-    | Number v -> string_of_float v
-    | Bool v -> string_of_bool v
-end
+  val string : string -> string -> t
+  val number : string -> float -> t
+  val bool : string -> bool -> t
 
-(**
- * Argument is a value along with some label.
- *)
-module Arg = struct
+end = struct
+
   type t = {
     name : string;
-    value : Value.t
+    value : value;
   }
+
+  and value =
+    | String of string
+    | Number of float
+    | Bool of bool
 
   let make name value = { name; value }
 
-end
+  let string name value = make name (String value)
+  let number name value = make name (Number value)
+  let bool name value = make name (Bool value)
 
+end
 
 (**
  * Type system.
@@ -135,21 +145,20 @@ module Type = struct
     | Record of field list
     | Value of (ValueType.t * field list option)
 
-  and arg = {
-    argName : string;
-    argTyp : Value.t;
-    argKind : argKind;
-  }
-
-  and argKind =
-    | Req
-    | Opt
-
   and field = {
     fieldName : string;
-    fieldArgs : arg list option;
+    fieldArgs : argTyp list option;
     fieldTyp : t;
-    fieldCard : Cardinality.t;
+    fieldCard : Card.t;
+  }
+
+  and argTyp =
+    | Req of argTypInfo
+    | Opt of argTypInfo
+
+  and argTypInfo = {
+    argName : string;
+    argTyp : ValueType.t;
   }
 
   let rec show = function
@@ -167,7 +176,7 @@ module Type = struct
 
     let entity name fields = Entity (name, Some fields)
 
-    let has ?(card=Cardinality.One) ?args name typ =
+    let has ?(card=Card.One) ?args name typ =
       {
         fieldName = name;
         fieldArgs = args;
@@ -175,9 +184,9 @@ module Type = struct
         fieldCard = card;
       }
 
-    let hasOne = has ~card:Cardinality.One
-    let hasOpt = has ~card:Cardinality.Opt
-    let hasMany = has ~card:Cardinality.Many
+    let hasOne = has ~card:Card.One
+    let hasOpt = has ~card:Card.Opt
+    let hasMany = has ~card:Card.Many
 
     let string = Value (ValueType.StringTyp, None)
     let number = Value (ValueType.NumberTyp, None)
@@ -198,9 +207,9 @@ module Universe : sig
    *)
   val empty : t
 
-  val hasOne : ?args : Type.arg list -> string -> Type.t -> t -> t
-  val hasOpt : ?args : Type.arg list -> string -> Type.t -> t -> t
-  val hasMany : ?args : Type.arg list -> string -> Type.t -> t -> t
+  val hasOne : ?args : Type.argTyp list -> string -> Type.t -> t -> t
+  val hasOpt : ?args : Type.argTyp list -> string -> Type.t -> t -> t
+  val hasMany : ?args : Type.argTyp list -> string -> Type.t -> t -> t
 
   val fields : t -> Type.field list
 
@@ -313,7 +322,7 @@ end
  *)
 module TypedQuery = struct
   include Query(struct
-    type t = (Cardinality.t * Type.t)
+    type t = (Card.t * Type.t)
   end)
 end
 
@@ -347,7 +356,7 @@ end = struct
           fieldName = "value";
           fieldArgs = None;
           fieldTyp = typ;
-          fieldCard = Cardinality.Opt
+          fieldCard = Card.Opt
         }
       | _ -> error {j|no such field on PickScreen: $fieldName|j}
       end
@@ -358,7 +367,7 @@ end = struct
           fieldName = "value";
           fieldArgs = None;
           fieldTyp = typ;
-          fieldCard = Cardinality.Opt
+          fieldCard = Card.Opt
         }
       | _ -> error {j|no such field on ViewScreen: $fieldName|j}
       end
@@ -367,14 +376,14 @@ end = struct
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ -> error "cannot extract field"
 
-  let rootScope = Cardinality.One, Type.Void
+  let rootScope = Card.One, Type.Void
 
   let typeQuery ?(scope=rootScope) ~univ query =
     let rec aux ~scope ((), query) =
       let open Result.Syntax in
       match query with
       | UntypedQuery.Void ->
-        return ((Cardinality.One, Type.Void), TypedQuery.Void)
+        return ((Card.One, Type.Void), TypedQuery.Void)
       | UntypedQuery.Here ->
         return (scope, TypedQuery.Here)
       | UntypedQuery.One parent ->
@@ -382,22 +391,22 @@ end = struct
         return (scope, TypedQuery.One parent)
       | UntypedQuery.First parent ->
         let%bind ((_, parentType), _) as parent = aux ~scope parent in
-        return ((Cardinality.Opt, parentType), TypedQuery.One parent)
+        return ((Card.Opt, parentType), TypedQuery.One parent)
       | UntypedQuery.PickScreen parent ->
         let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
         begin match parentCard with
-        | Cardinality.One
-        | Cardinality.Opt -> error "pick can only be rendered with queries which result in a list of entities"
-        | Cardinality.Many ->
-          return ((Cardinality.One, Type.PickScreen parentType), TypedQuery.PickScreen parent)
+        | Card.One
+        | Card.Opt -> error "pick can only be rendered with queries which result in a list of entities"
+        | Card.Many ->
+          return ((Card.One, Type.PickScreen parentType), TypedQuery.PickScreen parent)
         end
       | UntypedQuery.ViewScreen parent ->
         let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
         begin match parentCard with
-        | Cardinality.One
-        | Cardinality.Opt ->
-          return ((Cardinality.One, Type.ViewScreen parentType), TypedQuery.ViewScreen parent)
-        | Cardinality.Many ->
+        | Card.One
+        | Card.Opt ->
+          return ((Card.One, Type.ViewScreen parentType), TypedQuery.ViewScreen parent)
+        | Card.Many ->
           error "view can only be rendered with queries which result in nothing or a single entity"
         end
       | UntypedQuery.Navigate (parent, navigation) ->
@@ -406,7 +415,7 @@ end = struct
         let%bind parent = aux ~scope parent in
         let (parentCard, parentTyp), _parentSyn = parent in
         let%bind field = extractField univ name parentTyp in
-        let card = Cardinality.merge parentCard field.fieldCard in
+        let card = Card.merge parentCard field.fieldCard in
         return ((card, field.fieldTyp), TypedQuery.Navigate (parent, navigation))
       | UntypedQuery.Select (parent, selection) ->
         let%bind parent = aux ~scope parent in
@@ -418,7 +427,7 @@ end = struct
             let%bind query = aux ~scope:parentInfo query in
             let (fieldCard, fieldTyp), _ = query in
             let fieldName = Option.getWithDefault (string_of_int index) alias in
-            let fieldCard = Cardinality.merge parentCard fieldCard in
+            let fieldCard = Card.merge parentCard fieldCard in
             let field = { Type. fieldTyp; fieldCard; fieldName; fieldArgs = None } in
             let selectionField = { TypedQuery. alias; query; } in
             Result.Ok (field::fields, selectionField::selection, index + 1)
@@ -638,7 +647,7 @@ end
 
 module WorkflowTyper = struct
 
-  let rootScope = Cardinality.One, Type.Void
+  let rootScope = Card.One, Type.Void
 
   let typeWorkflow ~univ w =
     let open Result.Syntax in
@@ -756,7 +765,7 @@ module Test = struct
     void
     |> nav "individual"
     |> pickScreen
-    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
+    |> nav ~args:[Arg.number "id" 1.] "value"
     |> nav "site"
     |> viewScreen
   )
@@ -768,7 +777,7 @@ module Test = struct
     void
     |> nav "individual"
     |> pickScreen
-    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
+    |> nav ~args:[Arg.number "id" 1.] "value"
     |> nav "site"
     |> viewScreen
     |> nav "value"
@@ -782,7 +791,7 @@ module Test = struct
     void
     |> nav "individual"
     |> pickScreen
-    |> nav ~args:[Arg.make "id" (Value.Number 1.)] "value"
+    |> nav ~args:[Arg.number "id" 1.] "value"
   )
 
   let db = JSONDatabase.ofString {|
