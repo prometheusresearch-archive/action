@@ -312,3 +312,81 @@ workflow:
     action:
       another-action
 ```
+
+## 6.3.2018
+
+UI as a Query
+
+```
+
+let pickIndividual = individual.pick
+let viewIndividual = individual.view
+
+pickIndividual {
+  navigate(id: "42") {
+    viewIndividual { ui, data }
+  }
+}
+
+```
+
+## 19.3.2018
+
+Rabbit is extended with UI types and values. Thus queries represent recipes on
+how to get concrete datasets or how to render concrete UI for concrete datasets.
+
+Examples of such queries:
+
+* Render a list of all individuals:
+
+  ```
+  individual.pick
+  ```
+
+* Render a list of all a subset of individuals:
+
+  ```
+  individual.filter(sex = 'male').pick
+  ```
+
+* Render an individual after a list:
+
+  ```
+  individual.pick.value.view
+  ```
+
+  Note how you can navigate through `pick` query combinator.
+
+Now that we have representation for screens we need a language to compose such
+screens into workflows. I propose to define a `Workflow` monad on top of
+queries.
+
+Examples of workflows:
+
+* Render a list of individuals with a view afterwards:
+
+  ```
+  render(individual.pick) {
+    render(view)
+  }
+  ```
+
+* Render a list of individuals with a view and a related site view afterwards:
+
+  ```
+  render(individual.pick) {
+    render(view)
+    render(site.view)
+  }
+  ```
+
+* Render a list of individuals with a view based on the selected individual:
+
+  ```
+  render(individual.pick) {
+    render(switch(
+      sex = 'male', view(title: "View Male"),
+      sex = 'female', view(title: "View Female")
+    ))
+  }
+  ```
