@@ -2,80 +2,23 @@
  * @flow
  */
 
-import * as React from 'react';
-import * as Workflow from 'workflow';
-import {Text, ScrollView, View, TouchableOpacity} from 'react-native-web';
-import * as types from './types.js';
+import invariant from 'invariant';
+import React, {Component} from 'react';
+import {View, Text} from 'react-native-web';
+import * as W from 'workflow';
+import type {Result, State, UI, Query} from 'workflow';
+import {Loading} from './Loading.js';
 
-type Config = {
-  id: string,
-  entityName: string,
-  fields: Array<string>,
-  renderTitle?: (types.Context, ?types.DataSet) => React.Element<*>,
+type P = {
+  query: Query,
 };
 
-export function configure(config: Config): types.Workflow {
-  const ui = {
-    id: config.id,
-    renderTitle(context, data) {
-      if (config.renderTitle) {
-        return config.renderTitle(context, data);
-      } else {
-        return <Text>Pick {config.entityName}</Text>;
-      }
-    },
-    render(context, data, onContext) {
-      return (
-        <Component config={config} context={context} data={data} onContext={onContext} />
-      );
-    },
-  };
-  const query = context => {
-    const fields = config.fields.join(', ');
-    return `${config.entityName}__list {${fields}}`;
-  };
-  const queryTitle = _context => null;
-  return Workflow.interaction({
-    requires: {},
-    provides: {
-      [config.entityName]: Workflow.entityType(config.entityName),
-    },
-    query,
-    queryTitle,
-    ui,
-  });
-}
-
-type Props = {
-  data: types.DataSet,
-  context: types.Context,
-  onContext: types.Context => *,
-  config: Config,
-};
-
-function Component(props: Props) {
-  const items = props.data[`${props.config.entityName}__list`].map(row => {
-    const onPress = id => () => {
-      const nextContext = {
-        ...props.context,
-        [props.config.entityName]: Workflow.entity(props.config.entityName, {id}),
-      };
-      props.onContext(nextContext);
-    };
-    const isSelected =
-      props.context[props.config.entityName] != null &&
-      props.context[props.config.entityName].value.id === row.id;
-    const style = isSelected ? {fontWeight: '600'} : {fontWeight: '200'};
-    return (
-      <TouchableOpacity key={row.code} onPress={onPress(row.id)}>
-        <View style={{padding: 5}}>
-          <Text style={style}>
-            {row.code},
-            {row.sex}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  });
-  return <ScrollView>{items}</ScrollView>;
+export function Pick(props: P) {
+  const data = W.runQuery(props.query);
+  return (
+    <View>
+      <Text>Pick</Text>
+      <Text style={{fontFamily: 'monospace'}}>{JSON.stringify(data)}</Text>
+    </View>
+  );
 }

@@ -79,21 +79,6 @@ module Card = struct
 end
 
 (**
- * Represent available primitive value types.
- *)
-module ValueType = struct
-  type t =
-    | StringTyp
-    | NumberTyp
-    | BoolTyp
-
-  let show = function
-    | StringTyp -> "string"
-    | NumberTyp -> "number"
-    | BoolTyp -> "bool"
-end
-
-(**
  * Argument is a value along with some label.
  *)
 module Arg : sig
@@ -133,17 +118,35 @@ end = struct
 end
 
 (**
+ * Represent available primitive value types.
+ *)
+module ValueType = struct
+  type t =
+    | StringTyp
+    | NumberTyp
+    | BoolTyp
+
+  let show = function
+    | StringTyp -> "string"
+    | NumberTyp -> "number"
+    | BoolTyp -> "bool"
+end
+
+(**
  * Type system.
  *)
 module Type = struct
 
   type t =
     | Void
-    | PickScreen of entityInfo
-    | ViewScreen of entityInfo
+    | UI of ui
     | Entity of entityInfo
     | Record of field list
     | Value of (ValueType.t * field list option)
+
+  and ui =
+    | PickScreen of entityInfo
+    | ViewScreen of entityInfo
 
   and entityInfo = {
     entityName : string;
@@ -165,11 +168,15 @@ module Type = struct
     argTyp : ValueType.t;
   }
 
+  let extractUi = function
+    | UI ui -> Result.Ok ui
+    | _ -> Result.Error "not an ui type"
+
   let rec show = function
     | Void -> "void"
     | Value (t, _fields) -> ValueType.show t
-    | PickScreen entityInfo -> let t = show (Entity entityInfo) in {j|PickScreen($t)|j}
-    | ViewScreen entityInfo -> let t = show (Entity entityInfo) in {j|ViewScreen($t)|j}
+    | UI (PickScreen entityInfo) -> let t = show (Entity entityInfo) in {j|PickScreen($t)|j}
+    | UI (ViewScreen entityInfo) -> let t = show (Entity entityInfo) in {j|ViewScreen($t)|j}
     | Entity {entityName; _} -> {j|Entity($entityName)|j}
     | Record _fields -> "{}"
 
@@ -359,7 +366,7 @@ end = struct
     in
     match typ with
     | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
-    | Type.PickScreen entityInfo ->
+    | Type.UI (Type.PickScreen entityInfo) ->
       begin match fieldName with
       | "value" -> Ok {
           Type.
@@ -369,7 +376,7 @@ end = struct
         }
       | _ -> error {j|no such field on PickScreen: $fieldName|j}
       end
-    | Type.ViewScreen entityInfo ->
+    | Type.UI (Type.ViewScreen entityInfo) ->
       begin match fieldName with
       | "value" -> Ok {
           Type.
@@ -407,7 +414,7 @@ end = struct
         | Card.Opt, Type.Entity _ ->
           error "pick can only be rendered with queries which result in a list of entities"
         | Card.Many, Type.Entity entityInfo ->
-          return ((Card.One, Type.PickScreen entityInfo), TypedQuery.PickScreen parent)
+          return ((Card.One, Type.UI (Type.PickScreen entityInfo)), TypedQuery.PickScreen parent)
         | _, _ -> error "pick can only be applied to entity type"
         end
       | UntypedQuery.ViewScreen parent ->
@@ -415,7 +422,7 @@ end = struct
         begin match parentCard, parentTyp with
         | Card.One, Type.Entity entityInfo
         | Card.Opt, Type.Entity entityInfo ->
-          return ((Card.One, Type.ViewScreen entityInfo), TypedQuery.ViewScreen parent)
+          return ((Card.One, Type.UI (Type.ViewScreen entityInfo)), TypedQuery.ViewScreen parent)
         | Card.Many, Type.Entity _ ->
           error "view can only be rendered with queries which result in nothing or a single entity"
         | _, _ ->
@@ -465,15 +472,16 @@ module UI : sig
 
   type t
 
-  val make : string -> Type.t -> TypedQuery.t -> t
+  val make : name : string -> uiTyp : Type.ui -> TypedQuery.t -> t
   val test : 'a -> bool
   val query : t -> TypedQuery.t
-  val typ : t -> Type.t
+  val typ : t -> Type.ui
 
 end = struct
-  type t = < name : string; typ: Type.t; query : TypedQuery.t > Js.t
+  type t = < name : string; typ: Type.ui; query : TypedQuery.t > Js.t
 
-  external make : string -> Type.t -> TypedQuery.t -> t = "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
+  external make : name : string -> uiTyp : Type.ui -> TypedQuery.t -> t =
+    "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
 
   let test_ : 'a -> bool = [%bs.raw {|
     function test(v) { return v instanceof UIRepr.UIRepr; }
@@ -582,8 +590,12 @@ end = struct
           else return QueryResult.null
         | _ -> return parent
         end
-      | TypedQuery.PickScreen q -> return (QueryResult.ui (UI.make "pick" typ q))
-      | TypedQuery.ViewScreen q -> return (QueryResult.ui (UI.make "view" typ q))
+      | TypedQuery.PickScreen q ->
+        let%bind uiTyp = Type.extractUi typ in
+        return (QueryResult.ui (UI.make ~name:"pick" ~uiTyp q))
+      | TypedQuery.ViewScreen q ->
+        let%bind uiTyp = Type.extractUi typ in
+        return (QueryResult.ui (UI.make ~name:"view" ~uiTyp q))
       | TypedQuery.Navigate (query, { name; args = _ }) ->
         let%bind parent = aux parent query in
         let navigate dataset =
@@ -671,10 +683,10 @@ module WorkflowTyper = struct
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
           error "workflow can only be defined on UI values"
-        | Type.PickScreen entityInfo ->
+        | Type.UI (Type.PickScreen entityInfo) ->
           let scope = Card.One, Type.Entity entityInfo in
           return (TypedWorkflow.Render q, scope)
-        | Type.ViewScreen entityInfo ->
+        | Type.UI (Type.ViewScreen entityInfo) ->
           let scope = Card.One, Type.Entity entityInfo in
           return (TypedWorkflow.Render q, scope)
         end
@@ -829,6 +841,13 @@ module Test = struct
           "site": {
             "title": "RexDB Site"
           }
+        },
+        {
+          "id": 2,
+          "name": "Oleksiy Golovko",
+          "site": {
+            "title": "RexDB Site"
+          }
         }
       ]
     }
@@ -886,23 +905,22 @@ module Test = struct
 end
 
 module JsResult : sig
-  type 'v t = <
-    error : string Js.Nullable.t;
-    result : 'v Js.Nullable.t;
-  > Js.t
+  type 'v t
 
+  val ok : 'v -> 'v t
+  val error : string -> 'v t
   val ofResult : ('v, string) Result.t -> 'v t
 
 end = struct
 
-  type 'v t = <
-    error : string Js.Nullable.t;
-    result : 'v Js.Nullable.t;
-  > Js.t
+  type 'v t
+
+  let ok value = Obj.magic [%bs.obj {_type = "Ok"; value;}]
+  let error error = Obj.magic [%bs.obj {_type = "Error"; error;}]
 
   let ofResult = function
-    | Result.Ok v -> [%bs.obj { result = Js.Nullable.return v; error = Js.Nullable.null }]
-    | Result.Error error -> [%bs.obj { result = Js.Nullable.null; error = Js.Nullable.return error; }]
+    | Result.Ok v -> ok v
+    | Result.Error err -> error err
 
 end
 
@@ -911,17 +929,12 @@ end
  *)
 module JsApi : sig
 
-  type workflow
-  type db
   type ui
   type state
   type query
 
-  val db : db
-  val workflow : workflow
-
-  val init : < db : db; workflow : workflow > Js.t -> state JsResult.t
-  val render : state -> (state * ui) JsResult.t
+  val start : state JsResult.t
+  val render : state -> < state : state; ui : ui > Js.t JsResult.t
   val next : state -> state list
 
   val getQuery : ui -> query
@@ -954,17 +967,23 @@ end = struct
       render viewSite;
     ]
 
-  let init params =
+  let start =
     let v =
       let open Result.Syntax in
-      let%bind w = WorkflowTyper.typeWorkflow ~univ params##workflow in
-      let state = WorkflowRunnner.make params##db w in
+      let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
+      let state = WorkflowRunnner.make db w in
       return state
     in JsResult.ofResult v
 
   let next = WorkflowRunnner.next
-  let render state = JsResult.ofResult (WorkflowRunnner.render state)
+  let render state = JsResult.ofResult (
+    let open Result.Syntax in
+    let%bind state, ui = WorkflowRunnner.render state in
+    return [%bs.obj { state; ui }]
+  )
 
   let getQuery ui = UI.query ui
   let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
 end
+
+include JsApi
