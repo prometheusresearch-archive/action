@@ -139,17 +139,21 @@ module Type = struct
 
   type t =
     | Void
-    | PickScreen of t
-    | ViewScreen of t
-    | Entity of (string * field list option)
+    | PickScreen of entityInfo
+    | ViewScreen of entityInfo
+    | Entity of entityInfo
     | Record of field list
     | Value of (ValueType.t * field list option)
+
+  and entityInfo = {
+    entityName : string;
+    entityFields : field list option;
+  }
 
   and field = {
     fieldName : string;
     fieldArgs : argTyp list option;
-    fieldTyp : t;
-    fieldCard : Card.t;
+    fieldCtyp : Card.t * t;
   }
 
   and argTyp =
@@ -164,9 +168,9 @@ module Type = struct
   let rec show = function
     | Void -> "void"
     | Value (t, _fields) -> ValueType.show t
-    | PickScreen t -> let t = show t in {j|PickScreen($t)|j}
-    | ViewScreen t -> let t = show t in {j|ViewScreen($t)|j}
-    | Entity (name, _fields) -> {j|Entity($name)|j}
+    | PickScreen entityInfo -> let t = show (Entity entityInfo) in {j|PickScreen($t)|j}
+    | ViewScreen entityInfo -> let t = show (Entity entityInfo) in {j|ViewScreen($t)|j}
+    | Entity {entityName; _} -> {j|Entity($entityName)|j}
     | Record _fields -> "{}"
 
   (**
@@ -174,14 +178,13 @@ module Type = struct
    *)
   module Syntax = struct
 
-    let entity name fields = Entity (name, Some fields)
+    let entity name fields = Entity {entityName = name; entityFields = Some fields}
 
     let has ?(card=Card.One) ?args name typ =
       {
         fieldName = name;
         fieldArgs = args;
-        fieldTyp = typ;
-        fieldCard = card;
+        fieldCtyp = card, typ;
       }
 
     let hasOne = has ~card:Card.One
@@ -193,6 +196,13 @@ module Type = struct
     let bool = Value (ValueType.BoolTyp, None)
   end
 
+end
+
+(**
+ * Type annotated with cardinality.
+ *)
+module CType = struct
+  type t = Card.t * Type.t
 end
 
 (**
@@ -322,7 +332,7 @@ end
  *)
 module TypedQuery = struct
   include Query(struct
-    type t = (Card.t * Type.t)
+    type t = CType.t
   end)
 end
 
@@ -349,30 +359,28 @@ end = struct
     in
     match typ with
     | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
-    | Type.PickScreen typ ->
+    | Type.PickScreen entityInfo ->
       begin match fieldName with
       | "value" -> Ok {
           Type.
           fieldName = "value";
           fieldArgs = None;
-          fieldTyp = typ;
-          fieldCard = Card.Opt
+          fieldCtyp = Card.Opt, Type.Entity entityInfo;
         }
       | _ -> error {j|no such field on PickScreen: $fieldName|j}
       end
-    | Type.ViewScreen typ ->
+    | Type.ViewScreen entityInfo ->
       begin match fieldName with
       | "value" -> Ok {
           Type.
           fieldName = "value";
           fieldArgs = None;
-          fieldTyp = typ;
-          fieldCard = Card.Opt
+          fieldCtyp = Card.Opt, Type.Entity entityInfo;
         }
       | _ -> error {j|no such field on ViewScreen: $fieldName|j}
       end
-    | Type.Entity (_, None) -> error "cannot extract field"
-    | Type.Entity (_, Some fields) -> findInFieldList fields
+    | Type.Entity {entityName = _; entityFields = None} -> error "cannot extract field"
+    | Type.Entity {entityName = _; entityFields = Some fields} -> findInFieldList fields
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ -> error "cannot extract field"
 
@@ -393,21 +401,25 @@ end = struct
         let%bind ((_, parentType), _) as parent = aux ~scope parent in
         return ((Card.Opt, parentType), TypedQuery.One parent)
       | UntypedQuery.PickScreen parent ->
-        let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
-        begin match parentCard with
-        | Card.One
-        | Card.Opt -> error "pick can only be rendered with queries which result in a list of entities"
-        | Card.Many ->
-          return ((Card.One, Type.PickScreen parentType), TypedQuery.PickScreen parent)
+        let%bind ((parentCard, parentTyp), _) as parent = aux ~scope parent in
+        begin match parentCard, parentTyp with
+        | Card.One, Type.Entity _
+        | Card.Opt, Type.Entity _ ->
+          error "pick can only be rendered with queries which result in a list of entities"
+        | Card.Many, Type.Entity entityInfo ->
+          return ((Card.One, Type.PickScreen entityInfo), TypedQuery.PickScreen parent)
+        | _, _ -> error "pick can only be applied to entity type"
         end
       | UntypedQuery.ViewScreen parent ->
-        let%bind ((parentCard, parentType), _) as parent = aux ~scope parent in
-        begin match parentCard with
-        | Card.One
-        | Card.Opt ->
-          return ((Card.One, Type.ViewScreen parentType), TypedQuery.ViewScreen parent)
-        | Card.Many ->
+        let%bind ((parentCard, parentTyp), _) as parent = aux ~scope parent in
+        begin match parentCard, parentTyp with
+        | Card.One, Type.Entity entityInfo
+        | Card.Opt, Type.Entity entityInfo ->
+          return ((Card.One, Type.ViewScreen entityInfo), TypedQuery.ViewScreen parent)
+        | Card.Many, Type.Entity _ ->
           error "view can only be rendered with queries which result in nothing or a single entity"
+        | _, _ ->
+          error "view can only be rendered with queries which result entity"
         end
       | UntypedQuery.Navigate (parent, navigation) ->
         let { UntypedQuery. name; args } = navigation in
@@ -415,8 +427,9 @@ end = struct
         let%bind parent = aux ~scope parent in
         let (parentCard, parentTyp), _parentSyn = parent in
         let%bind field = extractField univ name parentTyp in
-        let card = Card.merge parentCard field.fieldCard in
-        return ((card, field.fieldTyp), TypedQuery.Navigate (parent, navigation))
+        let fieldCard, fieldTyp = field.fieldCtyp in
+        let fieldCard = Card.merge parentCard fieldCard in
+        return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
       | UntypedQuery.Select (parent, selection) ->
         let%bind parent = aux ~scope parent in
         let parentInfo, _parentSyn = parent in
@@ -428,7 +441,8 @@ end = struct
             let (fieldCard, fieldTyp), _ = query in
             let fieldName = Option.getWithDefault (string_of_int index) alias in
             let fieldCard = Card.merge parentCard fieldCard in
-            let field = { Type. fieldTyp; fieldCard; fieldName; fieldArgs = None } in
+            let fieldCtyp = fieldCard, fieldTyp in
+            let field = { Type. fieldCtyp; fieldName; fieldArgs = None } in
             let selectionField = { TypedQuery. alias; query; } in
             Result.Ok (field::fields, selectionField::selection, index + 1)
           | Result.Error err ->
@@ -654,11 +668,15 @@ module WorkflowTyper = struct
     let rec aux ~scope w =
       match w with
       | UntypedWorkflow.Render q ->
-        let%bind ((_, typ) as scope, _) as q = QueryTyper.typeQuery ~univ ~scope q in
+        let%bind ((_, typ), _) as q = QueryTyper.typeQuery ~univ ~scope q in
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
           error "workflow can only be defined on UI values"
-        | Type.PickScreen _ | Type.ViewScreen _ ->
+        | Type.PickScreen entityInfo ->
+          let scope = Card.One, Type.Entity entityInfo in
+          return (TypedWorkflow.Render q, scope)
+        | Type.ViewScreen entityInfo ->
+          let scope = Card.One, Type.Entity entityInfo in
           return (TypedWorkflow.Render q, scope)
         end
       | UntypedWorkflow.Next (first, next) ->
@@ -816,7 +834,7 @@ module Test = struct
 
     let view = here |> viewScreen in
 
-    let viewSite = here |> nav "value" |> nav "site" |> viewScreen in
+    let viewSite = here |> nav "site" |> viewScreen in
 
     render pickIndividual |> next [
       render view;
