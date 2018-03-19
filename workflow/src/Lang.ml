@@ -814,9 +814,9 @@ module Test = struct
 
     let pickIndividual = here |> nav "individual" |> pickScreen in
 
-    let view = (here |> viewScreen) in
+    let view = here |> viewScreen in
 
-    let viewSite = (here |> nav "value" |> nav "site" |> viewScreen) in
+    let viewSite = here |> nav "value" |> nav "site" |> viewScreen in
 
     render pickIndividual |> next [
       render view;
