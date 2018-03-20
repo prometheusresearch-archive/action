@@ -289,6 +289,29 @@ module Query (P : sig type t end)= struct
     query: t
   }
 
+  let rec show ((_, syn) : t) = match syn with
+  | Void -> "void"
+  | Here -> "here"
+  | Select (parent, fields) ->
+    let parent = show parent in
+    {j|$parent { $fields }|j}
+  | Navigate (parent,{ name; args = _ }) ->
+    let parent = show parent in
+    let this = name in
+    {j|$parent.$this|j}
+  | One _ -> "one"
+  | First _ -> "first"
+  | Bind (parent, this) ->
+    let parent = show parent in
+    let this = show this in
+    {j|$parent.bind($this)|j}
+  | PickScreen parent ->
+    let parent = show parent in
+    {j|$parent.pick|j}
+  | ViewScreen parent ->
+    let parent = show parent in
+    {j|$parent.view|j}
+
 end
 
 (**
@@ -410,8 +433,8 @@ end = struct
       | UntypedQuery.Bind (parent, q) ->
         let%bind ((prevCard, _) as ctyp, _) as parent = aux ~ctyp parent in
         let%bind ((card, typ), _) as q = aux ~ctyp q in
-        let scope = Card.merge prevCard card, typ in
-        return (scope, TypedQuery.Bind (parent, q))
+        let ctyp = Card.merge prevCard card, typ in
+        return (ctyp, TypedQuery.Bind (parent, q))
       | UntypedQuery.One parent ->
         let%bind parent = aux ~ctyp parent in
         return (ctyp, TypedQuery.One parent)
@@ -477,34 +500,6 @@ end = struct
 end
 
 (**
- * This is an opaque structure which defines UI.
- *)
-module UI : sig
-
-  type t
-
-  val make : name : string -> uiTyp : Type.ui -> TypedQuery.t -> t
-  val test : 'a -> bool
-  val query : t -> TypedQuery.t
-  val typ : t -> Type.ui
-
-end = struct
-  type t = < name : string; typ: Type.ui; query : TypedQuery.t > Js.t
-
-  external make : name : string -> uiTyp : Type.ui -> TypedQuery.t -> t =
-    "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
-
-  let test_ : 'a -> bool = [%bs.raw {|
-    function test(v) { return v instanceof UIRepr.UIRepr; }
-  |}]
-
-  let test x = test_ (Obj.magic x)
-
-  let query ui = ui##query
-  let typ ui = ui##typ
-end
-
-(**
  * Query result which extends JSON type with a special UI type.
  *
  * It is implemented as a zero (almost) cost on top of native JS data
@@ -513,6 +508,42 @@ end
 module QueryResult = struct
 
   type t
+  type queryResult = t
+
+  (**
+  * This is an opaque structure which defines UI.
+  *)
+  module UI : sig
+
+    type t
+
+    val make : name : string -> uiTyp : Type.ui -> queryResult -> TypedQuery.t -> t
+    val test : 'a -> bool
+    val query : t -> TypedQuery.t
+    val value : t -> queryResult
+    val typ : t -> Type.ui
+
+  end = struct
+    type t = <
+      name : string;
+      typ: Type.ui;
+      query : TypedQuery.t;
+      value : queryResult;
+    > Js.t
+
+    external make : name : string -> uiTyp : Type.ui -> queryResult -> TypedQuery.t -> t =
+      "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
+
+    let test_ : 'a -> bool = [%bs.raw {|
+      function test(v) { return v instanceof UIRepr.UIRepr; }
+    |}]
+
+    let test x = test_ (Obj.magic x)
+
+    let query ui = ui##query
+    let value ui = ui##value
+    let typ ui = ui##typ
+  end
 
   let null : t = Obj.magic (Js.null)
   external string : string -> t = "%identity"
@@ -581,7 +612,8 @@ end = struct
     let rec aux ~(value : QueryResult.t) ((_card, typ), syn) =
       match syn with
       | TypedQuery.Void -> return root
-      | TypedQuery.Here -> return value
+      | TypedQuery.Here ->
+        return value
       | TypedQuery.Bind (query, next) ->
         let%bind value = aux ~value query in
         let%bind value = aux ~value next in
@@ -607,19 +639,21 @@ end = struct
         end
       | TypedQuery.PickScreen q ->
         let%bind uiTyp = Type.extractUi typ in
-        return (QueryResult.ui (UI.make ~name:"pick" ~uiTyp q))
+        return (QueryResult.ui (QueryResult.UI.make ~name:"pick" ~uiTyp value q))
       | TypedQuery.ViewScreen q ->
         let%bind uiTyp = Type.extractUi typ in
-        return (QueryResult.ui (UI.make ~name:"view" ~uiTyp q))
+        return (QueryResult.ui (QueryResult.UI.make ~name:"view" ~uiTyp value q))
       | TypedQuery.Navigate (query, { name; args = _ }) ->
-        let prevValue = value in
         let%bind value = aux ~value query in
         let navigate name dataset =
           match QueryResult.classify dataset with
           | QueryResult.Object obj ->
             begin match Js.Dict.get obj name with
             | Some dataset -> return dataset
-            | None -> error {j|no such key: $name|j}
+            | None ->
+              let msg = {j|no such key "$name"|j} in
+              Js.log3 "ERROR:" msg [%bs.obj { data = dataset; key = name; }];
+              error msg
             end
           | _ -> error "expected an object"
         in begin
@@ -629,14 +663,15 @@ end = struct
           let%bind items = Result.Array.map ~f:(navigate name) items in
           return (QueryResult.array items)
         | QueryResult.UI ui, name ->
-          let query = UI.query ui in
-          let%bind value = aux ~value:prevValue query in
-          begin match (UI.typ ui), name, QueryResult.classify value with
+          let query = QueryResult.UI.query ui in
+          let queryValue = QueryResult.UI.value ui in
+          let%bind value = aux ~value:queryValue query in
+          begin match (QueryResult.UI.typ ui), name, QueryResult.classify value with
           | Type.PickScreen _, "value", QueryResult.Array items ->
             return (Array.get items 0)
           | Type.ViewScreen _, "value", QueryResult.Object _ ->
             return value
-          | _, name, _ -> error {j|no such key: $name|j}
+          | _, name, _ -> error {j|no such key "$name"|j}
           end
         | _ -> error "expected an object or an array"
         end
@@ -679,7 +714,7 @@ module UntypedWorkflow = struct
 
   module Syntax = struct
     let render q = Render q
-    let next path w = Next (w, path)
+    let andThen path w = Next (w, path)
   end
 end
 
@@ -717,7 +752,7 @@ module WorkflowTyper = struct
           in
           Result.List.foldLeft ~f ~init:([], ctyp) next
         in
-        return (TypedWorkflow.Next (first, next), ctyp)
+        return (TypedWorkflow.Next (first, List.rev next), ctyp)
     in
     let%bind tw, _ = aux w ~ctyp:rootCtyp in
     return tw
@@ -740,22 +775,25 @@ module WorkflowRunner (Db : DATABASE) : sig
    * Bind workflow execution state for the new query fragment.
    * TODO: We should instead define per UI operations.
    *)
-  val bind : UntypedQuery.t -> t -> ((t * UI.t), string) Result.t
+  val bind : UntypedQuery.t -> t -> ((t * QueryResult.UI.t), string) Result.t
 
   (**
    * Render workflows state and return a new state and a UI screen to render.
    *)
-  val render : t -> ((t * UI.t), string) Result.t
+  val render : t -> ((t * QueryResult.UI.t), string) Result.t
 
   (**
    * Return a list of next possible workflow states.
    *)
   val next : t -> t list
 
+  val query :QueryResult.UI.t -> t -> TypedQuery.t
+
 end = struct
 
   type t = {
     query : TypedQuery.t;
+    queryString : string;
     workflow : TypedWorkflow.t;
     db : Db.t;
     univ : Universe.t;
@@ -765,6 +803,7 @@ end = struct
   let _make ?parent ?(query=TypedQuery.void) univ db workflow = {
     univ;
     query;
+    queryString = TypedQuery.show query;
     db;
     workflow;
     parent;
@@ -782,34 +821,101 @@ end = struct
     | TypedWorkflow.Render q ->
       let ctyp, _ = q in
       let q = ctyp, TypedQuery.Bind (query, q) in
-      let state = { state with query = q; parent = Some state; } in
+      let state = { state with query = q; queryString = TypedQuery.show q; parent = Some state; } in
       let%bind res = Db.runQuery db q in
       match QueryResult.classify res with
       | QueryResult.UI ui -> return (state, ui)
       | _ -> error "expected UI, got data"
 
-  let rec next state =
-    let {workflow; db; univ; parent} = state in
-    match workflow, parent with
-    | TypedWorkflow.Render _, Some parent -> next parent
-    | TypedWorkflow.Render _, None -> []
-    | TypedWorkflow.Next (_first, []), Some parent -> next parent
-    | TypedWorkflow.Next (_first, next), _ ->
-      let f w = _make ~parent:state univ db w in
-      List.map f next
+  let next state =
+    let rec aux query state =
+      let {workflow; db; univ; parent} = state in
+      match workflow, parent with
+      | TypedWorkflow.Render _, Some parent -> aux query parent
+      | TypedWorkflow.Render _, None -> []
+      | TypedWorkflow.Next (_first, []), Some parent -> aux query parent
+      | TypedWorkflow.Next (_first, next), _ ->
+        let f w = _make ~query ~parent:state univ db w in
+        List.map f next
+    in aux state.query state
 
   let bind q state =
     let open Result.Syntax in
     let ctyp, _ = state.query in
-    let%bind q = QueryTyper.typeQuery ~univ:state.univ ~ctyp q in
-    let nextState = { state with query = q } in
+    let%bind (ctyp, _) as q = QueryTyper.typeQuery ~univ:state.univ ~ctyp q in
+    let q = ctyp, TypedQuery.Bind (state.query, q) in
+    let nextState = { state with query = q; queryString = TypedQuery.show q; } in
     match next nextState with
     | [] -> render state
-    | state::_ -> render state
+    | nextState::_ -> render nextState
+
+  let query ui state =
+    let baseQuery = match state.parent with
+    | Some parent -> parent.query
+    | None -> (Card.One, Type.Void), TypedQuery.Void
+    in
+    let (ctyp, _) as q = QueryResult.UI.query ui in
+    let q = ctyp, TypedQuery.Bind (baseQuery, q) in
+    q
 
 end
 
-module Test = struct
+module JsResult : sig
+  type 'v t
+
+  val ok : 'v -> 'v t
+  val error : string -> 'v t
+  val ofResult : ('v, string) Result.t -> 'v t
+
+end = struct
+
+  type 'v t
+
+  let ok value = Obj.magic [%bs.obj {_type = "Ok"; value;}]
+  let error error = Obj.magic [%bs.obj {_type = "Error"; error;}]
+
+  let ofResult = function
+    | Result.Ok v -> ok v
+    | Result.Error err -> error err
+
+end
+
+(**
+ * JS API
+ *)
+module JsApi : sig
+
+  type ui
+  type state
+  type query
+  type uquery
+
+  val start : state JsResult.t
+  val render : state -> < state : state; ui : ui > Js.t JsResult.t
+  val next : state -> state list
+  val bind : uquery -> state -> < state : state; ui : ui > Js.t JsResult.t
+
+  val pickValue : float -> uquery
+
+  val getQuery : ui -> state -> query
+  val runQuery : query -> QueryResult.t JsResult.t
+
+  val db : JSONDatabase.t
+  val univ : Universe.t
+
+  val showQuery : TypedQuery.t -> string
+
+end = struct
+  module WorkflowRunner = WorkflowRunner(JSONDatabase)
+
+  type workflow = UntypedWorkflow.t
+  type db = JSONDatabase.t
+  type ui = QueryResult.UI.t
+  type state = WorkflowRunner.t
+  type query = TypedQuery.t
+  type uquery = UntypedQuery.t
+
+  let showQuery = TypedQuery.show
 
   let univ =
     let site = Type.Syntax.(entity "site" [
@@ -823,6 +929,78 @@ module Test = struct
       empty
       |> hasMany "individual" individual
     )
+
+  let db = JSONDatabase.ofString {|
+    {
+      "individual": [
+        {
+          "id": 1,
+          "name": "Andrey Popp",
+          "site": {
+            "title": "RexDB Site"
+          }
+        },
+        {
+          "id": 2,
+          "name": "Oleksiy Golovko",
+          "site": {
+            "title": "RexDB Site"
+          }
+        }
+      ]
+    }
+  |}
+
+
+  let workflow =
+    let open UntypedWorkflow.Syntax in
+    let open UntypedQuery.Syntax in
+
+    let pickIndividual = render (here |> nav "individual" |> pickScreen) in
+
+    let view = render (here |> viewScreen) in
+
+    let viewSite = render (here |> nav "site" |> viewScreen) in
+
+    pickIndividual |> andThen [ view; viewSite; ]
+
+  let start =
+    let v =
+      let open Result.Syntax in
+      let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
+      let state = WorkflowRunner.make univ db w in
+      return state
+    in JsResult.ofResult v
+
+  let next = WorkflowRunner.next
+
+  let render state = JsResult.ofResult (
+    let open Result.Syntax in
+    let%bind state, ui = WorkflowRunner.render state in
+    return [%bs.obj { state; ui }]
+  )
+
+  let bind q state = JsResult.ofResult (
+    let open Result.Syntax in
+    let%bind state, ui = WorkflowRunner.bind q state in
+    return [%bs.obj { state; ui }]
+  )
+
+  let pickValue id =
+    UntypedQuery.Syntax.(
+      here |> nav ~args:[Arg.number "id" id] "value"
+    )
+
+  let getQuery ui state = WorkflowRunner.query ui state
+  let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
+end
+
+include JsApi
+
+module Test = struct
+
+  let univ = JsApi.univ
+  let db = JsApi.db
 
   (**
     * {
@@ -885,6 +1063,27 @@ module Test = struct
   (*
    * individual.pick.value(id: "someid").site.view
    *)
+  let getSiteTitleByIndividualViaViewViaBind2 = UntypedQuery.Syntax.(
+    void
+    |> bind (
+      here
+      |> nav "individual"
+      |> pickScreen
+      |> bind (
+        here
+        |> nav ~args:[Arg.number "id" 1.] "value"
+        |> bind (
+          here
+          |> nav "site"
+          |> viewScreen
+        )
+      )
+    )
+  )
+
+  (*
+   * individual.pick.value(id: "someid").site.view
+   *)
   let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
     void
     |> nav "individual"
@@ -912,41 +1111,17 @@ module Test = struct
     |> nav ~args:[Arg.number "id" 1.] "value"
   )
 
-  let db = JSONDatabase.ofString {|
-    {
-      "individual": [
-        {
-          "id": 1,
-          "name": "Andrey Popp",
-          "site": {
-            "title": "RexDB Site"
-          }
-        },
-        {
-          "id": 2,
-          "name": "Oleksiy Golovko",
-          "site": {
-            "title": "RexDB Site"
-          }
-        }
-      ]
-    }
-  |}
-
   let pickAndViewIndividualWorkflow =
     let open UntypedWorkflow.Syntax in
     let open UntypedQuery.Syntax in
 
-    let pickIndividual = here |> nav "individual" |> pickScreen in
+    let pickIndividual = render (here |> nav "individual" |> pickScreen) in
 
-    let view = here |> viewScreen in
+    let view = render (here |> viewScreen) in
 
-    let viewSite = here |> nav "site" |> viewScreen in
+    let viewSite = render (here |> nav "site" |> viewScreen) in
 
-    render pickIndividual |> next [
-      render view;
-      render viewSite;
-    ]
+    pickIndividual |> andThen [ view; viewSite; ]
 
   let runResult result = match result with
     | Result.Ok () -> ()
@@ -981,107 +1156,8 @@ module Test = struct
     runQuery db getSelectedIndividual;
     runQuery db getSiteTitleByIndividualViaView;
     runQuery db getSiteTitleByIndividualViaViewViaBind;
+    runQuery db getSiteTitleByIndividualViaViewViaBind2;
     typeWorkflow pickAndViewIndividualWorkflow;
 
 end
 
-module JsResult : sig
-  type 'v t
-
-  val ok : 'v -> 'v t
-  val error : string -> 'v t
-  val ofResult : ('v, string) Result.t -> 'v t
-
-end = struct
-
-  type 'v t
-
-  let ok value = Obj.magic [%bs.obj {_type = "Ok"; value;}]
-  let error error = Obj.magic [%bs.obj {_type = "Error"; error;}]
-
-  let ofResult = function
-    | Result.Ok v -> ok v
-    | Result.Error err -> error err
-
-end
-
-(**
- * JS API
- *)
-module JsApi : sig
-
-  type ui
-  type state
-  type query
-  type uquery
-
-  val start : state JsResult.t
-  val render : state -> < state : state; ui : ui > Js.t JsResult.t
-  val next : state -> state list
-  val bind : uquery -> state -> < state : state; ui : ui > Js.t JsResult.t
-
-  val pickValue : float -> uquery
-
-  val getQuery : ui -> query
-  val runQuery : query -> QueryResult.t JsResult.t
-
-end = struct
-  module WorkflowRunner = WorkflowRunner(JSONDatabase)
-
-  type workflow = UntypedWorkflow.t
-  type db = JSONDatabase.t
-  type ui = UI.t
-  type state = WorkflowRunner.t
-  type query = TypedQuery.t
-  type uquery = UntypedQuery.t
-
-  let univ = Test.univ
-  let db = Test.db
-
-  let workflow =
-    let open UntypedWorkflow.Syntax in
-    let open UntypedQuery.Syntax in
-
-    let pickIndividual = here |> nav "individual" |> pickScreen in
-
-    let view = here |> viewScreen in
-
-    let viewSite = here |> nav "site" |> viewScreen in
-
-    render pickIndividual |> next [
-      render view;
-      render viewSite;
-    ]
-
-  let start =
-    let v =
-      let open Result.Syntax in
-      let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-      let state = WorkflowRunner.make univ db w in
-      return state
-    in JsResult.ofResult v
-
-  let next = WorkflowRunner.next
-
-  let render state = JsResult.ofResult (
-    let open Result.Syntax in
-    let%bind state, ui = WorkflowRunner.render state in
-    return [%bs.obj { state; ui }]
-  )
-
-  let bind q state = JsResult.ofResult (
-    let open Result.Syntax in
-    let%bind state, ui = WorkflowRunner.bind q state in
-    return [%bs.obj { state; ui }]
-  )
-
-  let pickValue id =
-    UntypedQuery.Syntax.(
-      here |> nav ~args:[Arg.number "id" id] "value"
-    )
-
-  let getQuery ui = UI.query ui
-  let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
-end
-
-include JsApi
