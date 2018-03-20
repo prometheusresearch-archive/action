@@ -97,6 +97,8 @@ module Arg : sig
   val number : string -> float -> t
   val bool : string -> bool -> t
 
+  val findValueFromArgList : name : string -> t list -> value option
+
 end = struct
 
   type t = {
@@ -114,6 +116,14 @@ end = struct
   let string name value = make name (String value)
   let number name value = make name (Number value)
   let bool name value = make name (Bool value)
+
+  let rec findValueFromArgList ~name args =
+    match args with
+    | [] -> None
+    | {name = argName; value}::args ->
+      if name = argName
+      then Some value
+      else findValueFromArgList ~name args
 
 end
 
@@ -643,7 +653,7 @@ end = struct
       | TypedQuery.ViewScreen q ->
         let%bind uiTyp = Type.extractUi typ in
         return (QueryResult.ui (QueryResult.UI.make ~name:"view" ~uiTyp value q))
-      | TypedQuery.Navigate (query, { name; args = _ }) ->
+      | TypedQuery.Navigate (query, { name; args }) ->
         let%bind value = aux ~value query in
         let navigate name dataset =
           match QueryResult.classify dataset with
@@ -666,12 +676,29 @@ end = struct
           let query = QueryResult.UI.query ui in
           let queryValue = QueryResult.UI.value ui in
           let%bind value = aux ~value:queryValue query in
-          begin match (QueryResult.UI.typ ui), name, QueryResult.classify value with
-          | Type.PickScreen _, "value", QueryResult.Array items ->
-            return (Array.get items 0)
-          | Type.ViewScreen _, "value", QueryResult.Object _ ->
+          begin match (QueryResult.UI.typ ui), name, args, QueryResult.classify value with
+          | Type.PickScreen _, "value", None, _ ->
+            error "missing id argument"
+          | Type.PickScreen _, "value", Some args, QueryResult.Array items ->
+            let value: QueryResult.t = match Arg.findValueFromArgList ~name:"id" args with
+            | Some (Arg.Bool v) -> Obj.magic v
+            | Some (Arg.String v) -> Obj.magic v
+            | Some (Arg.Number v) -> Obj.magic v
+            | None -> Obj.magic Js.Nullable.null
+            in
+            let f item = match QueryResult.classify item with
+              | QueryResult.Object obj ->
+                let id = Option.getWithDefault QueryResult.null (Js.Dict.get obj "id") in
+                id = (Obj.magic value)
+              | _ -> false
+            in
+            return (match Js.Array.find f items with
+              | Some v -> v
+              | None -> QueryResult.null
+            )
+          | Type.ViewScreen _, "value", _, QueryResult.Object _ ->
             return value
-          | _, name, _ -> error {j|no such key "$name"|j}
+          | _, name, _, _ -> error {j|no such key "$name"|j}
           end
         | _ -> error "expected an object or an array"
         end
