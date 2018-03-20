@@ -343,6 +343,27 @@ Examples of such queries:
   individual.pick
   ```
 
+  Now we can get a value of the selected item:
+
+  ```
+  individual.pick.value
+  ```
+
+  In this case the value is always `null` due to the fact that no selection has
+  been made yet.
+
+  To render a list of all individuals with a selected individual:
+
+  ```
+  individual.pick(id: "id")
+  ```
+
+  And not to get the selected value:
+
+  ```
+  individual.pick(id: "id").value
+  ```
+
 * Render a list of all a subset of individuals:
 
   ```
