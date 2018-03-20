@@ -2,12 +2,10 @@
  * @flow
  */
 
-import invariant from 'invariant';
-import React, {Component} from 'react';
+import * as React from 'react';
 import {View, Text} from 'react-native-web';
 import * as W from 'workflow';
 import type {Result, State, UI} from 'workflow';
-import {Loading} from './Loading.js';
 import {Pick} from './Pick.js';
 
 type P = {
@@ -42,7 +40,7 @@ export class App extends React.Component<P, S> {
           <Text>{state.error}</Text>
         </View>
       );
-    } else if (state.type == 'Ok') {
+    } else if (state.type === 'Ok') {
       const {ui} = state.value;
       if (ui.name === 'pick') {
         return <Pick query={ui.query} />;

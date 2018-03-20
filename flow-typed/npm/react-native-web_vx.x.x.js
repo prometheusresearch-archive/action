@@ -19,6 +19,7 @@ declare module 'react-native-web' {
   declare export var View: ComponentType<any>;
   declare export var ScrollView: ComponentType<any>;
   declare export var TouchableOpacity: ComponentType<any>;
+  declare export var TouchableHighlight: ComponentType<any>;
   declare export var Button: ComponentType<any>;
   declare export var Text: ComponentType<any>;
 }

@@ -356,7 +356,7 @@ end
 module QueryTyper : sig
 
   val typeQuery :
-    ?scope : TypedQuery.payload
+    ?ctyp : TypedQuery.payload
     -> univ:Universe.t
     -> UntypedQuery.t
     -> (TypedQuery.t, string) Result.t
@@ -397,29 +397,29 @@ end = struct
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ -> error "cannot extract field"
 
-  let rootScope = Card.One, Type.Void
+  let rootCtyp = Card.One, Type.Void
 
-  let typeQuery ?(scope=rootScope) ~univ query =
-    let rec aux ~scope ((), query) =
+  let typeQuery ?(ctyp=rootCtyp) ~univ query =
+    let rec aux ~ctyp ((), query) =
       let open Result.Syntax in
       match query with
       | UntypedQuery.Void ->
         return ((Card.One, Type.Void), TypedQuery.Void)
       | UntypedQuery.Here ->
-        return (scope, TypedQuery.Here)
+        return (ctyp, TypedQuery.Here)
       | UntypedQuery.Bind (parent, q) ->
-        let%bind ((prevCard, _) as scope, _) as parent = aux ~scope parent in
-        let%bind ((card, typ), _) as q = aux ~scope q in
+        let%bind ((prevCard, _) as ctyp, _) as parent = aux ~ctyp parent in
+        let%bind ((card, typ), _) as q = aux ~ctyp q in
         let scope = Card.merge prevCard card, typ in
         return (scope, TypedQuery.Bind (parent, q))
       | UntypedQuery.One parent ->
-        let%bind parent = aux ~scope parent in
-        return (scope, TypedQuery.One parent)
+        let%bind parent = aux ~ctyp parent in
+        return (ctyp, TypedQuery.One parent)
       | UntypedQuery.First parent ->
-        let%bind ((_, parentType), _) as parent = aux ~scope parent in
+        let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
         return ((Card.Opt, parentType), TypedQuery.One parent)
       | UntypedQuery.PickScreen parent ->
-        let%bind ((parentCard, parentTyp), _) as parent = aux ~scope parent in
+        let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
         begin match parentCard, parentTyp with
         | Card.One, Type.Entity _
         | Card.Opt, Type.Entity _ ->
@@ -429,7 +429,7 @@ end = struct
         | _, _ -> error "pick can only be applied to entity type"
         end
       | UntypedQuery.ViewScreen parent ->
-        let%bind ((parentCard, parentTyp), _) as parent = aux ~scope parent in
+        let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
         begin match parentCard, parentTyp with
         | Card.One, Type.Entity entityInfo
         | Card.Opt, Type.Entity entityInfo ->
@@ -442,20 +442,20 @@ end = struct
       | UntypedQuery.Navigate (parent, navigation) ->
         let { UntypedQuery. name; args } = navigation in
         let navigation = { TypedQuery. name; args; } in
-        let%bind parent = aux ~scope parent in
+        let%bind parent = aux ~ctyp parent in
         let (parentCard, parentTyp), _parentSyn = parent in
         let%bind field = extractField univ name parentTyp in
         let fieldCard, fieldTyp = field.fieldCtyp in
         let fieldCard = Card.merge parentCard fieldCard in
         return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
       | UntypedQuery.Select (parent, selection) ->
-        let%bind parent = aux ~scope parent in
-        let parentInfo, _parentSyn = parent in
-        let parentCard, _parentTyp = parentInfo in
+        let%bind parent = aux ~ctyp parent in
+        let parentCtyp, _parentSyn = parent in
+        let parentCard, _parentTyp = parentCtyp in
         let checkField fields { UntypedQuery. alias; query } =
           match fields with
           | Result.Ok (fields, selection, index) ->
-            let%bind query = aux ~scope:parentInfo query in
+            let%bind query = aux ~ctyp:parentCtyp query in
             let (fieldCard, fieldTyp), _ = query in
             let fieldName = Option.getWithDefault (string_of_int index) alias in
             let fieldCard = Card.merge parentCard fieldCard in
@@ -472,7 +472,7 @@ end = struct
         in
         let typ = Type.Record fields in
         return ((parentCard, typ), TypedQuery.Select (parent, selection))
-    in aux ~scope query
+    in aux ~ctyp query
 
 end
 
@@ -691,13 +691,13 @@ end
 
 module WorkflowTyper = struct
 
-  let rootScope = Card.One, Type.Void
+  let rootCtyp = Card.One, Type.Void
 
   let typeWorkflow ~univ w =
     let open Result.Syntax in
-    let rec aux ~scope w =
+    let rec aux ~ctyp w =
       match w with | UntypedWorkflow.Render q ->
-        let%bind ((_, typ), _) as q = QueryTyper.typeQuery ~univ ~scope q in
+        let%bind ((_, typ), _) as q = QueryTyper.typeQuery ~univ ~ctyp q in
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
           error "workflow can only be defined on UI values"
@@ -709,33 +709,47 @@ module WorkflowTyper = struct
           return (TypedWorkflow.Render q, scope)
         end
       | UntypedWorkflow.Next (first, next) ->
-        let%bind first, scope = aux ~scope first in
+        let%bind first, ctyp = aux ~ctyp first in
         let%bind next, _ =
-          let f (next, scope) w =
-            let%bind w, _ = aux ~scope w in
-            return (w::next, scope)
+          let f (next, ctyp) w =
+            let%bind w, _ = aux ~ctyp w in
+            return (w::next, ctyp)
           in
-          Result.List.foldLeft ~f ~init:([], scope) next
+          Result.List.foldLeft ~f ~init:([], ctyp) next
         in
-        return (TypedWorkflow.Next (first, next), scope)
+        return (TypedWorkflow.Next (first, next), ctyp)
     in
-    let%bind tw, _ = aux w ~scope:rootScope in
+    let%bind tw, _ = aux w ~ctyp:rootCtyp in
     return tw
 
 end
 
-module WorkflowRunnner (Db : DATABASE) : sig
+module WorkflowRunner (Db : DATABASE) : sig
 
+  (**
+   * This type represents workflow execution state.
+   *)
   type t
 
-  val make :
-    ?parent : t
-    -> ?query : TypedQuery.t
-    -> Db.t
-    -> TypedWorkflow.t
-    -> t
+  (**
+   * Produce an initial state for the given database and workflow description.
+   *)
+  val make : Universe.t -> Db.t -> TypedWorkflow.t -> t
 
+  (**
+   * Bind workflow execution state for the new query fragment.
+   * TODO: We should instead define per UI operations.
+   *)
+  val bind : UntypedQuery.t -> t -> ((t * UI.t), string) Result.t
+
+  (**
+   * Render workflows state and return a new state and a UI screen to render.
+   *)
   val render : t -> ((t * UI.t), string) Result.t
+
+  (**
+   * Return a list of next possible workflow states.
+   *)
   val next : t -> t list
 
 end = struct
@@ -744,38 +758,54 @@ end = struct
     query : TypedQuery.t;
     workflow : TypedWorkflow.t;
     db : Db.t;
+    univ : Universe.t;
     parent : t option;
   }
 
-  let make ?parent ?(query=TypedQuery.void) db workflow = {
+  let _make ?parent ?(query=TypedQuery.void) univ db workflow = {
+    univ;
     query;
     db;
     workflow;
     parent;
   }
 
+  let make db workflow = _make db workflow
+
   let rec render state =
     let open Result.Syntax in
-    let {workflow; db; query; _} = state in
+    let {workflow; db; query; univ; _} = state in
     match workflow with
     | TypedWorkflow.Next (first, _next) ->
-      let state = make ~parent:state ~query db first in
+      let state = _make ~parent:state ~query univ db first in
       render state
     | TypedWorkflow.Render q ->
+      let ctyp, _ = q in
+      let q = ctyp, TypedQuery.Bind (query, q) in
+      let state = { state with query = q; parent = Some state; } in
       let%bind res = Db.runQuery db q in
       match QueryResult.classify res with
       | QueryResult.UI ui -> return (state, ui)
       | _ -> error "expected UI, got data"
 
   let rec next state =
-    let {workflow; db; parent} = state in
+    let {workflow; db; univ; parent} = state in
     match workflow, parent with
     | TypedWorkflow.Render _, Some parent -> next parent
     | TypedWorkflow.Render _, None -> []
     | TypedWorkflow.Next (_first, []), Some parent -> next parent
     | TypedWorkflow.Next (_first, next), _ ->
-      let f w = make ~parent:state db w in
+      let f w = _make ~parent:state univ db w in
       List.map f next
+
+  let bind q state =
+    let open Result.Syntax in
+    let ctyp, _ = state.query in
+    let%bind q = QueryTyper.typeQuery ~univ:state.univ ~ctyp q in
+    let nextState = { state with query = q } in
+    match next nextState with
+    | [] -> render state
+    | state::_ -> render state
 
 end
 
@@ -983,22 +1013,27 @@ module JsApi : sig
   type ui
   type state
   type query
+  type uquery
 
   val start : state JsResult.t
   val render : state -> < state : state; ui : ui > Js.t JsResult.t
   val next : state -> state list
+  val bind : uquery -> state -> < state : state; ui : ui > Js.t JsResult.t
+
+  val pickValue : float -> uquery
 
   val getQuery : ui -> query
   val runQuery : query -> QueryResult.t JsResult.t
 
 end = struct
-  module WorkflowRunnner = WorkflowRunnner(JSONDatabase)
+  module WorkflowRunner = WorkflowRunner(JSONDatabase)
 
   type workflow = UntypedWorkflow.t
   type db = JSONDatabase.t
   type ui = UI.t
-  type state = WorkflowRunnner.t
+  type state = WorkflowRunner.t
   type query = TypedQuery.t
+  type uquery = UntypedQuery.t
 
   let univ = Test.univ
   let db = Test.db
@@ -1022,16 +1057,28 @@ end = struct
     let v =
       let open Result.Syntax in
       let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-      let state = WorkflowRunnner.make db w in
+      let state = WorkflowRunner.make univ db w in
       return state
     in JsResult.ofResult v
 
-  let next = WorkflowRunnner.next
+  let next = WorkflowRunner.next
+
   let render state = JsResult.ofResult (
     let open Result.Syntax in
-    let%bind state, ui = WorkflowRunnner.render state in
+    let%bind state, ui = WorkflowRunner.render state in
     return [%bs.obj { state; ui }]
   )
+
+  let bind q state = JsResult.ofResult (
+    let open Result.Syntax in
+    let%bind state, ui = WorkflowRunner.bind q state in
+    return [%bs.obj { state; ui }]
+  )
+
+  let pickValue id =
+    UntypedQuery.Syntax.(
+      here |> nav ~args:[Arg.number "id" id] "value"
+    )
 
   let getQuery ui = UI.query ui
   let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
