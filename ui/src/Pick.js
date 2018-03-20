@@ -5,18 +5,20 @@
 import * as React from 'react';
 import {View, Text, TouchableHighlight} from 'react-native-web';
 import * as W from 'workflow';
-import type {Query} from 'workflow';
+import type {Query, UntypedQuery} from 'workflow';
 import {Error} from './Error.js';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
   query: Query,
+  onQuery: UntypedQuery => void,
 };
 
 export function Pick(props: P) {
   const data = W.runQuery(props.query);
   const onSelect = id => {
-    console.log(id);
+    const nextQuery = W.pickValue(id);
+    props.onQuery(nextQuery);
   };
   if (data.type === 'Error') {
     return <Error error={data.error} />;
@@ -44,10 +46,11 @@ function Table(props) {
       );
     }
     return (
-      <TouchableHighlight key={data.id} underlayColor="yellow" onPress={onSelect.bind(null, data.id)}>
-        <View style={{flexDirection: 'row'}}>
-          {cells}
-        </View>
+      <TouchableHighlight
+        key={data.id}
+        underlayColor="yellow"
+        onPress={onSelect.bind(null, data.id)}>
+        <View style={{flexDirection: 'row'}}>{cells}</View>
       </TouchableHighlight>
     );
   });
