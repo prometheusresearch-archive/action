@@ -24,4 +24,6 @@ declare module 'workflow' {
   declare export function getQuery(ui: UI, state: State): Query;
   declare export function runQuery(query: Query): Result<QueryResult>;
   declare export function pickValue(id: mixed): UntypedQuery;
+
+  declare export function uiName(ui: UI): string;
 }

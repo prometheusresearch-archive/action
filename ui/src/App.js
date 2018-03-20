@@ -59,9 +59,10 @@ export class App extends React.Component<P, S> {
       );
     } else if (state.type === 'Ok') {
       const {ui, state: node} = state.value;
-      if (ui.name === 'pick') {
+      const name = W.uiName(ui);
+      if (name === 'pick') {
         return <Pick query={W.getQuery(ui, node)} onQuery={this.onQuery} />;
-      } else if (ui.name === 'view') {
+      } else if (name === 'view') {
         return <View query={W.getQuery(ui, node)} onQuery={this.onQuery} />;
       } else {
         return (

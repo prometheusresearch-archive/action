@@ -211,6 +211,12 @@ module Type = struct
     let string = Value (ValueType.StringTyp, None)
     let number = Value (ValueType.NumberTyp, None)
     let bool = Value (ValueType.BoolTyp, None)
+
+    let requiredArg name typ =
+      Req {argName = name; argTyp = typ}
+
+    let optionalArg name typ =
+      Opt {argName = name; argTyp = typ}
   end
 
 end
@@ -413,6 +419,12 @@ end = struct
           fieldArgs = None;
           fieldCtyp = Card.Opt, Type.Entity entityInfo;
         }
+      | "title" -> Ok {
+          Type.
+          fieldName = "title";
+          fieldArgs = None;
+          fieldCtyp = Card.One, Type.Syntax.string
+        }
       | _ -> error {j|no such field on PickScreen: $fieldName|j}
       end
     | Type.UI (Type.ViewScreen entityInfo) ->
@@ -422,6 +434,12 @@ end = struct
           fieldName = "value";
           fieldArgs = None;
           fieldCtyp = Card.Opt, Type.Entity entityInfo;
+        }
+      | "title" -> Ok {
+          Type.
+          fieldName = "title";
+          fieldArgs = None;
+          fieldCtyp = Card.One, Type.Syntax.string
         }
       | _ -> error {j|no such field on ViewScreen: $fieldName|j}
       end
@@ -529,6 +547,8 @@ module QueryResult = struct
 
     val make : name : string -> uiTyp : Type.ui -> queryResult -> TypedQuery.t -> t
     val test : 'a -> bool
+
+    val name : t -> string
     val query : t -> TypedQuery.t
     val value : t -> queryResult
     val typ : t -> Type.ui
@@ -550,6 +570,7 @@ module QueryResult = struct
 
     let test x = test_ (Obj.magic x)
 
+    let name ui = ui##name
     let query ui = ui##query
     let value ui = ui##value
     let typ ui = ui##typ
@@ -814,7 +835,7 @@ module WorkflowRunner (Db : DATABASE) : sig
    *)
   val next : t -> t list
 
-  val query :QueryResult.UI.t -> t -> TypedQuery.t
+  val query : QueryResult.UI.t -> t -> TypedQuery.t
 
 end = struct
 
@@ -924,6 +945,7 @@ module JsApi : sig
 
   val pickValue : float -> uquery
 
+  val uiName : ui -> string
   val getQuery : ui -> state -> query
   val runQuery : query -> QueryResult.t JsResult.t
 
@@ -943,6 +965,8 @@ end = struct
   type uquery = UntypedQuery.t
 
   let showQuery = TypedQuery.show
+
+  let uiName = QueryResult.UI.name
 
   let univ =
     let site = Type.Syntax.(entity "site" [
@@ -971,7 +995,14 @@ end = struct
           "id": 2,
           "name": "Oleksiy Golovko",
           "site": {
-            "title": "RexDB Site"
+            "title": "Portal Site"
+          }
+        },
+        {
+          "id": 3,
+          "name": "Clark Evans",
+          "site": {
+            "title": "Portal Site"
           }
         }
       ]
@@ -984,12 +1015,15 @@ end = struct
     let open UntypedQuery.Syntax in
 
     let pickIndividual = render (here |> nav "individual" |> pickScreen) in
-
     let view = render (here |> viewScreen) in
-
     let viewSite = render (here |> nav "site" |> viewScreen) in
 
-    pickIndividual |> andThen [ view; viewSite; ]
+    pickIndividual |> andThen [
+      view |> andThen [
+        viewSite;
+      ];
+      viewSite;
+    ]
 
   let start =
     let v =
