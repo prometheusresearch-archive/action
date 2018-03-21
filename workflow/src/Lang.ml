@@ -1,7 +1,11 @@
 (**
- * Rabbit based UI query language.
+ * A query & workflow language based on query combinators.
  *)
 
+(**
+ * An extension to stdlib - result type which can represent a value or a
+ * failure.
+ *)
 module Result = struct
   include Js.Result
 
@@ -52,6 +56,10 @@ module Result = struct
   end
 end
 
+(**
+ * An extension to stdlib - option type which can represent either a value or an
+ * absence of it.
+ *)
 module Option = struct
   include Js.Option
 end
@@ -64,24 +72,6 @@ module Card = struct
     | One
     | Opt
     | Many
-
-  let compare a b =
-    match (a, b) with
-    | Many, Many -> 0
-    | Many,Opt -> -1
-    | Many,One -> -1
-    | Opt, Many -> 1
-    | Opt, Opt -> 0
-    | Opt, One -> -1
-    | One,Many -> 1
-    | One,Opt -> 1
-    | One,One -> 0
-
-  let (<) a b = compare a b < 0
-  let (>) a b = compare a b > 0
-  let (>=) a b = compare a b >= 0
-  let (<=) a b = compare a b <= 0
-  let (<>) a b = compare a b <> 0
 
   let merge a b =
     match (a, b) with
@@ -102,6 +92,8 @@ end
 
 (**
  * Argument is a value along with some label.
+ *
+ * TODO: We should only support queries as arguments.
  *)
 module Arg : sig
 
