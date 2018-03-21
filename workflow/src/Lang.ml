@@ -1058,9 +1058,6 @@ end = struct
   let uiName = Value.UI.name
 
   let pickScreen =
-    let resolveTitle ~screenArgs:_ ~args:_ _value =
-      Result.Ok (Value.string "Pick Screen")
-    in
     let resolveValue ~screenArgs ~args:_ value =
       let id = Arg.findValueFromArgList ~name:"id" screenArgs in
       match id, Value.classify value with
@@ -1080,6 +1077,17 @@ end = struct
             in
             Value.ofOption (Js.Array.find f value))
       | _ -> Result.Error "invalid invocation"
+    in
+    let resolveTitle ~screenArgs ~args:_ value =
+      let open Result.Syntax in
+      let%bind value = resolveValue ~screenArgs ~args:[] value in
+      match Value.classify value with
+      | Value.Object obj ->
+        begin match Js.Dict.get obj "id" with
+        | None -> Result.Ok (Value.string "Pick Screen")
+        | Some id -> Result.Ok (Value.string {j|Pick Screen ($id)|j})
+        end
+      | _ -> Result.Ok (Value.string "Pick Screen")
     in
     Screen.Syntax.(screen
       ~inputCard:Card.Many
@@ -1362,26 +1370,31 @@ module Test = struct
     runQuery db getSiteTitleByIndividualViaViewViaBind2;
 
     (**
-     * Render a value of the pick screen with no item selected.
+     * Value & title of the pick screen with no item selected.
      *)
     runQuery db UntypedQuery.Syntax.(
       void
       |> nav "individual"
       |> screen "pick"
-      |> nav "value"
+      |> select [
+        field ~alias:"value" (here |> nav "value");
+        field ~alias:"title" (here |> nav "title");
+      ]
     );
 
     (**
-     * Render a value of the pick screen with the selected item.
+     * Value of the pick screen with the selected item.
      *)
     runQuery db UntypedQuery.Syntax.(
       void
       |> nav "individual"
-      |> screen ~args:[Arg.number "id" 1.] "pick"
-      |> nav "value"
+      |> screen ~args:[Arg.number "id" 2.] "pick"
+      |> select [
+        field ~alias:"value" (here |> nav "value");
+        field ~alias:"title" (here |> nav "title");
+      ]
     );
 
-    runQuery db UntypedQuery.Syntax.(void |> nav "individual" |> screen "pick" |> nav "title");
     typeWorkflow pickAndViewIndividualWorkflow;
 
 end
