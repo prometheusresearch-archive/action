@@ -121,6 +121,8 @@ module Arg : sig
 
   val findValueFromArgList : name : string -> t list -> value option
 
+  val show : t -> string
+
 end = struct
 
   type t = {
@@ -146,6 +148,13 @@ end = struct
       if name = argName
       then Some value
       else findValueFromArgList ~name args
+
+  let show { name; value } =
+    let value = match value with
+    | String value -> {j|"$value"|j}
+    | Number value -> string_of_float value
+    | Bool value -> string_of_bool value
+    in {j|$name: $value|j}
 
 end
 
@@ -303,33 +312,44 @@ module Query (P : sig type t end) = struct
     query: t
   }
 
-  let rec show ((_, syn) : t) = match syn with
-  | Void -> "void"
-  | Here -> "here"
-  | Select (parent, fields) ->
-    let parent = show parent in
-    let fields =
-      fields
-      |> List.map (function
-        | {alias = None; query} -> show query
-        | {alias = Some alias; query} -> let query = show query in {j|$alias: $query|j})
-      |> String.concat ", "
+  let rec show ((_, syn) : t) =
+    let showArgs = function
+    | Some args ->
+      let args =
+        args
+        |> List.map Arg.show
+        |> String.concat ", "
+      in {j|($args)|j}
+    | None -> ""
     in
-    {j|$parent { $fields }|j}
-  | Navigate (parent,{ navName; navArgs = _ }) ->
-    let parent = show parent in
-    let this = navName in
-    {j|$parent.$this|j}
-  | One _ -> "one"
-  | First _ -> "first"
-  | Chain (parent, this) ->
-    let parent = show parent in
-    let this = show this in
-    {j|$parent.bind($this)|j}
-  | Screen (parent, { screenName; screenArgs = _ }) ->
-    let parent = show parent in
-    {j|$parent.render($screenName)|j}
-
+    match syn with
+    | Void -> "void"
+    | Here -> "here"
+    | Select (parent, fields) ->
+      let parent = show parent in
+      let fields =
+        fields
+        |> List.map (function
+          | {alias = None; query} -> show query
+          | {alias = Some alias; query} -> let query = show query in {j|$alias: $query|j})
+        |> String.concat ", "
+      in
+      {j|$parent { $fields }|j}
+    | Navigate (parent,{ navName; navArgs; }) ->
+      let navArgs = showArgs navArgs in
+      let parent = show parent in
+      let this = navName in
+      {j|$parent.$this$navArgs|j}
+    | One _ -> "one"
+    | First _ -> "first"
+    | Chain (parent, this) ->
+      let parent = show parent in
+      let this = show this in
+      {j|$parent.bind($this)|j}
+    | Screen (parent, { screenName; screenArgs; }) ->
+      let parent = show parent in
+      let screenArgs = showArgs screenArgs in
+      {j|$parent.$screenName$screenArgs|j}
 end
 
 (**
@@ -406,10 +426,18 @@ module Value = struct
 
     type t
 
-    val make : name : string -> typ : Type.t -> queryResult -> TypedQuery.t -> t
+    val make :
+      name : string
+      -> args : Arg.t list option
+      -> typ : Type.t
+      -> queryResult
+      -> TypedQuery.t
+      -> t
+
     val test : 'a -> bool
 
     val name : t -> string
+    val args : t -> Arg.t list option
     val query : t -> TypedQuery.t
     val value : t -> queryResult
     val typ : t -> Type.t
@@ -417,12 +445,13 @@ module Value = struct
   end = struct
     type t = <
       name : string;
+      args : Arg.t list option;
       query : TypedQuery.t;
       value : queryResult;
       typ : Type.t;
     > Js.t
 
-    external make : name : string -> typ : Type.t -> queryResult -> TypedQuery.t -> t =
+    external make : name : string -> args : Arg.t list option -> typ : Type.t -> queryResult -> TypedQuery.t -> t =
       "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
 
     let test_ : 'a -> bool = [%bs.raw {|
@@ -432,6 +461,7 @@ module Value = struct
     let test x = test_ (Obj.magic x)
 
     let name ui = ui##name
+    let args ui = ui##args
     let query ui = ui##query
     let value ui = ui##value
     let typ ui = ui##typ
@@ -445,6 +475,10 @@ module Value = struct
   external array : t array -> t = "%identity"
   external obj : t Js.Dict.t -> t = "%identity"
   external ofJson : Js.Json.t -> t = "%identity"
+
+  let ofOption = function
+    | Some v -> v
+    | None -> null
 
   type tagged =
     | Object of t Js.Dict.t
@@ -741,8 +775,8 @@ end = struct
           else return Value.null
         | _ -> return value
         end
-      | TypedQuery.Screen (q, { screenName; screenArgs = _; }) ->
-        return (Value.ui (Value.UI.make ~name:screenName ~typ value q))
+      | TypedQuery.Screen (q, { screenName; screenArgs; }) ->
+        return (Value.ui (Value.UI.make ~name:screenName ~args:screenArgs ~typ value q))
       | TypedQuery.Navigate (query, { navName; navArgs }) ->
         let args = Option.getWithDefault [] navArgs in
         let%bind value = aux ~value query in
@@ -770,6 +804,7 @@ end = struct
           let queryValue = Value.UI.value ui in
           let%bind value = aux ~value:queryValue query in
           let screenName = Value.UI.name ui in
+          let screenArgs = Option.getWithDefault [] (Value.UI.args ui) in
           let%bind screen = Result.ofOption
             ~err:{j|no such screen "$screenName"|j}
             (Universe.lookupScreen screenName db.univ)
@@ -777,7 +812,7 @@ end = struct
           let%bind _, resolve = Result.ofOption
             ~err:{j|no such field "$navName"|j}
             (Screen.lookupField ~name:navName ~typ:(Value.UI.typ ui) screen)
-          in resolve ~screenArgs:[] ~args value
+          in resolve ~screenArgs ~args value
         | _ -> error {|Cannot navigate away from this value|}
         end
       | TypedQuery.Select (query, selection) ->
@@ -1022,6 +1057,55 @@ end = struct
 
   let uiName = Value.UI.name
 
+  let pickScreen =
+    let resolveTitle ~screenArgs:_ ~args:_ _value =
+      Result.Ok (Value.string "Pick Screen")
+    in
+    let resolveValue ~screenArgs ~args:_ value =
+      let id = Arg.findValueFromArgList ~name:"id" screenArgs in
+      match id, Value.classify value with
+      | None, _ ->
+        Result.Ok Value.null
+      | Some (Arg.Number id), Value.Array value ->
+        Result.Ok (
+          if Array.length value = 0
+          then Value.null
+          else
+            let f value = match Value.classify value with
+            | Value.Object obj -> begin match Js.Dict.get obj "id" with
+              | Some v -> (Obj.magic v) = id
+              | None -> false
+              end
+            | _ -> false
+            in
+            Value.ofOption (Js.Array.find f value))
+      | _ -> Result.Error "invalid invocation"
+    in
+    Screen.Syntax.(screen
+      ~inputCard:Card.Many
+      ~outputCtyp:(fun entity -> (Card.One, entity))
+      (fun entity -> [
+        has ~resolve:resolveTitle "title" string;
+        has ~resolve:resolveValue ~card:Card.Opt "value" entity;
+      ])
+    )
+
+  let viewScreen =
+    let resolveTitle ~screenArgs:_ ~args:_ _value =
+      Result.Ok (Value.string "View Screen")
+    in
+    let resolveValue ~screenArgs:_ ~args:_ value =
+      Result.Ok value
+    in
+    Screen.Syntax.(screen
+      ~inputCard:Card.One
+      ~outputCtyp:(fun entity -> (Card.Opt, entity))
+      (fun entity -> [
+        has ~resolve:resolveTitle "title" string;
+        has ~resolve:resolveValue ~card:Card.Opt "value" entity;
+      ])
+    )
+
   let univ =
 
     let site = Type.Syntax.(entity "site" [
@@ -1032,47 +1116,6 @@ end = struct
       hasOne "name" string;
       hasOne "site" site;
     ]) in
-
-    let pickScreen =
-      let resolveTitle ~screenArgs:_ ~args:_ _value =
-        Result.Ok (Value.string "Pick Screen")
-      in
-      let resolveValue ~screenArgs:_ ~args:_ value =
-        match Value.classify value with
-        | Value.Array value ->
-          Result.Ok (
-            if Array.length value = 0
-            then Value.null
-            else Array.get value 0)
-        | _ -> Result.Error "expected an array"
-      in
-      Screen.Syntax.(screen
-        ~inputCard:Card.Many
-        ~outputCtyp:(fun entity -> (Card.One, entity))
-        (fun entity -> [
-          has ~resolve:resolveTitle "title" string;
-          has ~resolve:resolveValue ~card:Card.Opt "value" entity;
-        ])
-      )
-    in
-
-    let viewScreen =
-      let resolveTitle ~screenArgs:_ ~args:_ _value =
-        Result.Ok (Value.string "View Screen")
-      in
-      let resolveValue ~screenArgs:_ ~args:_ value =
-        Result.Ok value
-      in
-      Screen.Syntax.(screen
-        ~inputCard:Card.One
-        ~outputCtyp:(fun entity -> (Card.Opt, entity))
-        (fun entity -> [
-          has ~resolve:resolveTitle "title" string;
-          has ~resolve:resolveValue ~card:Card.Opt "value" entity;
-        ])
-      )
-    in
-
 
     Universe.(
       empty
@@ -1199,8 +1242,8 @@ module Test = struct
   let renderSiteByIndividual = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> screen "pick"
-    |> nav ~args:[Arg.number "id" 1.] "value"
+    |> screen ~args:[Arg.number "id" 1.] "pick"
+    |> nav "value"
     |> nav "site"
     |> screen "view"
   )
@@ -1211,8 +1254,8 @@ module Test = struct
   let getSiteTitleByIndividualViaView = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> screen "pick"
-    |> nav ~args:[Arg.number "id" 1.] "value"
+    |> screen ~args:[Arg.number "id" 1.] "pick"
+    |> nav "value"
     |> nav "site"
     |> screen "view"
     |> nav "value"
@@ -1227,10 +1270,10 @@ module Test = struct
     |> chain (
       here
       |> nav "individual"
-      |> screen "pick"
+      |> screen ~args:[Arg.number "id" 1.] "pick"
       |> chain (
         here
-        |> nav ~args:[Arg.number "id" 1.] "value"
+        |> nav "value"
         |> chain (
           here
           |> nav "site"
@@ -1246,10 +1289,10 @@ module Test = struct
   let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> screen "pick"
+    |> screen ~args:[Arg.number "id" 1.] "pick"
     |> chain (
       here
-      |> nav ~args:[Arg.number "id" 1.] "value"
+      |> nav "value"
       |> nav "site"
       |> screen "view"
       |> nav "value"
@@ -1266,8 +1309,8 @@ module Test = struct
   let getSelectedIndividual = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> screen "pick"
-    |> nav ~args:[Arg.number "id" 1.] "value"
+    |> screen ~args:[Arg.number "id" 1.] "pick"
+    |> nav "value"
   )
 
   let pickAndViewIndividualWorkflow =
@@ -1317,6 +1360,27 @@ module Test = struct
     runQuery db getSiteTitleByIndividualViaView;
     runQuery db getSiteTitleByIndividualViaViewViaBind;
     runQuery db getSiteTitleByIndividualViaViewViaBind2;
+
+    (**
+     * Render a value of the pick screen with no item selected.
+     *)
+    runQuery db UntypedQuery.Syntax.(
+      void
+      |> nav "individual"
+      |> screen "pick"
+      |> nav "value"
+    );
+
+    (**
+     * Render a value of the pick screen with the selected item.
+     *)
+    runQuery db UntypedQuery.Syntax.(
+      void
+      |> nav "individual"
+      |> screen ~args:[Arg.number "id" 1.] "pick"
+      |> nav "value"
+    );
+
     runQuery db UntypedQuery.Syntax.(void |> nav "individual" |> screen "pick" |> nav "title");
     typeWorkflow pickAndViewIndividualWorkflow;
 
