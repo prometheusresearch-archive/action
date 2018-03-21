@@ -9,6 +9,10 @@ module Result = struct
     | Ok _ -> Ok ()
     | Error err -> Error err
 
+  let ofOption ~err = function
+    | None -> Error err
+    | Some v -> Ok v
+
   module Syntax = struct
     let return v = Ok v
     let error err = Error err
@@ -60,6 +64,24 @@ module Card = struct
     | One
     | Opt
     | Many
+
+  let compare a b =
+    match (a, b) with
+    | Many, Many -> 0
+    | Many,Opt -> -1
+    | Many,One -> -1
+    | Opt, Many -> 1
+    | Opt, Opt -> 0
+    | Opt, One -> -1
+    | One,Many -> 1
+    | One,Opt -> 1
+    | One,One -> 0
+
+  let (<) a b = compare a b < 0
+  let (>) a b = compare a b > 0
+  let (>=) a b = compare a b >= 0
+  let (<=) a b = compare a b <= 0
+  let (<>) a b = compare a b <> 0
 
   let merge a b =
     match (a, b) with
@@ -149,16 +171,24 @@ module Type = struct
 
   type t =
     | Void
-    | UI of ui
-    | Entity of entityInfo
+    | Screen of screen
+    | Entity of entity
     | Record of field list
-    | Value of (ValueType.t * field list option)
+    | Value of value
 
-  and ui =
-    | PickScreen of entityInfo
-    | ViewScreen of entityInfo
+  and ct = Card.t * t
 
-  and entityInfo = {
+  and screen = {
+    screenName : string;
+    screenFields : field list;
+    screenOutputCtyp : ct;
+  }
+
+  and value = {
+    valueTyp: ValueType.t;
+  }
+
+  and entity = {
     entityName : string;
     entityFields : field list option;
   }
@@ -178,17 +208,25 @@ module Type = struct
     argTyp : ValueType.t;
   }
 
-  let extractUi = function
-    | UI ui -> Result.Ok ui
-    | _ -> Result.Error "not an ui type"
-
   let rec show = function
     | Void -> "void"
-    | Value (t, _fields) -> ValueType.show t
-    | UI (PickScreen entityInfo) -> let t = show (Entity entityInfo) in {j|PickScreen($t)|j}
-    | UI (ViewScreen entityInfo) -> let t = show (Entity entityInfo) in {j|ViewScreen($t)|j}
+    | Value {valueTyp; _} -> ValueType.show valueTyp;
+    | Screen { screenName; screenFields = _; } -> {j|Screen("$screenName")|j}
     | Entity {entityName; _} -> {j|Entity($entityName)|j}
-    | Record _fields -> "{}"
+    | Record fields ->
+      let fields =
+        fields
+        |> List.map (fun { fieldName; fieldArgs = _; fieldCtyp } ->
+          let fieldCtyp = showCt fieldCtyp in
+          {j|$fieldName: $fieldCtyp|j})
+        |> String.concat ", "
+      in
+      {j|{ $fields }|j}
+
+  and showCt (card, typ) =
+    let card = Card.show card in
+    let typ = show typ in
+    {j|$card $typ|j}
 
   (**
    * Combinators to define a type system.
@@ -208,9 +246,13 @@ module Type = struct
     let hasOpt = has ~card:Card.Opt
     let hasMany = has ~card:Card.Many
 
-    let string = Value (ValueType.StringTyp, None)
-    let number = Value (ValueType.NumberTyp, None)
-    let bool = Value (ValueType.BoolTyp, None)
+    module Value = struct
+      let string = Value { valueTyp = ValueType.StringTyp; }
+      let number = Value { valueTyp = ValueType.NumberTyp; }
+      let bool = Value { valueTyp = ValueType.BoolTyp; }
+    end
+
+    include Value
 
     let requiredArg name typ =
       Req {argName = name; argTyp = typ}
@@ -222,61 +264,13 @@ module Type = struct
 end
 
 (**
- * Type annotated with cardinality.
- *)
-module CType = struct
-  type t = Card.t * Type.t
-end
-
-(**
- * Universe is a collection of types which are available on a void type.
- *)
-module Universe : sig
-
-  type t
-
-  (**
-   * An empty universe.
-   *)
-  val empty : t
-
-  val hasOne : ?args : Type.argTyp list -> string -> Type.t -> t -> t
-  val hasOpt : ?args : Type.argTyp list -> string -> Type.t -> t -> t
-  val hasMany : ?args : Type.argTyp list -> string -> Type.t -> t -> t
-
-  val fields : t -> Type.field list
-
-end = struct
-
-  module Map = Belt.Map.String
-
-  type t = Type.field list
-
-  let empty = []
-
-  let hasOne ?args name typ univ =
-    let field = Type.Syntax.hasOne ?args name typ in
-    field::univ
-
-  let hasOpt ?args name typ univ =
-    let field = Type.Syntax.hasOpt ?args name typ in
-    field::univ
-
-  let hasMany ?args name typ univ =
-    let field = Type.Syntax.hasMany ?args name typ in
-    field::univ
-
-  let fields univ = univ
-end
-
-(**
  * This defines a query syntax parametrized by the payload.
  *
  * Payload can be used to store some semantic info along with a query, for
  * example location of the query sources parsed from source files or type
  * information.
  *)
-module Query (P : sig type t end)= struct
+module Query (P : sig type t end) = struct
 
   type payload = P.t
 
@@ -289,9 +283,13 @@ module Query (P : sig type t end)= struct
     | Navigate of t * nav
     | One of t
     | First of t
-    | Bind of (t * t)
-    | PickScreen of t
-    | ViewScreen of t
+    | Chain of (t * t)
+    | Screen of (t * string)
+
+  and ui = {
+    name : string;
+    ctyper : Type.ct -> (Type.ct, string) Result.t;
+  }
 
   and nav = {
     name : string;
@@ -310,6 +308,13 @@ module Query (P : sig type t end)= struct
   | Here -> "here"
   | Select (parent, fields) ->
     let parent = show parent in
+    let fields =
+      fields
+      |> List.map (function
+        | {alias = None; query} -> show query
+        | {alias = Some alias; query} -> let query = show query in {j|$alias: $query|j})
+      |> String.concat ", "
+    in
     {j|$parent { $fields }|j}
   | Navigate (parent,{ name; args = _ }) ->
     let parent = show parent in
@@ -317,16 +322,13 @@ module Query (P : sig type t end)= struct
     {j|$parent.$this|j}
   | One _ -> "one"
   | First _ -> "first"
-  | Bind (parent, this) ->
+  | Chain (parent, this) ->
     let parent = show parent in
     let this = show this in
     {j|$parent.bind($this)|j}
-  | PickScreen parent ->
+  | Screen (parent, name) ->
     let parent = show parent in
-    {j|$parent.pick|j}
-  | ViewScreen parent ->
-    let parent = show parent in
-    {j|$parent.view|j}
+    {j|$parent.render($name)|j}
 
 end
 
@@ -353,8 +355,8 @@ module UntypedQuery = struct
     let nav ?args name parent =
       (), Navigate (parent, { name; args; })
 
-    let bind q parent =
-      (), Bind (parent, q)
+    let chain q parent =
+      (), Chain (parent, q)
 
     let select fields parent =
       (), Select (parent, fields)
@@ -362,17 +364,15 @@ module UntypedQuery = struct
     let field ?alias query =
       { query; alias; }
 
-    let pickScreen query =
-      (), PickScreen query
-
-    let viewScreen query =
-      (), ViewScreen query
+    let screen name query =
+      (), Screen (query, name)
 
     let one query =
       (), One query
 
     let first query =
       (), First query
+
   end
 
 end
@@ -382,149 +382,10 @@ end
  *)
 module TypedQuery = struct
   include Query(struct
-    type t = CType.t
+    type t = Type.ct
   end)
 
   let void = (Card.One, Type.Void), Void
-end
-
-(**
- * This module implements a type checking / type inferrence for query structure
- * by turning untype queries into typed ones.
- *)
-module QueryTyper : sig
-
-  val typeQuery :
-    ?ctyp : TypedQuery.payload
-    -> univ:Universe.t
-    -> UntypedQuery.t
-    -> (TypedQuery.t, string) Result.t
-
-end = struct
-
-  let extractField univ fieldName (typ : Type.t) =
-    let open Result.Syntax in
-    let findInFieldList fields =
-      match Belt.List.getBy fields (fun field -> field.Type.fieldName = fieldName) with
-      | None -> error {j|no such field: $fieldName|j}
-      | Some field -> Ok field
-    in
-    match typ with
-    | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
-    | Type.UI (Type.PickScreen entityInfo) ->
-      begin match fieldName with
-      | "value" -> Ok {
-          Type.
-          fieldName = "value";
-          fieldArgs = None;
-          fieldCtyp = Card.Opt, Type.Entity entityInfo;
-        }
-      | "title" -> Ok {
-          Type.
-          fieldName = "title";
-          fieldArgs = None;
-          fieldCtyp = Card.One, Type.Syntax.string
-        }
-      | _ -> error {j|no such field on PickScreen: $fieldName|j}
-      end
-    | Type.UI (Type.ViewScreen entityInfo) ->
-      begin match fieldName with
-      | "value" -> Ok {
-          Type.
-          fieldName = "value";
-          fieldArgs = None;
-          fieldCtyp = Card.Opt, Type.Entity entityInfo;
-        }
-      | "title" -> Ok {
-          Type.
-          fieldName = "title";
-          fieldArgs = None;
-          fieldCtyp = Card.One, Type.Syntax.string
-        }
-      | _ -> error {j|no such field on ViewScreen: $fieldName|j}
-      end
-    | Type.Entity {entityName = _; entityFields = None} -> error "cannot extract field"
-    | Type.Entity {entityName = _; entityFields = Some fields} -> findInFieldList fields
-    | Type.Record fields -> findInFieldList fields
-    | Type.Value _ -> error "cannot extract field"
-
-  let rootCtyp = Card.One, Type.Void
-
-  let typeQuery ?(ctyp=rootCtyp) ~univ query =
-    let rec aux ~ctyp ((), query) =
-      let open Result.Syntax in
-      match query with
-      | UntypedQuery.Void ->
-        return ((Card.One, Type.Void), TypedQuery.Void)
-      | UntypedQuery.Here ->
-        return (ctyp, TypedQuery.Here)
-      | UntypedQuery.Bind (parent, q) ->
-        let%bind ((prevCard, _) as ctyp, _) as parent = aux ~ctyp parent in
-        let%bind ((card, typ), _) as q = aux ~ctyp q in
-        let ctyp = Card.merge prevCard card, typ in
-        return (ctyp, TypedQuery.Bind (parent, q))
-      | UntypedQuery.One parent ->
-        let%bind parent = aux ~ctyp parent in
-        return (ctyp, TypedQuery.One parent)
-      | UntypedQuery.First parent ->
-        let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
-        return ((Card.Opt, parentType), TypedQuery.One parent)
-      | UntypedQuery.PickScreen parent ->
-        let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
-        begin match parentCard, parentTyp with
-        | Card.One, Type.Entity _
-        | Card.Opt, Type.Entity _ ->
-          error "pick can only be rendered with queries which result in a list of entities"
-        | Card.Many, Type.Entity entityInfo ->
-          return ((Card.One, Type.UI (Type.PickScreen entityInfo)), TypedQuery.PickScreen parent)
-        | _, _ -> error "pick can only be applied to entity type"
-        end
-      | UntypedQuery.ViewScreen parent ->
-        let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
-        begin match parentCard, parentTyp with
-        | Card.One, Type.Entity entityInfo
-        | Card.Opt, Type.Entity entityInfo ->
-          return ((Card.One, Type.UI (Type.ViewScreen entityInfo)), TypedQuery.ViewScreen parent)
-        | Card.Many, Type.Entity _ ->
-          error "view can only be rendered with queries which result in nothing or a single entity"
-        | _, _ ->
-          error "view can only be rendered with queries which result entity"
-        end
-      | UntypedQuery.Navigate (parent, navigation) ->
-        let { UntypedQuery. name; args } = navigation in
-        let navigation = { TypedQuery. name; args; } in
-        let%bind parent = aux ~ctyp parent in
-        let (parentCard, parentTyp), _parentSyn = parent in
-        let%bind field = extractField univ name parentTyp in
-        let fieldCard, fieldTyp = field.fieldCtyp in
-        let fieldCard = Card.merge parentCard fieldCard in
-        return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
-      | UntypedQuery.Select (parent, selection) ->
-        let%bind parent = aux ~ctyp parent in
-        let parentCtyp, _parentSyn = parent in
-        let parentCard, _parentTyp = parentCtyp in
-        let checkField fields { UntypedQuery. alias; query } =
-          match fields with
-          | Result.Ok (fields, selection, index) ->
-            let%bind query = aux ~ctyp:parentCtyp query in
-            let (fieldCard, fieldTyp), _ = query in
-            let fieldName = Option.getWithDefault (string_of_int index) alias in
-            let fieldCard = Card.merge parentCard fieldCard in
-            let fieldCtyp = fieldCard, fieldTyp in
-            let field = { Type. fieldCtyp; fieldName; fieldArgs = None } in
-            let selectionField = { TypedQuery. alias; query; } in
-            Result.Ok (field::fields, selectionField::selection, index + 1)
-          | Result.Error err ->
-            error err
-        in
-        let%bind (fields, selection, _) =
-          let init = Result.Ok ([], [], 0) in
-          Belt.List.reduce selection init checkField
-        in
-        let typ = Type.Record fields in
-        return ((parentCard, typ), TypedQuery.Select (parent, selection))
-    in aux ~ctyp query
-
 end
 
 (**
@@ -533,7 +394,7 @@ end
  * It is implemented as a zero (almost) cost on top of native JS data
  * structures.
  *)
-module QueryResult = struct
+module Value = struct
 
   type t
   type queryResult = t
@@ -545,23 +406,23 @@ module QueryResult = struct
 
     type t
 
-    val make : name : string -> uiTyp : Type.ui -> queryResult -> TypedQuery.t -> t
+    val make : name : string -> typ : Type.t -> queryResult -> TypedQuery.t -> t
     val test : 'a -> bool
 
     val name : t -> string
     val query : t -> TypedQuery.t
     val value : t -> queryResult
-    val typ : t -> Type.ui
+    val typ : t -> Type.t
 
   end = struct
     type t = <
       name : string;
-      typ: Type.ui;
       query : TypedQuery.t;
       value : queryResult;
+      typ : Type.t;
     > Js.t
 
-    external make : name : string -> uiTyp : Type.ui -> queryResult -> TypedQuery.t -> t =
+    external make : name : string -> typ : Type.t -> queryResult -> TypedQuery.t -> t =
       "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
 
     let test_ : 'a -> bool = [%bs.raw {|
@@ -611,6 +472,213 @@ module QueryResult = struct
 
 end
 
+module Screen = struct
+
+  type t = {
+    args : Arg.t list option;
+    fields : Type.t -> (Type.field * fieldResolver) list;
+    inputCard : Card.t;
+    outputCtyp : Type.t -> Type.ct
+  }
+
+  and fieldResolver =
+    screenArgs : Arg.t list
+    -> args : Arg.t list
+    -> Value.t
+    -> (Value.t, string) Result.t
+
+  let typ ~name ~typ screen =
+    let fields = Belt.List.map (screen.fields typ) (fun (field, _) -> field)
+    in Type.Screen { screenName = name; screenFields = fields; screenOutputCtyp = screen.outputCtyp typ }
+
+  let lookupField ~name ~typ screen =
+    Belt.List.getBy (screen.fields typ) (fun (field, _) -> field.Type.fieldName = name)
+
+  module Syntax = struct
+
+    include Type.Syntax.Value
+
+    let screen ?args ~inputCard ~outputCtyp fields = {
+      fields;
+      args;
+      inputCard;
+      outputCtyp;
+    }
+
+    let has ?(card=Card.One) ?args ~resolve name typ =
+      let field = {
+        Type.
+        fieldName = name;
+        fieldArgs = args;
+        fieldCtyp = card, typ;
+      } in field, resolve
+  end
+
+end
+
+(**
+ * Universe represent system configuration and is used to resolve queries
+ * available on void type and screen types available.
+ *)
+module Universe : sig
+
+  type t
+
+  (**
+   * An empty universe.
+   *)
+  val empty : t
+
+  val hasOne : ?args : Type.argTyp list -> string -> Type.t -> t -> t
+  val hasOpt : ?args : Type.argTyp list -> string -> Type.t -> t -> t
+  val hasMany : ?args : Type.argTyp list -> string -> Type.t -> t -> t
+
+  val hasScreen : string -> Screen.t -> t -> t
+
+  val fields : t -> Type.field list
+
+  val lookupScreen : string -> t -> Screen.t option
+
+end = struct
+
+  module Map = Belt.Map.String
+
+  type t = {
+    fields : Type.field list;
+    screens : Screen.t Map.t;
+  }
+
+  let empty = { fields = []; screens = Map.empty }
+
+  let hasOne ?args name typ univ =
+    let field = Type.Syntax.hasOne ?args name typ in
+    { univ with fields = field::univ.fields }
+
+  let hasOpt ?args name typ univ =
+    let field = Type.Syntax.hasOpt ?args name typ in
+    { univ with fields = field::univ.fields }
+
+  let hasMany ?args name typ univ =
+    let field = Type.Syntax.hasMany ?args name typ in
+    { univ with fields = field::univ.fields }
+
+  let hasScreen name screen univ =
+    { univ with screens = Map.set univ.screens name screen; }
+
+  let fields univ = univ.fields
+
+  let lookupScreen name univ =
+    Map.get univ.screens name
+end
+
+(**
+ * This module implements a type checking / type inferrence for query structure
+ * by turning untype queries into typed ones.
+ *)
+module QueryTyper : sig
+
+  val typeQuery :
+    ?ctyp : TypedQuery.payload
+    -> univ:Universe.t
+    -> UntypedQuery.t
+    -> (TypedQuery.t, string) Result.t
+
+end = struct
+
+  let rec extractField univ fieldName (typ : Type.t) =
+    let open Result.Syntax in
+    let findInFieldList fields =
+      match Belt.List.getBy fields (fun field -> field.Type.fieldName = fieldName) with
+      | None ->
+        let typ = Type.show typ in
+        error {j|no such field "$fieldName" on $typ|j}
+      | Some field -> Ok field
+    in
+    match typ with
+    | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
+    | Type.Screen { screenFields; _ } -> findInFieldList screenFields
+    | Type.Entity {entityName = _; entityFields = None} -> error "cannot extract field"
+    | Type.Entity {entityName = _; entityFields = Some fields} -> findInFieldList fields
+    | Type.Record fields -> findInFieldList fields
+    | Type.Value _ -> error "cannot extract field"
+
+  let rootCtyp = Card.One, Type.Void
+
+  let typeQuery ?(ctyp=rootCtyp) ~univ query =
+    let rec aux ~ctyp ((), query) =
+      let open Result.Syntax in
+      match query with
+      | UntypedQuery.Void ->
+        return ((Card.One, Type.Void), TypedQuery.Void)
+      | UntypedQuery.Here ->
+        return (ctyp, TypedQuery.Here)
+      | UntypedQuery.Chain (parent, q) ->
+        let%bind ((prevCard, _) as ctyp, _) as parent = aux ~ctyp parent in
+        let%bind ((card, typ), _) as q = aux ~ctyp q in
+        let ctyp = Card.merge prevCard card, typ in
+        return (ctyp, TypedQuery.Chain (parent, q))
+      | UntypedQuery.One parent ->
+        let%bind parent = aux ~ctyp parent in
+        return (ctyp, TypedQuery.One parent)
+      | UntypedQuery.First parent ->
+        let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
+        return ((Card.Opt, parentType), TypedQuery.One parent)
+      | UntypedQuery.Screen (parent, screenName) ->
+        let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
+        let%bind screen = Result.ofOption
+          ~err:{j|no such screen "$screenName"|j}
+          (Universe.lookupScreen screenName univ)
+        in begin match (screen.inputCard, parentCard) with
+        | Card.One, Card.Many
+        | Card.Opt, Card.Many
+        | Card.Many, Card.One
+        | Card.Many, Card.Opt ->
+          error "screen cannot be constructed due to cardinality mismatch"
+        | Card.One, Card.Opt
+        | Card.One, Card.One
+        | Card.Opt, Card.Opt
+        | Card.Opt, Card.One
+        | Card.Many, Card.Many ->
+          let typ = Screen.typ ~name:screenName ~typ:parentTyp screen in
+          return ((Card.One, typ), TypedQuery.Screen (parent, screenName))
+        end
+      | UntypedQuery.Navigate (parent, navigation) ->
+        let { UntypedQuery. name; args } = navigation in
+        let navigation = { TypedQuery. name; args; } in
+        let%bind parent = aux ~ctyp parent in
+        let (parentCard, parentTyp), _parentSyn = parent in
+        let%bind field = extractField univ name parentTyp in
+        let fieldCard, fieldTyp = field.fieldCtyp in
+        let fieldCard = Card.merge parentCard fieldCard in
+        return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
+      | UntypedQuery.Select (parent, selection) ->
+        let%bind parent = aux ~ctyp parent in
+        let parentCtyp, _parentSyn = parent in
+        let parentCard, _parentTyp = parentCtyp in
+        let checkField fields { UntypedQuery. alias; query } =
+          match fields with
+          | Result.Ok (fields, selection, index) ->
+            let%bind query = aux ~ctyp:parentCtyp query in
+            let (fieldCard, fieldTyp), _ = query in
+            let fieldName = Option.getWithDefault (string_of_int index) alias in
+            let fieldCard = Card.merge parentCard fieldCard in
+            let fieldCtyp = fieldCard, fieldTyp in
+            let field = { Type. fieldCtyp; fieldName; fieldArgs = None } in
+            let selectionField = { TypedQuery. alias; query; } in
+            Result.Ok (field::fields, selectionField::selection, index + 1)
+          | Result.Error err ->
+            error err
+        in
+        let%bind (fields, selection, _) =
+          let init = Result.Ok ([], [], 0) in
+          Belt.List.reduce selection init checkField
+        in
+        let typ = Type.Record fields in
+        return ((parentCard, typ), TypedQuery.Select (parent, selection))
+    in aux ~ctyp query
+
+end
+
 (**
  * Abstract interface to the database.
  *)
@@ -618,7 +686,7 @@ module type DATABASE = sig
 
   type t
 
-  val runQuery : t -> TypedQuery.t -> (QueryResult.t, string) Result.t
+  val runQuery : t -> TypedQuery.t -> (Value.t, string) Result.t
 
 end
 
@@ -628,57 +696,59 @@ end
 module JSONDatabase : sig
   include DATABASE
 
-  val ofString : string -> t
-  val ofJson : Js.Json.t -> t
+  val ofString : univ : Universe.t -> string -> t
+  val ofJson : univ : Universe.t -> Js.Json.t -> t
 end = struct
 
-  type t = Js.Json.t
+  type t = {
+    root : Value.t;
+    univ : Universe.t;
+  }
 
-  let ofString = Js.Json.parseExn
-  let ofJson dataset = dataset
+  let ofString ~univ data =
+    let root = Js.Json.parseExn data in
+    { root = Value.ofJson root; univ }
+
+  let ofJson ~univ root = { root = Value.ofJson root; univ }
 
   let runQuery db query =
     let open Result.Syntax in
-    let root = QueryResult.ofJson db in
-    let rec aux ~(value : QueryResult.t) ((_card, typ), syn) =
+    let rec aux ~(value : Value.t) ((_card, typ), syn) =
       match syn with
-      | TypedQuery.Void -> return root
+      | TypedQuery.Void -> return db.root
       | TypedQuery.Here ->
         return value
-      | TypedQuery.Bind (query, next) ->
+      | TypedQuery.Chain (query, next) ->
         let%bind value = aux ~value query in
         let%bind value = aux ~value next in
         return value
       | TypedQuery.One query ->
         let%bind value = aux ~value query in
-        begin match QueryResult.classify value with
-        | QueryResult.Array items ->
+        begin match Value.classify value with
+        | Value.Array items ->
           if Array.length items = 1
           then return (Array.get items 0)
           else error "expected a single value but got multiple"
-        | QueryResult.Null -> error "expected a single value but got null"
+        | Value.Null -> error "expected a single value but got null"
         | _ -> return value
         end
       | TypedQuery.First query ->
         let%bind value = aux ~value query in
-        begin match QueryResult.classify value with
-        | QueryResult.Array items ->
+        begin match Value.classify value with
+        | Value.Array items ->
           if Array.length items = 1
           then return (Array.get items 0)
-          else return QueryResult.null
+          else return Value.null
         | _ -> return value
         end
-      | TypedQuery.PickScreen q ->
-        let%bind uiTyp = Type.extractUi typ in
-        return (QueryResult.ui (QueryResult.UI.make ~name:"pick" ~uiTyp value q))
-      | TypedQuery.ViewScreen q ->
-        let%bind uiTyp = Type.extractUi typ in
-        return (QueryResult.ui (QueryResult.UI.make ~name:"view" ~uiTyp value q))
+      | TypedQuery.Screen (q, screenName) ->
+        return (Value.ui (Value.UI.make ~name:screenName ~typ value q))
       | TypedQuery.Navigate (query, { name; args }) ->
+        let args = Option.getWithDefault [] args in
         let%bind value = aux ~value query in
         let navigate name dataset =
-          match QueryResult.classify dataset with
-          | QueryResult.Object obj ->
+          match Value.classify dataset with
+          | Value.Object obj ->
             begin match Js.Dict.get obj name with
             | Some dataset -> return dataset
             | None ->
@@ -688,40 +758,27 @@ end = struct
             end
           | _ -> error "expected an object"
         in begin
-        match QueryResult.classify value, name with
-        | QueryResult.Object _, name -> navigate name value
-        | QueryResult.Array items, name  ->
+        match Value.classify value with
+        | Value.Object _ -> navigate name value
+        | Value.Array items  ->
           let%bind items = Result.Array.map ~f:(navigate name) items in
-          return (QueryResult.array items)
-        | QueryResult.UI ui, name ->
-          let query = QueryResult.UI.query ui in
-          let queryValue = QueryResult.UI.value ui in
+          return (Value.array items)
+        | Value.Null ->
+          return Value.null
+        | Value.UI ui ->
+          let query = Value.UI.query ui in
+          let queryValue = Value.UI.value ui in
           let%bind value = aux ~value:queryValue query in
-          begin match (QueryResult.UI.typ ui), name, args, QueryResult.classify value with
-          | Type.PickScreen _, "value", None, _ ->
-            error "missing id argument"
-          | Type.PickScreen _, "value", Some args, QueryResult.Array items ->
-            let value: QueryResult.t = match Arg.findValueFromArgList ~name:"id" args with
-            | Some (Arg.Bool v) -> Obj.magic v
-            | Some (Arg.String v) -> Obj.magic v
-            | Some (Arg.Number v) -> Obj.magic v
-            | None -> Obj.magic Js.Nullable.null
-            in
-            let f item = match QueryResult.classify item with
-              | QueryResult.Object obj ->
-                let id = Option.getWithDefault QueryResult.null (Js.Dict.get obj "id") in
-                id = (Obj.magic value)
-              | _ -> false
-            in
-            return (match Js.Array.find f items with
-              | Some v -> v
-              | None -> QueryResult.null
-            )
-          | Type.ViewScreen _, "value", _, QueryResult.Object _ ->
-            return value
-          | _, name, _, _ -> error {j|no such key "$name"|j}
-          end
-        | _ -> error "expected an object or an array"
+          let screenName = Value.UI.name ui in
+          let%bind screen = Result.ofOption
+            ~err:{j|no such screen "$screenName"|j}
+            (Universe.lookupScreen screenName db.univ)
+          in
+          let%bind _, resolve = Result.ofOption
+            ~err:{j|no such field "$name"|j}
+            (Screen.lookupField ~name ~typ:(Value.UI.typ ui) screen)
+          in resolve ~screenArgs:[] ~args value
+        | _ -> error {|Cannot navigate away from this value|}
         end
       | TypedQuery.Select (query, selection) ->
         let%bind value = aux ~value query in
@@ -736,8 +793,8 @@ end = struct
             | Result.Error err -> error err
           in
           Belt.List.reduce selection (Result.Ok (0, Js.Dict.empty ())) build
-        in return (QueryResult.obj dataset)
-    in aux ~value:root query
+        in return (Value.obj dataset)
+    in aux ~value:db.root query
 
 end
 
@@ -779,17 +836,16 @@ module WorkflowTyper = struct
   let typeWorkflow ~univ w =
     let open Result.Syntax in
     let rec aux ~ctyp w =
-      match w with | UntypedWorkflow.Render q ->
+      match w with
+      | UntypedWorkflow.Render q ->
         let%bind ((_, typ), _) as q = QueryTyper.typeQuery ~univ ~ctyp q in
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
-          error "workflow can only be defined on UI values"
-        | Type.UI (Type.PickScreen entityInfo) ->
-          let scope = Card.One, Type.Entity entityInfo in
-          return (TypedWorkflow.Render q, scope)
-        | Type.UI (Type.ViewScreen entityInfo) ->
-          let scope = Card.One, Type.Entity entityInfo in
-          return (TypedWorkflow.Render q, scope)
+          let typ = Type.show typ in
+          let msg = {j|workflow can only be defined with screen but got $typ|j} in
+          error msg
+        | Type.Screen { screenOutputCtyp; _ } ->
+          return (TypedWorkflow.Render q, screenOutputCtyp)
         end
       | UntypedWorkflow.Next (first, next) ->
         let%bind first, ctyp = aux ~ctyp first in
@@ -823,19 +879,19 @@ module WorkflowRunner (Db : DATABASE) : sig
    * Bind workflow execution state for the new query fragment.
    * TODO: We should instead define per UI operations.
    *)
-  val bind : UntypedQuery.t -> t -> ((t * QueryResult.UI.t), string) Result.t
+  val bind : UntypedQuery.t -> t -> ((t * Value.UI.t), string) Result.t
 
   (**
    * Render workflows state and return a new state and a UI screen to render.
    *)
-  val render : t -> ((t * QueryResult.UI.t), string) Result.t
+  val renderState : t -> ((t * Value.UI.t), string) Result.t
 
   (**
    * Return a list of next possible workflow states.
    *)
   val next : t -> t list
 
-  val query : QueryResult.UI.t -> t -> TypedQuery.t
+  val query : Value.UI.t -> t -> TypedQuery.t
 
 end = struct
 
@@ -859,20 +915,20 @@ end = struct
 
   let make db workflow = _make db workflow
 
-  let rec render state =
+  let rec renderState state =
     let open Result.Syntax in
     let {workflow; db; query; univ; _} = state in
     match workflow with
     | TypedWorkflow.Next (first, _next) ->
       let state = _make ~parent:state ~query univ db first in
-      render state
+      renderState state
     | TypedWorkflow.Render q ->
       let ctyp, _ = q in
-      let q = ctyp, TypedQuery.Bind (query, q) in
+      let q = ctyp, TypedQuery.Chain (query, q) in
       let state = { state with query = q; queryString = TypedQuery.show q; parent = Some state; } in
       let%bind res = Db.runQuery db q in
-      match QueryResult.classify res with
-      | QueryResult.UI ui -> return (state, ui)
+      match Value.classify res with
+      | Value.UI ui -> return (state, ui)
       | _ -> error "expected UI, got data"
 
   let next state =
@@ -891,19 +947,19 @@ end = struct
     let open Result.Syntax in
     let ctyp, _ = state.query in
     let%bind (ctyp, _) as q = QueryTyper.typeQuery ~univ:state.univ ~ctyp q in
-    let q = ctyp, TypedQuery.Bind (state.query, q) in
+    let q = ctyp, TypedQuery.Chain (state.query, q) in
     let nextState = { state with query = q; queryString = TypedQuery.show q; } in
     match next nextState with
-    | [] -> render state
-    | nextState::_ -> render nextState
+    | [] -> renderState state
+    | nextState::_ -> renderState nextState
 
   let query ui state =
     let baseQuery = match state.parent with
     | Some parent -> parent.query
     | None -> (Card.One, Type.Void), TypedQuery.Void
     in
-    let (ctyp, _) as q = QueryResult.UI.query ui in
-    let q = ctyp, TypedQuery.Bind (baseQuery, q) in
+    let (ctyp, _) as q = Value.UI.query ui in
+    let q = ctyp, TypedQuery.Chain (baseQuery, q) in
     q
 
 end
@@ -939,7 +995,7 @@ module JsApi : sig
   type uquery
 
   val start : state JsResult.t
-  val render : state -> < state : state; ui : ui > Js.t JsResult.t
+  val renderState : state -> < state : state; ui : ui > Js.t JsResult.t
   val next : state -> state list
   val bind : uquery -> state -> < state : state; ui : ui > Js.t JsResult.t
 
@@ -947,7 +1003,7 @@ module JsApi : sig
 
   val uiName : ui -> string
   val getQuery : ui -> state -> query
-  val runQuery : query -> QueryResult.t JsResult.t
+  val runQuery : query -> Value.t JsResult.t
 
   val db : JSONDatabase.t
   val univ : Universe.t
@@ -957,31 +1013,75 @@ module JsApi : sig
 end = struct
   module WorkflowRunner = WorkflowRunner(JSONDatabase)
 
-  type workflow = UntypedWorkflow.t
-  type db = JSONDatabase.t
-  type ui = QueryResult.UI.t
+  type ui = Value.UI.t
   type state = WorkflowRunner.t
   type query = TypedQuery.t
   type uquery = UntypedQuery.t
 
   let showQuery = TypedQuery.show
 
-  let uiName = QueryResult.UI.name
+  let uiName = Value.UI.name
 
   let univ =
+
     let site = Type.Syntax.(entity "site" [
       hasOne "title" string;
     ]) in
+
     let individual = Type.Syntax.(entity "individual" [
       hasOne "name" string;
       hasOne "site" site;
     ]) in
+
+    let pickScreen =
+      let resolveTitle ~screenArgs:_ ~args:_ _value =
+        Result.Ok (Value.string "Pick Screen")
+      in
+      let resolveValue ~screenArgs:_ ~args:_ value =
+        match Value.classify value with
+        | Value.Array value ->
+          Result.Ok (
+            if Array.length value = 0
+            then Value.null
+            else Array.get value 0)
+        | _ -> Result.Error "expected an array"
+      in
+      Screen.Syntax.(screen
+        ~inputCard:Card.Many
+        ~outputCtyp:(fun entity -> (Card.One, entity))
+        (fun entity -> [
+          has ~resolve:resolveTitle "title" string;
+          has ~resolve:resolveValue ~card:Card.Opt "value" entity;
+        ])
+      )
+    in
+
+    let viewScreen =
+      let resolveTitle ~screenArgs:_ ~args:_ _value =
+        Result.Ok (Value.string "View Screen")
+      in
+      let resolveValue ~screenArgs:_ ~args:_ value =
+        Result.Ok value
+      in
+      Screen.Syntax.(screen
+        ~inputCard:Card.One
+        ~outputCtyp:(fun entity -> (Card.Opt, entity))
+        (fun entity -> [
+          has ~resolve:resolveTitle "title" string;
+          has ~resolve:resolveValue ~card:Card.Opt "value" entity;
+        ])
+      )
+    in
+
+
     Universe.(
       empty
       |> hasMany "individual" individual
+      |> hasScreen "pick" pickScreen
+      |> hasScreen "view" viewScreen
     )
 
-  let db = JSONDatabase.ofString {|
+  let db = JSONDatabase.ofString ~univ {|
     {
       "individual": [
         {
@@ -1014,14 +1114,12 @@ end = struct
     let open UntypedWorkflow.Syntax in
     let open UntypedQuery.Syntax in
 
-    let pickIndividual = render (here |> nav "individual" |> pickScreen) in
-    let view = render (here |> viewScreen) in
-    let viewSite = render (here |> nav "site" |> viewScreen) in
+    let pickIndividual = render (here |> nav "individual" |> screen "pick") in
+    let view = render (here |> screen "view") in
+    let viewSite = render (here |> nav "site" |> screen "view") in
 
     pickIndividual |> andThen [
-      view |> andThen [
-        viewSite;
-      ];
+      view;
       viewSite;
     ]
 
@@ -1035,9 +1133,9 @@ end = struct
 
   let next = WorkflowRunner.next
 
-  let render state = JsResult.ofResult (
+  let renderState state = JsResult.ofResult (
     let open Result.Syntax in
-    let%bind state, ui = WorkflowRunner.render state in
+    let%bind state, ui = WorkflowRunner.renderState state in
     return [%bs.obj { state; ui }]
   )
 
@@ -1085,14 +1183,14 @@ module Test = struct
    * individual.site.pick
    *)
   let renderListOfSites = UntypedQuery.Syntax.(
-    void |> nav "individual" |> nav "site" |> pickScreen
+    void |> nav "individual" |> nav "site" |> screen "pick"
   )
 
   (*
    * individual.site.first.view
    *)
   let renderFirstSite = UntypedQuery.Syntax.(
-    void |> nav "individual" |> nav "site" |> first |> viewScreen
+    void |> nav "individual" |> nav "site" |> first |> screen "view"
   )
 
   (*
@@ -1101,10 +1199,10 @@ module Test = struct
   let renderSiteByIndividual = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> pickScreen
+    |> screen "pick"
     |> nav ~args:[Arg.number "id" 1.] "value"
     |> nav "site"
-    |> viewScreen
+    |> screen "view"
   )
 
   (*
@@ -1113,10 +1211,10 @@ module Test = struct
   let getSiteTitleByIndividualViaView = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> pickScreen
+    |> screen "pick"
     |> nav ~args:[Arg.number "id" 1.] "value"
     |> nav "site"
-    |> viewScreen
+    |> screen "view"
     |> nav "value"
     |> nav "title"
   )
@@ -1126,17 +1224,17 @@ module Test = struct
    *)
   let getSiteTitleByIndividualViaViewViaBind2 = UntypedQuery.Syntax.(
     void
-    |> bind (
+    |> chain (
       here
       |> nav "individual"
-      |> pickScreen
-      |> bind (
+      |> screen "pick"
+      |> chain (
         here
         |> nav ~args:[Arg.number "id" 1.] "value"
-        |> bind (
+        |> chain (
           here
           |> nav "site"
-          |> viewScreen
+          |> screen "view"
         )
       )
     )
@@ -1148,14 +1246,14 @@ module Test = struct
   let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> pickScreen
-    |> bind (
+    |> screen "pick"
+    |> chain (
       here
       |> nav ~args:[Arg.number "id" 1.] "value"
       |> nav "site"
-      |> viewScreen
+      |> screen "view"
       |> nav "value"
-      |> bind (
+      |> chain (
         here
         |> nav "title"
       )
@@ -1168,7 +1266,7 @@ module Test = struct
   let getSelectedIndividual = UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> pickScreen
+    |> screen "pick"
     |> nav ~args:[Arg.number "id" 1.] "value"
   )
 
@@ -1176,11 +1274,11 @@ module Test = struct
     let open UntypedWorkflow.Syntax in
     let open UntypedQuery.Syntax in
 
-    let pickIndividual = render (here |> nav "individual" |> pickScreen) in
+    let pickIndividual = render (here |> nav "individual" |> screen "pick") in
 
-    let view = render (here |> viewScreen) in
+    let view = render (here |> screen "view") in
 
-    let viewSite = render (here |> nav "site" |> viewScreen) in
+    let viewSite = render (here |> nav "site" |> screen "view") in
 
     pickIndividual |> andThen [ view; viewSite; ]
 
@@ -1191,6 +1289,7 @@ module Test = struct
   let runQuery db query =
     Js.log "--- RUNNING QUERY ---";
     let result =
+      Js.log2 "QUERY:" (UntypedQuery.show query);
       let open Result.Syntax in
       Js.log "TYPING...";
       let%bind query = QueryTyper.typeQuery ~univ query in
