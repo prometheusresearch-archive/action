@@ -284,16 +284,16 @@ module Query (P : sig type t end) = struct
     | One of t
     | First of t
     | Chain of (t * t)
-    | Screen of (t * string)
-
-  and ui = {
-    name : string;
-    ctyper : Type.ct -> (Type.ct, string) Result.t;
-  }
+    | Screen of (t * screen)
 
   and nav = {
-    name : string;
-    args : Arg.t list option;
+    navName : string;
+    navArgs : Arg.t list option;
+  }
+
+  and screen = {
+    screenName : string;
+    screenArgs : Arg.t list option;
   }
 
   and select = field list
@@ -316,9 +316,9 @@ module Query (P : sig type t end) = struct
       |> String.concat ", "
     in
     {j|$parent { $fields }|j}
-  | Navigate (parent,{ name; args = _ }) ->
+  | Navigate (parent,{ navName; navArgs = _ }) ->
     let parent = show parent in
-    let this = name in
+    let this = navName in
     {j|$parent.$this|j}
   | One _ -> "one"
   | First _ -> "first"
@@ -326,9 +326,9 @@ module Query (P : sig type t end) = struct
     let parent = show parent in
     let this = show this in
     {j|$parent.bind($this)|j}
-  | Screen (parent, name) ->
+  | Screen (parent, { screenName; screenArgs = _ }) ->
     let parent = show parent in
-    {j|$parent.render($name)|j}
+    {j|$parent.render($screenName)|j}
 
 end
 
@@ -353,7 +353,7 @@ module UntypedQuery = struct
       (), Here
 
     let nav ?args name parent =
-      (), Navigate (parent, { name; args; })
+      (), Navigate (parent, { navName = name; navArgs = args; })
 
     let chain q parent =
       (), Chain (parent, q)
@@ -364,8 +364,8 @@ module UntypedQuery = struct
     let field ?alias query =
       { query; alias; }
 
-    let screen name query =
-      (), Screen (query, name)
+    let screen ?args name query =
+      (), Screen (query, { screenName = name; screenArgs = args; })
 
     let one query =
       (), One query
@@ -623,7 +623,7 @@ end = struct
       | UntypedQuery.First parent ->
         let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
         return ((Card.Opt, parentType), TypedQuery.One parent)
-      | UntypedQuery.Screen (parent, screenName) ->
+      | UntypedQuery.Screen (parent, { screenName; screenArgs; }) ->
         let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
         let%bind screen = Result.ofOption
           ~err:{j|no such screen "$screenName"|j}
@@ -640,14 +640,14 @@ end = struct
         | Card.Opt, Card.One
         | Card.Many, Card.Many ->
           let typ = Screen.typ ~name:screenName ~typ:parentTyp screen in
-          return ((Card.One, typ), TypedQuery.Screen (parent, screenName))
+          return ((Card.One, typ), TypedQuery.Screen (parent, { screenName; screenArgs; }))
         end
       | UntypedQuery.Navigate (parent, navigation) ->
-        let { UntypedQuery. name; args } = navigation in
-        let navigation = { TypedQuery. name; args; } in
+        let { UntypedQuery. navName; navArgs } = navigation in
+        let navigation = { TypedQuery. navName; navArgs; } in
         let%bind parent = aux ~ctyp parent in
         let (parentCard, parentTyp), _parentSyn = parent in
-        let%bind field = extractField univ name parentTyp in
+        let%bind field = extractField univ navName parentTyp in
         let fieldCard, fieldTyp = field.fieldCtyp in
         let fieldCard = Card.merge parentCard fieldCard in
         return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
@@ -741,10 +741,10 @@ end = struct
           else return Value.null
         | _ -> return value
         end
-      | TypedQuery.Screen (q, screenName) ->
+      | TypedQuery.Screen (q, { screenName; screenArgs = _; }) ->
         return (Value.ui (Value.UI.make ~name:screenName ~typ value q))
-      | TypedQuery.Navigate (query, { name; args }) ->
-        let args = Option.getWithDefault [] args in
+      | TypedQuery.Navigate (query, { navName; navArgs }) ->
+        let args = Option.getWithDefault [] navArgs in
         let%bind value = aux ~value query in
         let navigate name dataset =
           match Value.classify dataset with
@@ -759,9 +759,9 @@ end = struct
           | _ -> error "expected an object"
         in begin
         match Value.classify value with
-        | Value.Object _ -> navigate name value
+        | Value.Object _ -> navigate navName value
         | Value.Array items  ->
-          let%bind items = Result.Array.map ~f:(navigate name) items in
+          let%bind items = Result.Array.map ~f:(navigate navName) items in
           return (Value.array items)
         | Value.Null ->
           return Value.null
@@ -775,8 +775,8 @@ end = struct
             (Universe.lookupScreen screenName db.univ)
           in
           let%bind _, resolve = Result.ofOption
-            ~err:{j|no such field "$name"|j}
-            (Screen.lookupField ~name ~typ:(Value.UI.typ ui) screen)
+            ~err:{j|no such field "$navName"|j}
+            (Screen.lookupField ~name:navName ~typ:(Value.UI.typ ui) screen)
           in resolve ~screenArgs:[] ~args value
         | _ -> error {|Cannot navigate away from this value|}
         end
@@ -1317,6 +1317,7 @@ module Test = struct
     runQuery db getSiteTitleByIndividualViaView;
     runQuery db getSiteTitleByIndividualViaViewViaBind;
     runQuery db getSiteTitleByIndividualViaViewViaBind2;
+    runQuery db UntypedQuery.Syntax.(void |> nav "individual" |> screen "pick" |> nav "title");
     typeWorkflow pickAndViewIndividualWorkflow;
 
 end
