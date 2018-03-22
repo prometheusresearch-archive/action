@@ -112,6 +112,7 @@ module Arg : sig
   val bool : string -> bool -> t
 
   val findValueFromArgList : name : string -> t list -> value option
+  val update : update : t list option -> t list option -> t list option
 
   val show : t -> string
 
@@ -141,6 +142,27 @@ end = struct
       then Some value
       else findValueFromArgList ~name args
 
+  let update ~update args = match update, args with
+    | Some update, Some args ->
+      let update =
+        let f update {name; value} =
+          Belt.Map.String.set update name value
+        in
+        Belt.List.reduce update (Belt.Map.String.empty) f
+      in
+      let args =
+        let f {name; value} =
+          match Belt.Map.String.get update name with
+          | None -> {name; value}
+          | Some value -> {name; value}
+        in
+        Belt.List.map args f
+      in
+      Some args
+    | Some update, None -> Some update
+    | None, Some args -> Some args
+    | None, None -> None
+
   let show { name; value } =
     let value = match value with
     | String value -> {j|"$value"|j}
@@ -163,105 +185,6 @@ module ValueType = struct
     | StringTyp -> "string"
     | NumberTyp -> "number"
     | BoolTyp -> "bool"
-end
-
-(**
- * Type system.
- *)
-module Type = struct
-
-  type t =
-    | Void
-    | Screen of screen
-    | Entity of entity
-    | Record of field list
-    | Value of value
-
-  and ct = Card.t * t
-
-  and screen = {
-    screenName : string;
-    screenFields : field list;
-    screenOutputCtyp : ct;
-  }
-
-  and value = {
-    valueTyp: ValueType.t;
-  }
-
-  and entity = {
-    entityName : string;
-    entityFields : field list option;
-  }
-
-  and field = {
-    fieldName : string;
-    fieldArgs : argTyp list option;
-    fieldCtyp : Card.t * t;
-  }
-
-  and argTyp =
-    | Req of argTypInfo
-    | Opt of argTypInfo
-
-  and argTypInfo = {
-    argName : string;
-    argTyp : ValueType.t;
-  }
-
-  let rec show = function
-    | Void -> "void"
-    | Value {valueTyp; _} -> ValueType.show valueTyp;
-    | Screen { screenName; screenFields = _; } -> {j|Screen("$screenName")|j}
-    | Entity {entityName; _} -> {j|Entity($entityName)|j}
-    | Record fields ->
-      let fields =
-        fields
-        |> List.map (fun { fieldName; fieldArgs = _; fieldCtyp } ->
-          let fieldCtyp = showCt fieldCtyp in
-          {j|$fieldName: $fieldCtyp|j})
-        |> String.concat ", "
-      in
-      {j|{ $fields }|j}
-
-  and showCt (card, typ) =
-    let card = Card.show card in
-    let typ = show typ in
-    {j|$card $typ|j}
-
-  (**
-   * Combinators to define a type system.
-   *)
-  module Syntax = struct
-
-    let entity name fields = Entity {entityName = name; entityFields = Some fields}
-
-    let has ?(card=Card.One) ?args name typ =
-      {
-        fieldName = name;
-        fieldArgs = args;
-        fieldCtyp = card, typ;
-      }
-
-    let hasOne = has ~card:Card.One
-    let hasOpt = has ~card:Card.Opt
-    let hasMany = has ~card:Card.Many
-
-    module Value = struct
-      let string = Value { valueTyp = ValueType.StringTyp; }
-      let number = Value { valueTyp = ValueType.NumberTyp; }
-      let bool = Value { valueTyp = ValueType.BoolTyp; }
-    end
-
-    include Value
-
-    let requiredArg name typ =
-      Req {argName = name; argTyp = typ}
-
-    let optionalArg name typ =
-      Opt {argName = name; argTyp = typ}
-  end
-
 end
 
 (**
@@ -390,6 +313,106 @@ module UntypedQuery = struct
 end
 
 (**
+ * Type system.
+ *)
+module Type = struct
+
+  type t =
+    | Void
+    | Screen of screen
+    | Entity of entity
+    | Record of field list
+    | Value of value
+
+  and ct = Card.t * t
+
+  and screen = {
+    screenName : string;
+    screenFields : field list;
+    screenNavigate : string;
+  }
+
+  and value = {
+    valueTyp: ValueType.t;
+  }
+
+  and entity = {
+    entityName : string;
+    entityFields : field list option;
+  }
+
+  and field = {
+    fieldName : string;
+    fieldArgs : argTyp list option;
+    fieldCtyp : Card.t * t;
+  }
+
+  and argTyp =
+    | Req of argTypInfo
+    | Opt of argTypInfo
+
+  and argTypInfo = {
+    argName : string;
+    argTyp : ValueType.t;
+  }
+
+  let rec show = function
+    | Void -> "void"
+    | Value {valueTyp; _} -> ValueType.show valueTyp;
+    | Screen { screenName; screenFields = _; } -> {j|Screen("$screenName")|j}
+    | Entity {entityName; _} -> {j|Entity($entityName)|j}
+    | Record fields ->
+      let fields =
+        fields
+        |> List.map (fun { fieldName; fieldArgs = _; fieldCtyp } ->
+          let fieldCtyp = showCt fieldCtyp in
+          {j|$fieldName: $fieldCtyp|j})
+        |> String.concat ", "
+      in
+      {j|{ $fields }|j}
+
+  and showCt (card, typ) =
+    let card = Card.show card in
+    let typ = show typ in
+    {j|$card $typ|j}
+
+  (**
+   * Combinators to define a type system.
+   *)
+  module Syntax = struct
+
+    let entity name fields = Entity {entityName = name; entityFields = Some fields}
+
+    let has ?(card=Card.One) ?args name typ =
+      {
+        fieldName = name;
+        fieldArgs = args;
+        fieldCtyp = card, typ;
+      }
+
+    let hasOne = has ~card:Card.One
+    let hasOpt = has ~card:Card.Opt
+    let hasMany = has ~card:Card.Many
+
+    module Value = struct
+      let string = Value { valueTyp = ValueType.StringTyp; }
+      let number = Value { valueTyp = ValueType.NumberTyp; }
+      let bool = Value { valueTyp = ValueType.BoolTyp; }
+    end
+
+    include Value
+
+    let requiredArg name typ =
+      Req {argName = name; argTyp = typ}
+
+    let optionalArg name typ =
+      Opt {argName = name; argTyp = typ}
+  end
+
+end
+
+
+(**
  * Query with type and cardinality information attached.
  *)
 module TypedQuery = struct
@@ -430,6 +453,7 @@ module Value = struct
 
     val name : t -> string
     val args : t -> Arg.t list option
+    val setArgs : args : Arg.t list option -> t -> t
     val query : t -> TypedQuery.t
     val value : t -> queryResult
     val typ : t -> Type.t
@@ -457,6 +481,10 @@ module Value = struct
     let query ui = ui##query
     let value ui = ui##value
     let typ ui = ui##typ
+
+    let setArgs ~args ui =
+      let args = Arg.update ~update:args ui##args in
+      make ~name:ui##name ~args ~typ:ui##typ ui##value ui##query
   end
 
   let null : t = Obj.magic (Js.null)
@@ -504,7 +532,7 @@ module Screen = struct
     args : Arg.t list option;
     fields : Type.t -> (Type.field * fieldResolver) list;
     inputCard : Card.t;
-    outputCtyp : Type.t -> Type.ct
+    navigate : string;
   }
 
   and fieldResolver =
@@ -515,7 +543,7 @@ module Screen = struct
 
   let typ ~name ~typ screen =
     let fields = Belt.List.map (screen.fields typ) (fun (field, _) -> field)
-    in Type.Screen { screenName = name; screenFields = fields; screenOutputCtyp = screen.outputCtyp typ }
+    in Type.Screen { screenName = name; screenFields = fields; screenNavigate = screen.navigate }
 
   let lookupField ~name ~typ screen =
     Belt.List.getBy (screen.fields typ) (fun (field, _) -> field.Type.fieldName = name)
@@ -524,11 +552,11 @@ module Screen = struct
 
     include Type.Syntax.Value
 
-    let screen ?args ~inputCard ~outputCtyp fields = {
+    let screen ?args ~inputCard ~navigate fields = {
       fields;
       args;
       inputCard;
-      outputCtyp;
+      navigate;
     }
 
     let has ?(card=Card.One) ?args ~resolve name typ =
@@ -609,9 +637,16 @@ module QueryTyper : sig
     -> UntypedQuery.t
     -> (TypedQuery.t, string) Result.t
 
+  val nav :
+    univ:Universe.t
+    -> ?args : Arg.t list
+    -> string
+    -> TypedQuery.t
+    -> (TypedQuery.t, string) Result.t
+
 end = struct
 
-  let extractField univ fieldName (typ : Type.t) =
+  let extractField ~univ fieldName (typ : Type.t) =
     let open Result.Syntax in
     let findInFieldList fields =
       match Belt.List.getBy fields (fun field -> field.Type.fieldName = fieldName) with
@@ -629,6 +664,15 @@ end = struct
     | Type.Value _ -> error "cannot extract field"
 
   let rootCtyp = Card.One, Type.Void
+
+  let nav ~univ ?args name parent =
+    let open Result.Syntax in
+    let navigation = { TypedQuery. navName = name; navArgs = args; } in
+    let (parentCard, parentTyp), _parentSyn = parent in
+    let%bind field = extractField ~univ name parentTyp in
+    let fieldCard, fieldTyp = field.fieldCtyp in
+    let fieldCard = Card.merge parentCard fieldCard in
+    return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
 
   let typeQuery ?(ctyp=rootCtyp) ~univ query =
     let rec aux ~ctyp ((), query) =
@@ -670,13 +714,8 @@ end = struct
         end
       | UntypedQuery.Navigate (parent, navigation) ->
         let { UntypedQuery. navName; navArgs } = navigation in
-        let navigation = { TypedQuery. navName; navArgs; } in
         let%bind parent = aux ~ctyp parent in
-        let (parentCard, parentTyp), _parentSyn = parent in
-        let%bind field = extractField univ navName parentTyp in
-        let fieldCard, fieldTyp = field.fieldCtyp in
-        let fieldCard = Card.merge parentCard fieldCard in
-        return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
+        nav ~univ ?args:navArgs navName parent
       | UntypedQuery.Select (parent, selection) ->
         let%bind parent = aux ~ctyp parent in
         let parentCtyp, _parentSyn = parent in
@@ -712,7 +751,9 @@ module type DATABASE = sig
 
   type t
 
-  val runQuery : t -> TypedQuery.t -> (Value.t, string) Result.t
+  val univ : t -> Universe.t
+
+  val execute : t -> TypedQuery.t -> (Value.t, string) Result.t
 
 end
 
@@ -737,7 +778,10 @@ end = struct
 
   let ofJson ~univ root = { root = Value.ofJson root; univ }
 
-  let runQuery db query =
+  let univ db = db.univ
+
+  let execute db query =
+    Js.log2 "EXECUTE" (TypedQuery.show query);
     let open Result.Syntax in
     let rec aux ~(value : Value.t) ((_card, typ), syn) =
       match syn with
@@ -852,7 +896,7 @@ end
 
 module TypedWorkflow = struct
   include Workflow(struct
-    type t = TypedQuery.t
+    type t = (TypedQuery.t * string)
   end)
 end
 
@@ -865,14 +909,16 @@ module WorkflowTyper = struct
     let rec aux ~ctyp w =
       match w with
       | UntypedWorkflow.Render q ->
-        let%bind ((_, typ), _) as q = QueryTyper.typeQuery ~univ ~ctyp q in
+        let%bind ((_, typ) as ctyp, _) as tq = QueryTyper.typeQuery ~univ ~ctyp q in
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
           let typ = Type.show typ in
           let msg = {j|workflow can only be defined with screen but got $typ|j} in
           error msg
-        | Type.Screen { screenOutputCtyp; _ } ->
-          return (TypedWorkflow.Render q, screenOutputCtyp)
+        | Type.Screen { screenNavigate; _ } ->
+          let q = UntypedQuery.Syntax.(here |> nav screenNavigate) in
+          let%bind screenOutputCtyp, _ = QueryTyper.typeQuery ~univ ~ctyp q in
+          return (TypedWorkflow.Render (tq, screenNavigate), screenOutputCtyp)
         end
       | UntypedWorkflow.Next (first, next) ->
         let%bind first, ctyp = aux ~ctyp first in
@@ -900,94 +946,160 @@ module WorkflowInterpreter (Db : DATABASE) : sig
   (**
    * Produce an initial state for the given database and workflow description.
    *)
-  val make : Universe.t -> Db.t -> TypedWorkflow.t -> t
+  val boot : db : Db.t -> TypedWorkflow.t -> ((t * Value.UI.t), string) Result.t
 
   (**
-   * Bind workflow execution state for the new query fragment.
-   * TODO: We should instead define per UI operations.
+   * Render workflow state and return a new state and a UI screen to render.
    *)
-  val bind : UntypedQuery.t -> t -> ((t * Value.UI.t), string) Result.t
+  val render : t -> ((t * Value.UI.t), string) Result.t
 
   (**
-   * Render workflows state and return a new state and a UI screen to render.
+   * Advance workflow and render.
    *)
-  val renderState : t -> ((t * Value.UI.t), string) Result.t
+  val renderNext : t -> ((t * Value.UI.t), string) Result.t
 
-  (**
-   * Return a list of next possible workflow states.
-   *)
-  val next : t -> t list
+  val dataQuery : t -> (TypedQuery.t, string) Result.t
 
-  val query : Value.UI.t -> t -> TypedQuery.t
+  val setArgs : args : Arg.t list option -> t -> t
+
+  val show : t -> string
 
 end = struct
 
-  type t = {
-    query : TypedQuery.t;
-    queryString : string;
-    workflow : TypedWorkflow.t;
+  type t = frame * Value.UI.t option
+
+  and frame = {
     db : Db.t;
-    univ : Universe.t;
-    parent : t option;
+    query : TypedQuery.t;
+    position : TypedWorkflow.t * t option;
+    args : Arg.t list option;
   }
 
-  let _make ?parent ?(query=TypedQuery.void) univ db workflow = {
-    univ;
-    query;
-    queryString = TypedQuery.show query;
-    db;
-    workflow;
-    parent;
-  }
+  let rec show (frame, _) =
+    let query = TypedQuery.show frame.query in
+    match frame.position with
+    | _, None -> {j|$query <- ROOT|j}
+    | _, Some parent -> let parent = show parent in {j|$query <- $parent|j}
 
-  let make db workflow = _make db workflow
+  let make ?ui ?args ~parent ?(query=TypedQuery.void) ~db workflow =
+    begin
+    match parent, workflow with
+    | (Some ({position = TypedWorkflow.Render _, _; _}, _)), TypedWorkflow.Render _ ->
+      failwith "circular parent reference"
+    | (Some ({position = TypedWorkflow.Render _, _; _}, _)), TypedWorkflow.Next _ ->
+      failwith "Next depends on Render"
+    | _ -> ()
+    end;
+    let frame = {
+      query;
+      db;
+      position = workflow, parent;
+      args;
+    } in frame, ui
 
-  let rec renderState state =
+  let uiQuery (frame, _) =
     let open Result.Syntax in
-    let {workflow; db; query; univ; _} = state in
+    let workflow, _ = frame.position in
     match workflow with
-    | TypedWorkflow.Next (first, _next) ->
-      let state = _make ~parent:state ~query univ db first in
-      renderState state
-    | TypedWorkflow.Render q ->
+    | TypedWorkflow.Render (q, _) ->
       let ctyp, _ = q in
-      let q = ctyp, TypedQuery.Chain (query, q) in
-      let state = { state with query = q; queryString = TypedQuery.show q; parent = Some state; } in
-      let%bind res = Db.runQuery db q in
-      match Value.classify res with
-      | Value.UI ui -> return (state, ui)
-      | _ -> error "expected UI, got data"
+      let q = ctyp, TypedQuery.Chain (frame.query, q) in
+      return q
+    | _ -> error "no query"
 
-  let next state =
-    let rec aux query state =
-      let {workflow; db; univ; parent} = state in
-      match workflow, parent with
+  let render (frame, _ as state) =
+    let open Result.Syntax in
+
+    let render (frame, _ as state) =
+      let%bind q = uiQuery state in
+      Js.log2 "WorkflowInterpreter.render" (TypedQuery.show q);
+      let%bind res = Db.execute frame.db q in
+      match Value.classify res, frame.args with
+      | Value.UI ui, Some args ->
+        let ui = Value.UI.setArgs ~args:(Some args) ui in
+        return ((frame, Some ui), ui)
+      | Value.UI ui, None ->
+        return ((frame, Some ui), ui)
+      | _ -> error "expected UI, got data"
+    in
+
+    let rec find (frame, _ as state) =
+      let {position = workflow, _; db; query; _} = frame in
+      match workflow with
+      | TypedWorkflow.Next (first, _next) ->
+        let state = make ~parent:(Some state) ~query ~db first in
+        find state
+      | TypedWorkflow.Render _ ->
+        render state
+    in
+
+    match frame.position with
+    | TypedWorkflow.Render _, _ ->
+      render state
+    | _ -> find state
+
+  let boot ~db workflow =
+    let open Result.Syntax in
+    let state = make ~parent:None ~db workflow in
+    Js.log2 "WorkflowInterpreter.boot: init:" (show state);
+    let%bind state, ui = render state in
+    Js.log2 "WorkflowInterpreter.boot: first render:" (show state);
+    return (state, ui)
+
+  let next (frame, _ as state) =
+    let open Result.Syntax in
+    let rec aux query (frame, _ as state) =
+      let {position; db;} = frame in
+      match position with
       | TypedWorkflow.Render _, Some parent -> aux query parent
       | TypedWorkflow.Render _, None -> []
       | TypedWorkflow.Next (_first, []), Some parent -> aux query parent
       | TypedWorkflow.Next (_first, next), _ ->
-        let f w = _make ~query ~parent:state univ db w in
+        let f w = make ~query ~parent:(Some state) ~db w in
         List.map f next
-    in aux state.query state
-
-  let bind q state =
-    let open Result.Syntax in
-    let ctyp, _ = state.query in
-    let%bind (ctyp, _) as q = QueryTyper.typeQuery ~univ:state.univ ~ctyp q in
-    let q = ctyp, TypedQuery.Chain (state.query, q) in
-    let nextState = { state with query = q; queryString = TypedQuery.show q; } in
-    match next nextState with
-    | [] -> renderState state
-    | nextState::_ -> renderState nextState
-
-  let query ui state =
-    let baseQuery = match state.parent with
-    | Some parent -> parent.query
-    | None -> (Card.One, Type.Void), TypedQuery.Void
     in
-    let (ctyp, _) as q = Value.UI.query ui in
-    let q = ctyp, TypedQuery.Chain (baseQuery, q) in
-    q
+    let%bind q = uiQuery state in
+    let%bind query = match frame.position with
+    | Render (_, navigate), _ ->
+      let univ = Db.univ frame.db in
+      QueryTyper.nav ~univ navigate q
+    | _ -> return q
+    in
+    return (aux query state)
+
+  let renderNext state =
+    let open Result.Syntax in
+    Js.log2 "WorkflowInterpreter.renderNext: start state:" (show state);
+    let%bind next = next state in
+    let%bind state, ui = match next with
+    | [] -> render state
+    | state::_ -> render state
+    in
+    Js.log2 "WorkflowInterpreter.renderNext: end state:" (show state);
+    return (state, ui)
+
+  let dataQuery (frame, ui as state) =
+    let open Result.Syntax in
+    Js.log2 "WorkflowInterpreter.dataQuery: state:" (show state);
+    match ui with
+    | None -> error "no query defined"
+    | Some _ ->
+      let univ = Db.univ frame.db in
+      let%bind q = uiQuery state in
+      let%bind q = QueryTyper.nav ~univ "data" q in
+      Js.log2 "WorkflowInterpreter.dataQuery: result:" (TypedQuery.show q);
+      return q
+
+  let setArgs ~args (frame, ui) =
+    let workflow, parent = frame.position in
+    let workflow = match workflow with
+    | TypedWorkflow.Render ((ct, TypedQuery.Screen (p, c)), n) ->
+      let c = { c with TypedQuery. screenArgs = Arg.update ~update:args c.screenArgs } in
+      TypedWorkflow.Render ((ct, TypedQuery.Screen (p, c)), n)
+    | _ -> workflow
+    in
+    let frame = { frame with args; position = workflow, parent; } in
+    (frame, ui)
 
 end
 
@@ -1021,17 +1133,14 @@ module JsApi : sig
   type query
   type uquery
 
-  val start : state JsResult.t
+  val start : < state : state; ui : ui > Js.t JsResult.t
   val renderState : state -> < state : state; ui : ui > Js.t JsResult.t
-  val next : state -> state list
-  val bind : uquery -> state -> < state : state; ui : ui > Js.t JsResult.t
 
-  val pickValue : float -> uquery
+  val pickValue : float -> state -> < state : state; ui : ui > Js.t JsResult.t
 
   val uiName : ui -> string
-  val getQuery : ui -> state -> query
 
-  val runQuery : query -> Value.t JsResult.t
+  val getData : state -> Value.t JsResult.t
 
   val db : JSONDatabase.t
   val univ : Universe.t
@@ -1051,6 +1160,10 @@ end = struct
   let uiName = Value.UI.name
 
   let pickScreen =
+    let resolveData ~screenArgs:_ ~args:_ value =
+      let open Result.Syntax in
+      return value
+    in
     let resolveValue ~screenArgs ~args:_ value =
       let id = Arg.findValueFromArgList ~name:"id" screenArgs in
       match id, Value.classify value with
@@ -1084,14 +1197,19 @@ end = struct
     in
     Screen.Syntax.(screen
       ~inputCard:Card.Many
-      ~outputCtyp:(fun entity -> (Card.One, entity))
+      ~navigate:"value"
       (fun entity -> [
         has ~resolve:resolveTitle "title" string;
         has ~resolve:resolveValue ~card:Card.Opt "value" entity;
+        has ~resolve:resolveData ~card:Card.Many "data" entity;
       ])
     )
 
   let viewScreen =
+    let resolveData ~screenArgs:_ ~args:_ value =
+      let open Result.Syntax in
+      return value
+    in
     let resolveTitle ~screenArgs:_ ~args:_ _value =
       Result.Ok (Value.string "View Screen")
     in
@@ -1100,10 +1218,11 @@ end = struct
     in
     Screen.Syntax.(screen
       ~inputCard:Card.One
-      ~outputCtyp:(fun entity -> (Card.Opt, entity))
+      ~navigate:"value"
       (fun entity -> [
         has ~resolve:resolveTitle "title" string;
         has ~resolve:resolveValue ~card:Card.Opt "value" entity;
+        has ~resolve:resolveData ~card:Card.Opt "data" entity;
       ])
     )
 
@@ -1171,224 +1290,34 @@ end = struct
     let v =
       let open Result.Syntax in
       let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-      let state = WorkflowInterpreter.make univ db w in
-      return state
+      let%bind state, ui = WorkflowInterpreter.boot ~db w in
+      return [%bs.obj { state; ui }]
     in JsResult.ofResult v
 
-  let next = WorkflowInterpreter.next
-
-  let renderState state = JsResult.ofResult (
-    let open Result.Syntax in
-    let%bind state, ui = WorkflowInterpreter.renderState state in
-    return [%bs.obj { state; ui }]
-  )
-
-  let bind q state = JsResult.ofResult (
-    let open Result.Syntax in
-    let%bind state, ui = WorkflowInterpreter.bind q state in
-    return [%bs.obj { state; ui }]
-  )
-
-  let pickValue id =
-    UntypedQuery.Syntax.(
-      here |> nav ~args:[Arg.number "id" id] "value"
+  let toJS state =
+    JsResult.ofResult (
+      let open Result.Syntax in
+      let%bind state, ui = state in
+      Result.Ok [%bs.obj { state; ui }]
     )
 
-  let getQuery ui state = WorkflowInterpreter.query ui state
-  let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
+  let renderState state =
+    toJS (WorkflowInterpreter.render state)
+
+  let pickValue id state =
+    let args = Some [Arg.number "id" id] in
+    let state = WorkflowInterpreter.setArgs ~args state in
+    toJS (WorkflowInterpreter.renderNext state)
+
+  let getData state =
+    JsResult.ofResult (
+      let open Result.Syntax in
+      let%bind q = WorkflowInterpreter.dataQuery state in
+      let%bind data = JSONDatabase.execute db q in
+      return data
+    )
+
 end
 
 include JsApi
-
-module Test = struct
-
-  let univ = JsApi.univ
-  let db = JsApi.db
-
-  (**
-    * {
-    *   individuals: individual
-    *   individualsNames: individual.name
-    *   sites: individual.site
-    *   siteTitles: individual.site.title
-    * }
-    *)
-  let getSomeData = UntypedQuery.Syntax.(
-    void
-    |> select [
-      field ~alias:"individuals" (here |> nav "individual");
-      field ~alias:"individualNames" (here |> nav "individual" |> nav "name");
-      field ~alias:"sites" (here |> nav "individual" |> nav "site");
-      field ~alias:"siteTitles" (here |> nav "individual" |> nav "site" |> nav "title");
-    ]
-  )
-
-  (*
-   * individual.site.pick
-   *)
-  let renderListOfSites = UntypedQuery.Syntax.(
-    void |> nav "individual" |> nav "site" |> screen "pick"
-  )
-
-  (*
-   * individual.site.first.view
-   *)
-  let renderFirstSite = UntypedQuery.Syntax.(
-    void |> nav "individual" |> nav "site" |> first |> screen "view"
-  )
-
-  (*
-   * individual.pick.value(id: "someid").site.view
-   *)
-  let renderSiteByIndividual = UntypedQuery.Syntax.(
-    void
-    |> nav "individual"
-    |> screen ~args:[Arg.number "id" 1.] "pick"
-    |> nav "value"
-    |> nav "site"
-    |> screen "view"
-  )
-
-  (*
-   * individual.pick.value(id: "someid").site.view
-   *)
-  let getSiteTitleByIndividualViaView = UntypedQuery.Syntax.(
-    void
-    |> nav "individual"
-    |> screen ~args:[Arg.number "id" 1.] "pick"
-    |> nav "value"
-    |> nav "site"
-    |> screen "view"
-    |> nav "value"
-    |> nav "title"
-  )
-
-  (*
-   * individual.pick.value(id: "someid").site.view
-   *)
-  let getSiteTitleByIndividualViaViewViaBind2 = UntypedQuery.Syntax.(
-    void
-    |> chain (
-      here
-      |> nav "individual"
-      |> screen ~args:[Arg.number "id" 1.] "pick"
-      |> chain (
-        here
-        |> nav "value"
-        |> chain (
-          here
-          |> nav "site"
-          |> screen "view"
-        )
-      )
-    )
-  )
-
-  (*
-   * individual.pick.value(id: "someid").site.view
-   *)
-  let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
-    void
-    |> nav "individual"
-    |> screen ~args:[Arg.number "id" 1.] "pick"
-    |> chain (
-      here
-      |> nav "value"
-      |> nav "site"
-      |> screen "view"
-      |> nav "value"
-      |> chain (
-        here
-        |> nav "title"
-      )
-    )
-  )
-
-  (*
-   * individual.pick.value(id: "someid").site.view
-   *)
-  let getSelectedIndividual = UntypedQuery.Syntax.(
-    void
-    |> nav "individual"
-    |> screen ~args:[Arg.number "id" 1.] "pick"
-    |> nav "value"
-  )
-
-  let pickAndViewIndividualWorkflow =
-    let open UntypedWorkflow.Syntax in
-    let open UntypedQuery.Syntax in
-
-    let pickIndividual = render (here |> nav "individual" |> screen "pick") in
-
-    let view = render (here |> screen "view") in
-
-    let viewSite = render (here |> nav "site" |> screen "view") in
-
-    pickIndividual |> andThen [ view; viewSite; ]
-
-  let runResult result = match result with
-    | Result.Ok () -> ()
-    | Result.Error err -> Js.log2 "ERROR:" err
-
-  let runQuery db query =
-    Js.log "--- RUNNING QUERY ---";
-    let result =
-      Js.log2 "QUERY:" (UntypedQuery.show query);
-      let open Result.Syntax in
-      Js.log "TYPING...";
-      let%bind query = QueryTyper.typeQuery ~univ query in
-      let (_, typ), _ = query in
-      Js.log2 "TYPE:" (Type.show typ);
-      Js.log "RUNNING...";
-      let%bind result = JSONDatabase.runQuery db query in
-      Js.log2 "RESULT:" result;
-      return ()
-    in
-    runResult result;
-    Js.log "--- DONE ---"
-
-  let typeWorkflow w =
-    Js.log "TYPING WORKFLOW...";
-    runResult (Result.ignore (WorkflowTyper.typeWorkflow ~univ w))
-
-  let () =
-    Js.log db;
-    runQuery db getSomeData;
-    runQuery db renderListOfSites;
-    runQuery db renderFirstSite;
-    runQuery db renderSiteByIndividual;
-    runQuery db getSelectedIndividual;
-    runQuery db getSiteTitleByIndividualViaView;
-    runQuery db getSiteTitleByIndividualViaViewViaBind;
-    runQuery db getSiteTitleByIndividualViaViewViaBind2;
-
-    (**
-     * Value & title of the pick screen with no item selected.
-     *)
-    runQuery db UntypedQuery.Syntax.(
-      void
-      |> nav "individual"
-      |> screen "pick"
-      |> select [
-        field ~alias:"value" (here |> nav "value");
-        field ~alias:"title" (here |> nav "title");
-      ]
-    );
-
-    (**
-     * Value of the pick screen with the selected item.
-     *)
-    runQuery db UntypedQuery.Syntax.(
-      void
-      |> nav "individual"
-      |> screen ~args:[Arg.number "id" 2.] "pick"
-      |> select [
-        field ~alias:"value" (here |> nav "value");
-        field ~alias:"title" (here |> nav "title");
-      ]
-    );
-
-    typeWorkflow pickAndViewIndividualWorkflow;
-
-end
 
