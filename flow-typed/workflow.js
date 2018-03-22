@@ -25,4 +25,5 @@ declare module 'workflow' {
 
   declare export function uiName(ui: UI): string;
   declare export function breadcrumbs(State): Array<State>;
+  declare export function next(State): Array<State>;
 }

@@ -53,6 +53,7 @@ export class App extends React.Component<P, S> {
       );
     } else if (state.type === 'Ok') {
       const breadcrumbs = W.breadcrumbs(state.value.state);
+      const next = W.next(state.value.state);
       const {ui, state: node} = state.value;
       const name = W.uiName(ui);
       let screen = null;
@@ -69,7 +70,8 @@ export class App extends React.Component<P, S> {
       }
       return (
         <ReactNative.View>
-          <Breadcrumbs breadcrumbs={breadcrumbs} onState={this.onState} />
+          <NavToolbar items={breadcrumbs.slice().reverse()} onState={this.onState} />
+          <NavToolbar items={next} onState={this.onState} />
           {screen}
         </ReactNative.View>
       );
@@ -77,14 +79,12 @@ export class App extends React.Component<P, S> {
   }
 }
 
-function Breadcrumbs({breadcrumbs, onState}) {
-  breadcrumbs = breadcrumbs.slice();
-  breadcrumbs.reverse();
-  const buttons = breadcrumbs.map(state => {
+function NavToolbar({items, onState}) {
+  const buttons = items.map((state, idx) => {
     const title = W.getTitle(state);
     const onPress = () => onState(state);
     return (
-      <ReactNative.TouchableOpacity onPress={onPress}>
+      <ReactNative.TouchableOpacity key={idx} onPress={onPress}>
         <ReactNative.View style={{padding: 10}}>
           <ReactNative.Text>{title}</ReactNative.Text>
         </ReactNative.View>

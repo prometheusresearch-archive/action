@@ -6,7 +6,6 @@ import * as React from 'react';
 import {View, Text, TouchableHighlight} from 'react-native-web';
 import * as W from 'workflow';
 import type {State} from 'workflow';
-import {Error} from './Error.js';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
