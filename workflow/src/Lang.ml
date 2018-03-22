@@ -960,6 +960,8 @@ module WorkflowInterpreter (Db : DATABASE) : sig
 
   val dataQuery : t -> (TypedQuery.t, string) Result.t
 
+  val titleQuery : t -> (TypedQuery.t, string) Result.t
+
   val setArgs : args : Arg.t list option -> t -> t
 
   val show : t -> string
@@ -1078,17 +1080,19 @@ end = struct
     Js.log2 "WorkflowInterpreter.renderNext: end state:" (show state);
     return (state, ui)
 
-  let dataQuery (frame, ui as state) =
+  let dataQuery (frame, _ as state) =
     let open Result.Syntax in
-    Js.log2 "WorkflowInterpreter.dataQuery: state:" (show state);
-    match ui with
-    | None -> error "no query defined"
-    | Some _ ->
-      let univ = Db.univ frame.db in
-      let%bind q = uiQuery state in
-      let%bind q = QueryTyper.nav ~univ "data" q in
-      Js.log2 "WorkflowInterpreter.dataQuery: result:" (TypedQuery.show q);
-      return q
+    let univ = Db.univ frame.db in
+    let%bind q = uiQuery state in
+    let%bind q = QueryTyper.nav ~univ "data" q in
+    return q
+
+  let titleQuery (frame, _ as state) =
+    let open Result.Syntax in
+    let univ = Db.univ frame.db in
+    let%bind q = uiQuery state in
+    let%bind q = QueryTyper.nav ~univ "title" q in
+    return q
 
   let setArgs ~args (frame, ui) =
     let workflow, parent = frame.position in
@@ -1141,6 +1145,7 @@ module JsApi : sig
   val uiName : ui -> string
 
   val getData : state -> Value.t JsResult.t
+  val getTitle : state -> Value.t JsResult.t
 
   val db : JSONDatabase.t
   val univ : Universe.t
@@ -1210,11 +1215,19 @@ end = struct
       let open Result.Syntax in
       return value
     in
-    let resolveTitle ~screenArgs:_ ~args:_ _value =
-      Result.Ok (Value.string "View Screen")
-    in
     let resolveValue ~screenArgs:_ ~args:_ value =
       Result.Ok value
+    in
+    let resolveTitle ~screenArgs ~args:_ value =
+      let open Result.Syntax in
+      let%bind value = resolveValue ~screenArgs ~args:[] value in
+      match Value.classify value with
+      | Value.Object obj ->
+        begin match Js.Dict.get obj "id" with
+        | None -> Result.Ok (Value.string "View Screen")
+        | Some id -> Result.Ok (Value.string {j|View Screen ($id)|j})
+        end
+      | _ -> Result.Ok (Value.string "View Screen")
     in
     Screen.Syntax.(screen
       ~inputCard:Card.One
@@ -1309,13 +1322,19 @@ end = struct
     let state = WorkflowInterpreter.setArgs ~args state in
     toJS (WorkflowInterpreter.renderNext state)
 
-  let getData state =
+  let executeQuery q =
     JsResult.ofResult (
       let open Result.Syntax in
-      let%bind q = WorkflowInterpreter.dataQuery state in
+      let%bind q = q in
       let%bind data = JSONDatabase.execute db q in
       return data
     )
+
+  let getData state =
+    executeQuery (WorkflowInterpreter.dataQuery state)
+
+  let getTitle state =
+    executeQuery (WorkflowInterpreter.titleQuery state)
 
 end
 
