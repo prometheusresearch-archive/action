@@ -611,7 +611,7 @@ module QueryTyper : sig
 
 end = struct
 
-  let rec extractField univ fieldName (typ : Type.t) =
+  let extractField univ fieldName (typ : Type.t) =
     let open Result.Syntax in
     let findInFieldList fields =
       match Belt.List.getBy fields (fun field -> field.Type.fieldName = fieldName) with
@@ -890,7 +890,7 @@ module WorkflowTyper = struct
 
 end
 
-module WorkflowRunner (Db : DATABASE) : sig
+module WorkflowInterpreter (Db : DATABASE) : sig
 
   (**
    * This type represents workflow execution state.
@@ -1030,6 +1030,7 @@ module JsApi : sig
 
   val uiName : ui -> string
   val getQuery : ui -> state -> query
+
   val runQuery : query -> Value.t JsResult.t
 
   val db : JSONDatabase.t
@@ -1038,10 +1039,10 @@ module JsApi : sig
   val showQuery : TypedQuery.t -> string
 
 end = struct
-  module WorkflowRunner = WorkflowRunner(JSONDatabase)
+  module WorkflowInterpreter = WorkflowInterpreter(JSONDatabase)
 
   type ui = Value.UI.t
-  type state = WorkflowRunner.t
+  type state = WorkflowInterpreter.t
   type query = TypedQuery.t
   type uquery = UntypedQuery.t
 
@@ -1170,21 +1171,21 @@ end = struct
     let v =
       let open Result.Syntax in
       let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-      let state = WorkflowRunner.make univ db w in
+      let state = WorkflowInterpreter.make univ db w in
       return state
     in JsResult.ofResult v
 
-  let next = WorkflowRunner.next
+  let next = WorkflowInterpreter.next
 
   let renderState state = JsResult.ofResult (
     let open Result.Syntax in
-    let%bind state, ui = WorkflowRunner.renderState state in
+    let%bind state, ui = WorkflowInterpreter.renderState state in
     return [%bs.obj { state; ui }]
   )
 
   let bind q state = JsResult.ofResult (
     let open Result.Syntax in
-    let%bind state, ui = WorkflowRunner.bind q state in
+    let%bind state, ui = WorkflowInterpreter.bind q state in
     return [%bs.obj { state; ui }]
   )
 
@@ -1193,7 +1194,7 @@ end = struct
       here |> nav ~args:[Arg.number "id" id] "value"
     )
 
-  let getQuery ui state = WorkflowRunner.query ui state
+  let getQuery ui state = WorkflowInterpreter.query ui state
   let runQuery q = JsResult.ofResult (JSONDatabase.runQuery db q)
 end
 
