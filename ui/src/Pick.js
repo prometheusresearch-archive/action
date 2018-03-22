@@ -5,33 +5,29 @@
 import * as React from 'react';
 import {View, Text, TouchableHighlight} from 'react-native-web';
 import * as W from 'workflow';
-import type {Query, UntypedQuery} from 'workflow';
+import type {State} from 'workflow';
 import {Error} from './Error.js';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
-  query: Query,
-  onQuery: UntypedQuery => void,
+  state: State,
+  onPick: mixed => void,
 };
 
 export function Pick(props: P) {
-  const data = W.runQuery(props.query);
+  const data = W.getData(props.state);
+  const title = W.getTitle(props.state);
   const onSelect = id => {
-    const nextQuery = W.pickValue(id);
-    props.onQuery(nextQuery);
+    props.onPick(id);
   };
-  if (data.type === 'Error') {
-    return <Error error={data.error} />;
-  } else {
-    return (
+  return (
+    <View>
+      <ScreenTitle>{title}</ScreenTitle>
       <View>
-        <ScreenTitle>Pick</ScreenTitle>
-        <View>
-          <Table data={data.value} onSelect={onSelect} />
-        </View>
+        <Table data={data} onSelect={onSelect} />
       </View>
-    );
-  }
+    </View>
+  );
 }
 
 function Table(props) {

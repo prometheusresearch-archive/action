@@ -9,21 +9,20 @@ declare module 'workflow' {
 
   declare export opaque type UI;
   declare export opaque type State;
-  declare export opaque type Query;
-  declare export opaque type UntypedQuery;
   declare export opaque type QueryResult;
 
-  declare export var start: Result<State>;
-  declare export function render(state: State): Result<{+ui: UI, +state: State}>;
-  declare export function bind(
-    query: UntypedQuery,
-    state: State,
-  ): Result<{+ui: UI, +state: State}>;
+  declare export var start: Result<{+ui: UI, +state: State}>;
+  declare export function renderState(state: State): Result<{+ui: UI, +state: State}>;
   declare export function next(state: State): Array<State>;
 
-  declare export function getQuery(ui: UI, state: State): Query;
-  declare export function runQuery(query: Query): Result<QueryResult>;
-  declare export function pickValue(id: mixed): UntypedQuery;
+  declare export function getData(state: State): QueryResult;
+  declare export function getTitle(state: State): QueryResult;
+
+  declare export function pickValue(
+    id: mixed,
+    state: State,
+  ): Result<{+ui: UI, +state: State}>;
 
   declare export function uiName(ui: UI): string;
+  declare export function breadcrumbs(State): Array<State>;
 }
