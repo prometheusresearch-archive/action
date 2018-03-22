@@ -966,6 +966,8 @@ module WorkflowInterpreter (Db : DATABASE) : sig
 
   val show : t -> string
 
+  val breadcrumbs : t -> t list
+
 end = struct
 
   type t = frame * Value.UI.t option
@@ -973,41 +975,52 @@ end = struct
   and frame = {
     db : Db.t;
     query : TypedQuery.t;
-    position : TypedWorkflow.t * t option;
+    workflow : TypedWorkflow.t;
+    parent: t option;
+    prev: t option;
     args : Arg.t list option;
   }
 
-  let rec show (frame, _) =
-    let query = TypedQuery.show frame.query in
-    match frame.position with
-    | _, None -> {j|$query <- ROOT|j}
-    | _, Some parent -> let parent = show parent in {j|$query <- $parent|j}
+  let uiQuery (frame, _) =
+    let open Result.Syntax in
+    match frame.workflow with
+    | TypedWorkflow.Render (q, _) ->
+      let ctyp, _ = q in
+      let q = ctyp, TypedQuery.Chain (frame.query, q) in
+      return q
+    | _ -> error "no query"
 
-  let make ?ui ?args ~parent ?(query=TypedQuery.void) ~db workflow =
+  let rec breadcrumbs (frame, _ as state) =
+    match frame.prev with
+    | Some prev -> state::(breadcrumbs prev)
+    | None -> [state]
+
+  let rec show (frame, _ as state) =
+    let query = match uiQuery state with
+    | Result.Ok query -> TypedQuery.show query
+    | Result.Error _ -> "EMPTY"
+    in
+    match frame.prev with
+    | None -> {j|$query <- ROOT|j}
+    | Some prev -> let prev = show prev in {j|$query <- $prev|j}
+
+  let make ?prev ?ui ?args ~parent ?(query=TypedQuery.void) ~db workflow =
     begin
     match parent, workflow with
-    | (Some ({position = TypedWorkflow.Render _, _; _}, _)), TypedWorkflow.Render _ ->
+    | (Some ({workflow = TypedWorkflow.Render _; _}, _)), TypedWorkflow.Render _ ->
       failwith "circular parent reference"
-    | (Some ({position = TypedWorkflow.Render _, _; _}, _)), TypedWorkflow.Next _ ->
+    | (Some ({workflow = TypedWorkflow.Render _; _}, _)), TypedWorkflow.Next _ ->
       failwith "Next depends on Render"
     | _ -> ()
     end;
     let frame = {
       query;
       db;
-      position = workflow, parent;
+      workflow;
+      parent;
+      prev;
       args;
     } in frame, ui
-
-  let uiQuery (frame, _) =
-    let open Result.Syntax in
-    let workflow, _ = frame.position in
-    match workflow with
-    | TypedWorkflow.Render (q, _) ->
-      let ctyp, _ = q in
-      let q = ctyp, TypedQuery.Chain (frame.query, q) in
-      return q
-    | _ -> error "no query"
 
   let render (frame, _ as state) =
     let open Result.Syntax in
@@ -1026,7 +1039,7 @@ end = struct
     in
 
     let rec find (frame, _ as state) =
-      let {position = workflow, _; db; query; _} = frame in
+      let {workflow; db; query; _} = frame in
       match workflow with
       | TypedWorkflow.Next (first, _next) ->
         let state = make ~parent:(Some state) ~query ~db first in
@@ -1035,8 +1048,8 @@ end = struct
         render state
     in
 
-    match frame.position with
-    | TypedWorkflow.Render _, _ ->
+    match frame.workflow with
+    | TypedWorkflow.Render _ ->
       render state
     | _ -> find state
 
@@ -1048,26 +1061,26 @@ end = struct
     Js.log2 "WorkflowInterpreter.boot: first render:" (show state);
     return (state, ui)
 
-  let next (frame, _ as state) =
+  let next (startFrame, _ as startState) =
     let open Result.Syntax in
     let rec aux query (frame, _ as state) =
-      let {position; db;} = frame in
-      match position with
+      let {workflow; parent; db;} = frame in
+      match workflow, parent with
       | TypedWorkflow.Render _, Some parent -> aux query parent
       | TypedWorkflow.Render _, None -> []
       | TypedWorkflow.Next (_first, []), Some parent -> aux query parent
       | TypedWorkflow.Next (_first, next), _ ->
-        let f w = make ~query ~parent:(Some state) ~db w in
+        let f w = make ~prev:startState ~query ~parent:(Some state) ~db w in
         List.map f next
     in
-    let%bind q = uiQuery state in
-    let%bind query = match frame.position with
-    | Render (_, navigate), _ ->
-      let univ = Db.univ frame.db in
+    let%bind q = uiQuery startState in
+    let%bind query = match startFrame.workflow with
+    | Render (_, navigate) ->
+      let univ = Db.univ startFrame.db in
       QueryTyper.nav ~univ navigate q
     | _ -> return q
     in
-    return (aux query state)
+    return (aux query startState)
 
   let renderNext state =
     let open Result.Syntax in
@@ -1095,14 +1108,13 @@ end = struct
     return q
 
   let setArgs ~args (frame, ui) =
-    let workflow, parent = frame.position in
-    let workflow = match workflow with
+    let workflow = match frame.workflow with
     | TypedWorkflow.Render ((ct, TypedQuery.Screen (p, c)), n) ->
       let c = { c with TypedQuery. screenArgs = Arg.update ~update:args c.screenArgs } in
       TypedWorkflow.Render ((ct, TypedQuery.Screen (p, c)), n)
-    | _ -> workflow
+    | _ -> frame.workflow
     in
-    let frame = { frame with args; position = workflow, parent; } in
+    let frame = { frame with args; workflow; } in
     (frame, ui)
 
 end
@@ -1143,9 +1155,10 @@ module JsApi : sig
   val pickValue : float -> state -> < state : state; ui : ui > Js.t JsResult.t
 
   val uiName : ui -> string
+  val breadcrumbs : state -> state array
 
-  val getData : state -> Value.t JsResult.t
-  val getTitle : state -> Value.t JsResult.t
+  val getData : state -> Value.t
+  val getTitle : state -> Value.t
 
   val db : JSONDatabase.t
   val univ : Universe.t
@@ -1163,6 +1176,9 @@ end = struct
   let showQuery = TypedQuery.show
 
   let uiName = Value.UI.name
+
+  let breadcrumbs state =
+    state |> WorkflowInterpreter.breadcrumbs |> Array.of_list
 
   let pickScreen =
     let resolveData ~screenArgs:_ ~args:_ value =
@@ -1323,12 +1339,14 @@ end = struct
     toJS (WorkflowInterpreter.renderNext state)
 
   let executeQuery q =
-    JsResult.ofResult (
+    let res =
       let open Result.Syntax in
       let%bind q = q in
       let%bind data = JSONDatabase.execute db q in
       return data
-    )
+    in match res with
+    | Result.Ok data -> data
+    | Result.Error err -> Js.Exn.raiseError err
 
   let getData state =
     executeQuery (WorkflowInterpreter.dataQuery state)
