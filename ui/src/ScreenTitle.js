@@ -1,5 +1,5 @@
 /**
- * @flow
+ * @flow strict
  */
 
 import * as React from 'react';
@@ -11,6 +11,8 @@ type P = {
 
 export function ScreenTitle(props: P) {
   return (
-    <Text style={{padding: 10, fontSize: '24pt', fontWeight: '900'}}>{props.children}</Text>
+    <Text style={{padding: 10, fontSize: '24pt', fontWeight: '900'}}>
+      {props.children}
+    </Text>
   );
 }

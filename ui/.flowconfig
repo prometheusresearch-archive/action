@@ -1,11 +1,8 @@
 [ignore]
 
 [include]
-../node_modules/**/*
-../api
 
 [libs]
-../flow-typed
 
 [lints]
 all=error

@@ -1164,7 +1164,7 @@ module JsApi : sig
   type uquery
 
   val start : < state : state; ui : ui > Js.t JsResult.t
-  val renderState : state -> < state : state; ui : ui > Js.t JsResult.t
+  val render : state -> < state : state; ui : ui > Js.t JsResult.t
 
   val pickValue : float -> state -> < state : state; ui : ui > Js.t JsResult.t
 
@@ -1275,7 +1275,7 @@ end = struct
 
     let individual = Type.Syntax.(entity "individual" [
       hasOne "name" string;
-      hasOne "site" site;
+      hasOpt "site" site;
     ]) in
 
     Universe.(
@@ -1308,6 +1308,11 @@ end = struct
           "site": {
             "title": "Portal Site"
           }
+        },
+        {
+          "id": 4,
+          "name": "This individual has no site",
+          "site": null
         }
       ]
     }
@@ -1319,11 +1324,11 @@ end = struct
     let open UntypedQuery.Syntax in
 
     let pickIndividual = render (here |> nav "individual" |> screen "pick") in
-    let view = render (here |> screen "view") in
+    (* let view = render (here |> screen "view") in *)
     let viewSite = render (here |> nav "site" |> screen "view") in
 
     pickIndividual |> andThen [
-      view;
+      (* view; *)
       viewSite;
     ]
 
@@ -1350,7 +1355,7 @@ end = struct
     | Ok next -> Array.of_list next
     | Error err -> Js.Exn.raiseError err
 
-  let renderState state =
+  let render state =
     toJS (WorkflowInterpreter.render state)
 
   let pickValue id state =

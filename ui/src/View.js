@@ -10,6 +10,7 @@ import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
   state: State,
+  toolbar: React.Node,
 };
 
 export function View(props: P) {
@@ -18,6 +19,7 @@ export function View(props: P) {
   return (
     <ReactNative.View>
       <ScreenTitle>{title}</ScreenTitle>
+      <ReactNative.View>{props.toolbar}</ReactNative.View>
       <ReactNative.View>
         <ReactNative.Text>{JSON.stringify(data, null, 2)}</ReactNative.Text>
       </ReactNative.View>

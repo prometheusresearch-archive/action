@@ -40,7 +40,7 @@ export class App extends React.Component<P, S> {
   };
 
   onState = (state: State) => {
-    this.setState({state: W.renderState(state)});
+    this.setState({state: W.render(state)});
   };
 
   render() {
@@ -54,14 +54,16 @@ export class App extends React.Component<P, S> {
     } else if (state.type === 'Ok') {
       const breadcrumbs = W.breadcrumbs(state.value.state);
       const prev = breadcrumbs[1];
+      const siblings = prev != null ? W.next(prev) : [];
       const next = W.next(state.value.state);
       const {ui, state: node} = state.value;
       const name = W.uiName(ui);
       let screen = null;
+      const toolbar = <NavToolbar items={next} onState={this.onState} />;
       if (name === 'pick') {
-        screen = <Pick state={node} onPick={this.onPick} />;
+        screen = <Pick toolbar={toolbar} state={node} onPick={this.onPick} />;
       } else if (name === 'view') {
-        screen = <View state={node} />;
+        screen = <View toolbar={toolbar} state={node} />;
       } else {
         screen = (
           <ReactNative.View>
@@ -72,8 +74,9 @@ export class App extends React.Component<P, S> {
       return (
         <ReactNative.View>
           <NavToolbar items={breadcrumbs.slice().reverse()} onState={this.onState} />
-          {prev != null && <NavToolbar items={W.next(prev)} onState={this.onState} />}
-          <NavToolbar items={next} onState={this.onState} />
+          {siblings.length > 1 && (
+            <NavToolbar items={W.next(prev)} onState={this.onState} />
+          )}
           <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
         </ReactNative.View>
       );

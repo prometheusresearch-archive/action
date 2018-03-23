@@ -1,5 +1,5 @@
 /**
- * @flow
+ * @flow strict
  */
 
 import * as React from 'react';
@@ -11,6 +11,7 @@ import {ScreenTitle} from './ScreenTitle.js';
 type P = {
   state: State,
   onPick: mixed => void,
+  toolbar: React.Node,
 };
 
 export function Pick(props: P) {
@@ -22,6 +23,7 @@ export function Pick(props: P) {
   return (
     <View>
       <ScreenTitle>{title}</ScreenTitle>
+      <View>{props.toolbar}</View>
       <View>
         <Table data={data} onSelect={onSelect} />
       </View>
