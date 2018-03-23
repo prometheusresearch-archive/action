@@ -1,27 +1,8 @@
 # Action
 
-Composable workflows for relational data.
+Langauge for composable data-driven workflows.
 
-## Repository structure
+Action is an experimental language based on [Query Combinators][] paper which
+defines a notion of UI values and workflows over them.
 
-- `api`
-
-  Data services, GraphQL endpoing, CRUD.
-
-- `ui`
-
-  User Interface which renders workflows with the help of `workflow` execution
-  engine and `api` data services.
-
-- `workflow`
-
-  Workflow execution engine decoupled from the UI.
-
-## Development
-
-```
-% make bootstrap
-% make -C workflow build
-% make ui/serve-dev
-% make api/serve-dev
-```
+[Query Combinators]: https://arxiv.org/abs/1702.08409

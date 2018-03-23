@@ -1,5 +1,5 @@
 {
   "name": "workflow",
   "version": "1.0.0",
-  "main": "./src/Execution.bs.js"
+  "main": "./src/Workflow.bs.js"
 }

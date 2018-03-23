@@ -2,161 +2,94 @@
  * @flow
  */
 
-import invariant from 'invariant';
-import React, {Component} from 'react';
-import {View, Text} from 'react-native-web';
-import {Workflow as WorkflowUI} from './Workflow.js';
-import * as PickAction from './Pick.js';
-import * as ViewAction from './View.js';
-import * as Workflow from 'workflow';
-import * as t from './types.js';
-import {Loading} from './Loading.js';
-//import * as apiTypes from 'api/types';
+import * as React from 'react';
+import * as ReactNative from 'react-native-web';
+import * as W from 'workflow';
+import type {Result, State, UI} from 'workflow';
+import {Pick} from './Pick.js';
+import {View} from './View.js';
 
-type State = {
-  workflow: ?t.Workflow,
+type P = {
+  startState: Result<{+ui: UI, +state: State}>,
 };
 
-export default class App extends Component<{}, State> {
-  state = {
-    workflow: null,
+type S = {
+  state: Result<{+ui: UI, +state: State}>,
+};
+
+export class App extends React.Component<P, S> {
+  constructor(props: P) {
+    super(props);
+    this.state = {
+      state: props.startState,
+    };
+  }
+
+  onPick = (id: mixed) => {
+    this.setState(state => {
+      const w = state.state;
+      if (w.type === 'Error') {
+        return state;
+      }
+      const next = W.pickValue(id, w.value.state);
+      return {
+        ...state,
+        state: next,
+      };
+    });
+  };
+
+  onState = (state: State) => {
+    this.setState({state: W.renderState(state)});
   };
 
   render() {
-    const {workflow} = this.state;
+    const {state} = this.state;
+    if (state.type === 'Error') {
+      return (
+        <ReactNative.View>
+          <ReactNative.Text>{state.error}</ReactNative.Text>
+        </ReactNative.View>
+      );
+    } else if (state.type === 'Ok') {
+      const breadcrumbs = W.breadcrumbs(state.value.state);
+      const next = W.next(state.value.state);
+      const {ui, state: node} = state.value;
+      const name = W.uiName(ui);
+      let screen = null;
+      if (name === 'pick') {
+        screen = <Pick state={node} onPick={this.onPick} />;
+      } else if (name === 'view') {
+        screen = <View state={node} />;
+      } else {
+        screen = (
+          <ReactNative.View>
+            <ReactNative.Text>UNKNOWN SCREEN</ReactNative.Text>
+          </ReactNative.View>
+        );
+      }
+      return (
+        <ReactNative.View>
+          <NavToolbar items={breadcrumbs.slice().reverse()} onState={this.onState} />
+          <NavToolbar items={next} onState={this.onState} />
+          {screen}
+        </ReactNative.View>
+      );
+    }
+  }
+}
+
+function NavToolbar({items, onState}) {
+  const buttons = items.map((state, idx) => {
+    const title = W.getTitle(state);
+    const onPress = () => onState(state);
     return (
-      <View style={{flex: 1, height: '100%'}}>
-        {workflow == null && <Loading />}
-        {workflow != null && <WorkflowUI workflow={workflow} />}
-      </View>
+      <ReactNative.TouchableOpacity key={idx} onPress={onPress}>
+        <ReactNative.View style={{padding: 10}}>
+          <ReactNative.Text>{title}</ReactNative.Text>
+        </ReactNative.View>
+      </ReactNative.TouchableOpacity>
     );
-  }
-
-  async componentDidMount() {
-    const workflow = await boot({url: '/graphql'});
-    this.setState({workflow});
-  }
-}
-
-async function boot(config: {url: string}): Promise<t.Workflow> {
-  const query = `
-    _workflow {
-      workflow
-    }
-  `;
-  const resp = await fetch(`${config.url}?query=query{${query}}`);
-  const data = await resp.json();
-  const workflow: apiTypes.Workflow = data.data._workflow.workflow;
-  return configureWorkflow(workflow);
-}
-
-function configureWorkflow(workflow: apiTypes.Workflow): t.Workflow {
-  const {start, nodes} = workflow;
-
-  function configureAction(action: apiTypes.Action) {
-    switch (action.type) {
-      case 'PickAction':
-        return PickAction.configure({
-          id: action.id,
-          title: action.title,
-          entityName: action.entity,
-          fields: action.fields,
-        });
-      case 'ViewAction':
-        return ViewAction.configure({
-          id: action.id,
-          title: action.title,
-          entityName: action.entity,
-          fields: action.fields,
-        });
-      case 'GuardAction': {
-        const requires = {};
-        for (const {name, type} of action.require) {
-          requires[name] = Workflow.entityType(type);
-        }
-        return Workflow.guard({
-          requires,
-          query(context) {
-            const args = [];
-            for (const {name, type} of action.require) {
-              args.push(`${name}: "${context[name].value.id}"`);
-            }
-            return `
-              _workflow {
-                values {
-                  ${action.id}(${args.join(', ')})
-                }
-              }
-            `;
-          },
-          check(context, data) {
-            return Boolean(data._workflow.values[action.id]);
-          },
-        });
-      }
-      case 'QueryAction': {
-        const requires = {};
-        for (const {name, type} of action.require) {
-          requires[name] = Workflow.entityType(type);
-        }
-        return Workflow.query({
-          requires,
-          provides: {},
-
-          query(context) {
-            const args = [];
-            for (const {name, type} of action.require) {
-              args.push(`${name}: "${context[name].value.id}"`);
-            }
-            const query = [];
-            for (const {type} of action.query) {
-              query.push(`${type.name}`);
-            }
-            return `
-              _workflow {
-                values {
-                  ${action.id}(${args.join(', ')}) {
-                    ${query.join(', ')}
-                  }
-                }
-              }
-            `;
-          },
-
-          update(context, data) {
-            const update = {};
-            for (const {type} of action.query) {
-              update[type.name] = Workflow.entity(type.type, {
-                id: data._workflow.values[action.id][type.name],
-              });
-            }
-            return {...context, ...update};
-          },
-        });
-      }
-      default:
-        invariant(false, 'Unknown action type: %s', action.type);
-    }
-  }
-
-  function configureNode(node: apiTypes.WorkflowNode) {
-    switch (node.type) {
-      case 'WorkflowRef':
-        return configureNode(nodes[node.ref]);
-      case 'WorkflowSequence':
-        const sequence = node.sequence.map(node => configureNode(node));
-        return Workflow.sequence(sequence);
-      case 'WorkflowChoice':
-        const choice = node.choice.map(node => configureNode(node));
-        return Workflow.choice(choice);
-      case 'WorkflowAction':
-        return configureAction(node.action);
-      default:
-        invariant(false, 'Unknown workflow type: %s', node.type);
-    }
-  }
-
-  const node = configureNode(start);
-
-  return node;
+  });
+  return <ReactNative.View style={{flexDirection: 'row'}}>{buttons}</ReactNative.View>;
 }
