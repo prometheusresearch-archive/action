@@ -1,4 +1,4 @@
-open Workflow
+open Core
 
 let univ = JsApi.univ
 let db = JsApi.db
