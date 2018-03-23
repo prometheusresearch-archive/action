@@ -21,22 +21,40 @@ export function Pick(props: P) {
   const onSelect = id => {
     props.onPick(id);
   };
+  const fields = props.args.fields || inferFields(data[0]);
   return (
     <View>
       <ScreenTitle>{title}</ScreenTitle>
       <View>{props.toolbar}</View>
       <View>
-        <Table selectedId={props.args.id} data={data} onSelect={onSelect} />
+        <Table
+          selectedId={props.args.id}
+          data={data}
+          onSelect={onSelect}
+          fields={fields}
+        />
       </View>
     </View>
   );
 }
 
+function inferFields(item) {
+  const fields = [];
+  for (const name in item) {
+    const value = item[name];
+    if (typeof value === 'object') {
+      continue;
+    }
+    fields.push(name);
+  }
+  return fields;
+}
+
 function Table(props) {
-  const {data, onSelect, selectedId} = props;
+  const {data, onSelect, fields, selectedId} = props;
   const rows = data.map(data => {
     const cells = [];
-    for (const key in data) {
+    for (const key of fields) {
       cells.push(
         <View key={key} style={{padding: 5}}>
           <Text>{String(data[key])}</Text>

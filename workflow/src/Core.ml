@@ -120,10 +120,12 @@ module Arg : sig
     | String of string
     | Number of float
     | Bool of bool
+    | StringList of string list
 
   val string : string -> string -> t
   val number : string -> float -> t
   val bool : string -> bool -> t
+  val stringList : string -> string list -> t
 
   val findValueFromArgList : name : string -> t list -> value option
   val update : update : t list option -> t list option -> t list option
@@ -141,12 +143,14 @@ end = struct
     | String of string
     | Number of float
     | Bool of bool
+    | StringList of string list
 
   let make name value = { name; value }
 
   let string name value = make name (String value)
   let number name value = make name (Number value)
   let bool name value = make name (Bool value)
+  let stringList name value = make name (StringList value)
 
   let rec findValueFromArgList ~name args =
     match args with
@@ -156,21 +160,32 @@ end = struct
       then Some value
       else findValueFromArgList ~name args
 
-  let update ~update args = match update, args with
-    | Some update, Some args ->
-      let update =
-        let f update {name; value} =
-          Belt.Map.String.set update name value
-        in
-        Belt.List.reduce update (Belt.Map.String.empty) f
+  let update ~update args =
+    let argsToMap args =
+      let f update {name; value} =
+        Belt.Map.String.set update name value
       in
+      Belt.List.reduce args (Belt.Map.String.empty) f
+    in
+    match update, args with
+    | Some update, Some args ->
+      let updateMap = argsToMap update in
+      let argsMap = argsToMap args in
       let args =
         let f {name; value} =
-          match Belt.Map.String.get update name with
+          match Belt.Map.String.get updateMap name with
           | None -> {name; value}
           | Some value -> {name; value}
         in
         Belt.List.map args f
+      in
+      let args =
+        let f args {name; value} =
+          match Belt.Map.String.get argsMap name with
+          | Some _ -> args
+          | None -> {name;value}::args
+        in
+        Belt.List.reduce update args f
       in
       Some args
     | Some update, None -> Some update
@@ -180,6 +195,7 @@ end = struct
   let show { name; value } =
     let value = match value with
     | String value -> {j|"$value"|j}
+    | StringList value -> let value = String.concat ", " value in {j|"$value"|j}
     | Number value -> string_of_float value
     | Bool value -> string_of_bool value
     in {j|$name: $value|j}
@@ -1267,6 +1283,7 @@ end = struct
       let f args {Arg. name; value} =
         let value = match value with
         | Arg.String v -> Js.Json.string v
+        | Arg.StringList v -> v |> Array.of_list |> Js.Json.stringArray
         | Arg.Number v -> Js.Json.number v
         | Arg.Bool v -> Js.Json.boolean (Js.Boolean.to_js_boolean v)
         in
@@ -1407,9 +1424,22 @@ end = struct
     let open UntypedWorkflow.Syntax in
     let open UntypedQuery.Syntax in
 
-    let pickIndividual = render (here |> nav "individual" |> screen "pick") in
-    let view = render (here |> screen "view") in
-    let viewSite = render (here |> nav "site" |> screen "view") in
+    let pickIndividual = render (
+      here
+      |> nav "individual"
+      |> screen ~args:[Arg.stringList "fields" ["id"; "name"]] "pick"
+    ) in
+
+    let view = render (
+      here
+      |> screen "view"
+    ) in
+
+    let viewSite = render (
+      here
+      |> nav "site"
+      |> screen "view"
+    ) in
 
     pickIndividual |> andThen [
       view;
