@@ -23,24 +23,25 @@ let newline = '\r' | '\n' | "\r\n"
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule read = parse
-  | white    { read lexbuf }
-  | newline  { next_line lexbuf; read lexbuf }
-  | '/' { VOID }
+  | white      { read lexbuf }
+  | newline    { next_line lexbuf; read lexbuf }
+  | '/'        { VOID }
   | "screen"   { SCREEN }
-  | "true"   { BOOL true }
-  | "false"  { BOOL false }
-  | '{'      { LEFT_BRACE }
-  | '}'      { RIGHT_BRACE }
-  | '('      { LEFT_PAREN }
-  | ')'      { RIGHT_PAREN }
-  | ':'      { COLON }
-  | '.'      { DOT }
-  | ','      { COMMA }
-  | id       { ID (Lexing.lexeme lexbuf) }
-  | float    { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }
-  | '"'      { read_string (Buffer.create 17) lexbuf }
-  | _  { read lexbuf }
-  | eof      { EOF }
+  | "render"   { RENDER }
+  | "true"     { BOOL true }
+  | "false"    { BOOL false }
+  | '{'        { LEFT_BRACE }
+  | '}'        { RIGHT_BRACE }
+  | '('        { LEFT_PAREN }
+  | ')'        { RIGHT_PAREN }
+  | ':'        { COLON }
+  | '.'        { DOT }
+  | ','        { COMMA }
+  | id         { ID (Lexing.lexeme lexbuf) }
+  | float      { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }
+  | '"'        { read_string (Buffer.create 17) lexbuf }
+  | _          { read lexbuf }
+  | eof        { EOF }
 
 and read_string buf =
   parse

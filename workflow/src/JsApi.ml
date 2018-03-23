@@ -252,3 +252,44 @@ let getData state =
 
 let getTitle state =
   executeQuery (WorkflowInterpreter.titleQuery state)
+
+let parse s =
+  let module N = Js.Nullable in
+  let makeError err = [%bs.obj {error = N.return err; ui = N.null; data = N.null; state = N.null}] in
+  let r =
+    let open Result.Syntax in
+    let makeUi ui =
+      return [%bs.obj {error = N.null; ui = N.return ui; data = N.null; state = N.null}]
+    in
+    let makeData data =
+      return [%bs.obj {error = N.null; ui = N.null; data = N.return data; state = N.null}]
+    in
+    let makeError err =
+      return (makeError err)
+    in
+    let makeWorkflow w =
+      let state =
+        let%bind w = WorkflowTyper.typeWorkflow ~univ w in
+        WorkflowInterpreter.boot ~db w
+      in
+      return [%bs.obj {error = N.null; ui = N.null; data = N.null; state = N.return (toJS state)}]
+    in
+    let filebuf = Lexing.from_string s in
+    try
+      match Parser.start Lexer.read filebuf with
+      | Core.ParseResult.Workflow w ->
+        makeWorkflow w
+      | Core.ParseResult.Query q ->
+        let%bind q = QueryTyper.typeQuery ~univ q in
+        let%bind value = JSONDatabase.execute db q in
+        match Value.classify value with
+        | Value.UI ui -> makeUi ui
+        | _ -> makeData value
+    with
+    | Lexer.Error msg ->
+      makeError msg
+    | Parser.Error ->
+      makeError "Syntax Error"
+  in match r with
+  | Result.Ok r -> r
+  | Result.Error err -> makeError err

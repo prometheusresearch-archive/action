@@ -935,7 +935,10 @@ end
 (**
  * Monadic structure on top queries which represent transition between screens.
  *)
-module Workflow (Q : sig type t end) = struct
+module Workflow (Q : sig
+  type t
+  val show : t -> string
+end) = struct
 
   type q = Q.t
   type t =
@@ -944,12 +947,19 @@ module Workflow (Q : sig type t end) = struct
     (** Define how to transition from one screen to another screen *)
     | Next of (t * t list)
 
+  let rec show v =
+    match v with
+    | Render q ->
+        let q = Q.show q in {j|render($q)|j}
+    | Next (w, next) ->
+      let w = show w
+      and next = next |> List.map show |> String.concat ", "
+      in {j|$w { $next }|j}
+
 end
 
 module UntypedWorkflow = struct
-  include Workflow(struct
-    type t = UntypedQuery.t
-  end)
+  include Workflow(UntypedQuery)
 
   module Syntax = struct
     let render q = Render q
@@ -960,6 +970,7 @@ end
 module TypedWorkflow = struct
   include Workflow(struct
     type t = (TypedQuery.t * string)
+    let show (q, _) = TypedQuery.show q
   end)
 end
 
@@ -1206,4 +1217,10 @@ end = struct
     let frame = { frame with args; workflow; } in
     (frame, ui)
 
+end
+
+module ParseResult = struct
+  type t =
+    | Workflow of UntypedWorkflow.t
+    | Query of UntypedQuery.t
 end

@@ -31,3 +31,12 @@ val db : Core.JSONDatabase.t
 val univ : Core.Universe.t
 
 val showQuery : Core.TypedQuery.t -> string
+
+val parse :
+  string
+  -> <
+    error : string Js.Nullable.t;
+    ui : ui Js.Nullable.t;
+    data : Core.Value.t Js.Nullable.t;
+    state : renderableState Js.Nullable.t;
+  > Js.t

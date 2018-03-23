@@ -3,145 +3,97 @@
  */
 
 import * as React from 'react';
-import * as ReactNative from 'react-native-web';
+import {View, Text, TouchableOpacity} from 'react-native-web';
+import {Workflow} from './Workflow';
 import * as W from 'workflow';
-import type {Result, RenderableState, State, UI} from 'workflow';
-import {Pick} from './Pick.js';
-import {View} from './View.js';
 
-type P = {
-  startState: Result<RenderableState>,
+type ScreenId = 'start' | 'workflow' | 'console';
+
+type ScreenConfig = {
+  [id: ScreenId]: {
+    title: string,
+    Component: React.ComponentType<{}>,
+  },
 };
 
-type S = {
-  state: Result<RenderableState>,
-};
+type P = {};
+type S = {activeScreen: ScreenId};
 
 export class App extends React.Component<P, S> {
-  constructor(props: P) {
-    super(props);
-    this.state = {
-      state: props.startState,
-    };
-  }
-
-  onPick = (id: mixed) => {
-    this.setState(state => {
-      const w = state.state;
-      if (w.type === 'Error') {
-        return state;
-      }
-      const next = W.pickValue(id, w.value.state);
-      return {
-        ...state,
-        state: next,
-      };
-    });
-  };
-
-  onState = (state: State) => {
-    this.setState({state: W.render(state)});
-  };
-
+  state = {activeScreen: 'start'};
+  onScreen = (activeScreen: ScreenId) => this.setState({activeScreen});
   render() {
-    const {state} = this.state;
-    if (state.type === 'Error') {
-      return (
-        <ReactNative.View>
-          <ReactNative.Text>{state.error}</ReactNative.Text>
-        </ReactNative.View>
-      );
-    } else if (state.type === 'Ok') {
-      const breadcrumbs = W.breadcrumbs(state.value.state);
-      const prev = breadcrumbs[1];
-      const siblings = prev != null ? W.next(prev) : [];
-      const next = W.next(state.value.state);
-      const {ui, state: node} = state.value;
-      const name = W.uiName(ui);
-      const args = W.uiArgs(ui);
-      let screen = null;
-      const toolbar = <NavToolbar items={next} onState={this.onState} />;
-      if (name === 'pick') {
-        screen = <Pick toolbar={toolbar} state={node} args={args} onPick={this.onPick} />;
-      } else if (name === 'view') {
-        screen = <View toolbar={toolbar} state={node} args={args} />;
-      } else {
-        screen = (
-          <ReactNative.View>
-            <ReactNative.Text>UNKNOWN SCREEN</ReactNative.Text>
-          </ReactNative.View>
-        );
-      }
-      const breadcrumbsItems = breadcrumbs
-        .slice()
-        .slice(1)
-        .reverse();
-      return (
-        <ReactNative.View>
-          <NavToolbar
-            Button={BreadcrumbButton}
-            items={breadcrumbsItems}
-            onState={this.onState}
-          />
-          {siblings.length > 1 && (
-            <NavToolbar
-              isItemActive={item => W.id(item) === W.id(node)}
-              items={W.next(prev)}
-              onState={this.onState}
-            />
-          )}
-          <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
-        </ReactNative.View>
-      );
-    }
+    const {activeScreen} = this.state;
+    const screen = screens[activeScreen];
+    return (
+      <View>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View style={{padding: 10}}>
+            <Text style={{fontWeight: '900', fontSize: '22pt'}}>action</Text>
+          </View>
+          <View style={{flexDirection: 'row'}}>
+            {Object.keys(screens).map(id => {
+              const screen = screens[id];
+              return (
+                <MenuButton
+                  active={activeScreen === id}
+                  onPress={this.onScreen.bind(null, id)}>
+                  {screen.title}
+                </MenuButton>
+              );
+            })}
+          </View>
+        </View>
+        <View />
+        <View>
+          <screen.Component />
+        </View>
+      </View>
+    );
   }
 }
 
-function BreadcrumbButton(props) {
+function StartScreen() {
   return (
-    <ReactNative.TouchableOpacity onPress={props.onPress}>
-      <ReactNative.View style={{padding: 10, flexDirection: 'row'}}>
-        <ReactNative.Text style={{fontWeight: props.isActive ? '900' : '200'}}>
-          {props.title}
-        </ReactNative.Text>
-        <ReactNative.Text style={{paddingLeft: 15}}>→</ReactNative.Text>
-      </ReactNative.View>
-    </ReactNative.TouchableOpacity>
+    <View style={{padding: 10}}>
+      <Text>Hello</Text>
+    </View>
   );
 }
 
-function Button(props) {
+function WorkflowScreen() {
+  return <Workflow startState={W.start} />;
+}
+
+function ConsoleScreen() {
   return (
-    <ReactNative.TouchableOpacity onPress={props.onPress}>
-      <ReactNative.View style={{padding: 10, flexDirection: 'row'}}>
-        <ReactNative.Text style={{fontWeight: props.isActive ? '900' : '200'}}>
-          {props.title}
-        </ReactNative.Text>
-      </ReactNative.View>
-    </ReactNative.TouchableOpacity>
+    <View style={{padding: 10}}>
+      <Text>Hello</Text>
+    </View>
   );
 }
 
-function NavToolbar({items, onState, isItemActive, Button}) {
-  const buttons = items.map((state, idx) => {
-    const title = W.getTitle(state);
-    const onPress = () => onState(state);
-    const isLast = idx === items.length - 1;
-    const isActive = isItemActive(state, idx);
-    return (
-      <Button
-        key={idx}
-        isActive={isActive}
-        isLast={isLast}
-        onPress={onPress}
-        title={title}
-      />
-    );
-  });
-  return <ReactNative.View style={{flexDirection: 'row'}}>{buttons}</ReactNative.View>;
-}
-
-NavToolbar.defaultProps = {
-  Button: Button,
-  isItemActive: (_state, _idx) => false,
+const screens: ScreenConfig = {
+  start: {
+    title: 'Start',
+    Component: StartScreen,
+  },
+  workflow: {
+    title: 'Predefined Workflow',
+    Component: WorkflowScreen,
+  },
+  console: {
+    title: 'Query Console',
+    Component: WorkflowScreen,
+  },
 };
+
+function MenuButton({children, active, onPress}) {
+  return (
+    <TouchableOpacity onPress={onPress}>
+      <View style={{padding: 10}}>
+        <Text style={{fontWeight: active ? '900' : '400'}}>{children}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}

@@ -2,7 +2,12 @@ let () =
   let parse s =
     let filebuf = Lexing.from_string s in
     try
-      Js.log2 "RESULT" (Core.UntypedQuery.show (Parser.query Lexer.read filebuf))
+      let res = Parser.start Lexer.read filebuf in
+      match res with
+      | Core.ParseResult.Query q ->
+        Js.log2 "QUERY" (Core.UntypedQuery.show q)
+      | Core.ParseResult.Workflow w ->
+        Js.log2 "WORKFLOW" (Core.UntypedWorkflow.show w)
     with
     | Lexer.Error msg ->
       Js.log msg
@@ -33,3 +38,13 @@ let () =
   parse "individual(x: \"hello\")";
   parse "individual(x: 1, y :2)";
   parse "individual.screen:pick(x: 1, y :2)";
+  parse "render(individual.screen:pick)";
+  parse "render(individual.screen:pick) { render(screen:view) }";
+  parse {|
+
+    render(individual.screen:pick) {
+      render(screen:view),
+      render(site.screen:view)
+    }
+
+  |}

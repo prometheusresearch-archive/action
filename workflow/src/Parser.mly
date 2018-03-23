@@ -1,5 +1,6 @@
 %token VOID
 %token SCREEN
+%token RENDER
 %token NULL
 %token DOT
 %token COMMA
@@ -14,36 +15,49 @@
 %token <bool> BOOL
 %token EOF
 
-%start query
-%type <Core.UntypedQuery.t> query
-
 %{
 
   module S = Core.UntypedQuery.Syntax
+  module W = Core.UntypedWorkflow.Syntax
   module A = Core.Arg
 
-  type nav = { name : string; args : Core.Arg.t list option }
+  type nav = {
+    name : string;
+    args : Core.Arg.t list option;
+  }
 
 %}
 
+%start start
+%type <Core.ParseResult.t> start
+
 %%
 
-query:
-  | s = program EOF { s }
+start:
+  | p = program EOF { p }
 
 program:
-  | sl = term { sl }
+  | q = query { Core.ParseResult.Query q }
+  | w = workflow { Core.ParseResult.Workflow w }
 
-term:
+workflow:
+  | RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render q }
+  | w = workflow; LEFT_BRACE; ws = workflowList; RIGHT_BRACE { W.andThen ws w }
+
+workflowList:
+  | w = workflow { [w] }
+  | w = workflow; COMMA; ws = workflowList { w::ws }
+
+query:
   | VOID { S.void }
   | nav = nav { S.nav ?args:nav.args nav.name S.here }
   | SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name S.here }
   | VOID; nav = nav { S.nav ?args:nav.args nav.name S.void }
   | VOID; SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name S.void }
-  | parent = term; DOT; nav = nav { S.nav ?args:nav.args nav.name parent }
-  | parent = term; DOT; SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name parent }
-  | parent = term; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
-  | parent = term; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
+  | parent = query; DOT; nav = nav { S.nav ?args:nav.args nav.name parent }
+  | parent = query; DOT; SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name parent }
+  | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
+  | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
 
 nav:
   | name = ID { {name; args = None} }
@@ -60,8 +74,8 @@ argList:
   | a = arg; COMMA; as_ = argList { a::as_ }
 
 selectField:
-  | t = term { S.field t }
-  | alias = ID; COLON; t = term { S.field ~alias t }
+  | q = query { S.field q }
+  | alias = ID; COLON; q = query { S.field ~alias q }
 
 selectFieldList:
   | f = selectField { [f] }
