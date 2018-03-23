@@ -5,13 +5,14 @@
 import * as React from 'react';
 import {View, Text, TouchableHighlight} from 'react-native-web';
 import * as W from 'workflow';
-import type {State} from 'workflow';
+import type {State, Args} from 'workflow';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
   state: State,
-  onPick: mixed => void,
+  args: Args,
   toolbar: React.Node,
+  onPick: mixed => void,
 };
 
 export function Pick(props: P) {
@@ -25,14 +26,14 @@ export function Pick(props: P) {
       <ScreenTitle>{title}</ScreenTitle>
       <View>{props.toolbar}</View>
       <View>
-        <Table data={data} onSelect={onSelect} />
+        <Table selectedId={props.args.id} data={data} onSelect={onSelect} />
       </View>
     </View>
   );
 }
 
 function Table(props) {
-  const {data, onSelect} = props;
+  const {data, onSelect, selectedId} = props;
   const rows = data.map(data => {
     const cells = [];
     for (const key in data) {
@@ -47,7 +48,13 @@ function Table(props) {
         key={data.id}
         underlayColor="yellow"
         onPress={onSelect.bind(null, data.id)}>
-        <View style={{flexDirection: 'row'}}>{cells}</View>
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: selectedId === data.id ? '#33ccff' : 'transparent',
+          }}>
+          {cells}
+        </View>
       </TouchableHighlight>
     );
   });

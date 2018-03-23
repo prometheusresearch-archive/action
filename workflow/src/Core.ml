@@ -71,6 +71,11 @@ module Option = struct
       | None::xs -> filterNone xs
 
   end
+
+  let alt a b = match a with
+  | Some a -> Some a
+  | None -> b
+
 end
 
 (**
@@ -441,7 +446,7 @@ end
 module Value = struct
 
   type t
-  type queryResult = t
+  type value = t
 
   (**
   * This is an opaque structure which defines UI.
@@ -454,7 +459,7 @@ module Value = struct
       name : string
       -> args : Arg.t list option
       -> typ : Type.t
-      -> queryResult
+      -> value
       -> TypedQuery.t
       -> t
 
@@ -464,7 +469,7 @@ module Value = struct
     val args : t -> Arg.t list option
     val setArgs : args : Arg.t list option -> t -> t
     val query : t -> TypedQuery.t
-    val value : t -> queryResult
+    val value : t -> value
     val typ : t -> Type.t
 
   end = struct
@@ -472,11 +477,11 @@ module Value = struct
       name : string;
       args : Arg.t list option;
       query : TypedQuery.t;
-      value : queryResult;
+      value : value;
       typ : Type.t;
     > Js.t
 
-    external make : name : string -> args : Arg.t list option -> typ : Type.t -> queryResult -> TypedQuery.t -> t =
+    external make : name : string -> args : Arg.t list option -> typ : Type.t -> value -> TypedQuery.t -> t =
       "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
 
     let test_ : 'a -> bool = [%bs.raw {|
@@ -532,6 +537,11 @@ module Value = struct
     else if UI.test v
     then UI (Obj.magic v)
     else Object (Obj.magic v)
+
+  let get ~name value =
+    match classify value with
+    | Object value -> Js.Dict.get value name
+    | _ -> None
 
 end
 
@@ -994,6 +1004,8 @@ module WorkflowInterpreter (Db : DATABASE) : sig
 
   val titleQuery : t -> (TypedQuery.t, string) Result.t
 
+  val uiQuery : t -> (TypedQuery.t, string) Result.t
+
   val setArgs : args : Arg.t list option -> t -> t
 
   val step : t -> (t, string) Result.t
@@ -1215,7 +1227,9 @@ module JsApi : sig
 
   val pickValue : float -> state -> renderableState JsResult.t
 
+  val id : state -> string
   val uiName : ui -> string
+  val uiArgs : ui -> Js.Json.t Js.Dict.t
   val breadcrumbs : state -> state array
   val next : state -> state array
 
@@ -1237,7 +1251,28 @@ end = struct
 
   let showQuery = TypedQuery.show
 
+  let unwrapResult v =
+    match v with
+    | Result.Ok v -> v
+    | Result.Error err -> Js.Exn.raiseError err
+
+  let id state =
+    state |> WorkflowInterpreter.uiQuery |> unwrapResult |> TypedQuery.show
+
   let uiName = Value.UI.name
+  let uiArgs ui =
+    match Value.UI.args ui with
+    | None -> Js.Dict.empty ()
+    | Some args ->
+      let f args {Arg. name; value} =
+        let value = match value with
+        | Arg.String v -> Js.Json.string v
+        | Arg.Number v -> Js.Json.number v
+        | Arg.Bool v -> Js.Json.boolean (Js.Boolean.to_js_boolean v)
+        in
+        Js.Dict.set args name value;
+        args
+      in Belt.List.reduce args (Js.Dict.empty ()) f
 
   let pickScreen =
     let resolveData ~screenArgs:_ ~args:_ value =
@@ -1267,13 +1302,14 @@ end = struct
     let resolveTitle ~screenArgs ~args:_ value =
       let open Result.Syntax in
       let%bind value = resolveValue ~screenArgs ~args:[] value in
-      match Value.classify value with
-      | Value.Object obj ->
-        begin match Js.Dict.get obj "id" with
-        | None -> Result.Ok (Value.string "Pick Screen")
-        | Some id -> Result.Ok (Value.string {j|Pick Screen ($id)|j})
-        end
-      | _ -> Result.Ok (Value.string "Pick Screen")
+      let title =
+        Value.get ~name:"id" value
+        |> Option.alt (Value.get ~name:"title" value)
+        |> Option.alt (Value.get ~name:"name" value)
+      in
+      match title with
+      | Some title -> Result.Ok (Value.string {j|Pick ($title)|j})
+      | None -> Result.Ok (Value.string {j|Pick|j})
     in
     Screen.Syntax.(screen
       ~inputCard:Card.Many
@@ -1296,13 +1332,14 @@ end = struct
     let resolveTitle ~screenArgs ~args:_ value =
       let open Result.Syntax in
       let%bind value = resolveValue ~screenArgs ~args:[] value in
-      match Value.classify value with
-      | Value.Object obj ->
-        begin match Js.Dict.get obj "id" with
-        | None -> Result.Ok (Value.string "View Screen")
-        | Some id -> Result.Ok (Value.string {j|View Screen ($id)|j})
-        end
-      | _ -> Result.Ok (Value.string "View Screen")
+      let title =
+        Value.get ~name:"id" value
+        |> Option.alt (Value.get ~name:"title" value)
+        |> Option.alt (Value.get ~name:"name" value)
+      in
+      match title with
+      | Some title -> Result.Ok (Value.string {j|View ($title)|j})
+      | None -> Result.Ok (Value.string {j|View|j})
     in
     Screen.Syntax.(screen
       ~inputCard:Card.One
@@ -1371,11 +1408,11 @@ end = struct
     let open UntypedQuery.Syntax in
 
     let pickIndividual = render (here |> nav "individual" |> screen "pick") in
-    (* let view = render (here |> screen "view") in *)
+    let view = render (here |> screen "view") in
     let viewSite = render (here |> nav "site" |> screen "view") in
 
     pickIndividual |> andThen [
-      (* view; *)
+      view;
       viewSite;
     ]
 
@@ -1398,8 +1435,8 @@ end = struct
 
   let next state =
     match WorkflowInterpreter.next state with
-    | Ok next -> Array.of_list next
-    | Error err -> Js.Exn.raiseError err
+    | Result.Ok next -> Array.of_list next
+    | Result.Error err -> Js.Exn.raiseError err
 
   let render state =
     toJS (WorkflowInterpreter.render state)

@@ -58,12 +58,13 @@ export class App extends React.Component<P, S> {
       const next = W.next(state.value.state);
       const {ui, state: node} = state.value;
       const name = W.uiName(ui);
+      const args = W.uiArgs(ui);
       let screen = null;
       const toolbar = <NavToolbar items={next} onState={this.onState} />;
       if (name === 'pick') {
-        screen = <Pick toolbar={toolbar} state={node} onPick={this.onPick} />;
+        screen = <Pick toolbar={toolbar} state={node} args={args} onPick={this.onPick} />;
       } else if (name === 'view') {
-        screen = <View toolbar={toolbar} state={node} />;
+        screen = <View toolbar={toolbar} state={node} args={args} />;
       } else {
         screen = (
           <ReactNative.View>
@@ -71,11 +72,23 @@ export class App extends React.Component<P, S> {
           </ReactNative.View>
         );
       }
+      const breadcrumbsItems = breadcrumbs
+        .slice()
+        .slice(1)
+        .reverse();
       return (
         <ReactNative.View>
-          <NavToolbar items={breadcrumbs.slice().reverse()} onState={this.onState} />
+          <NavToolbar
+            Button={BreadcrumbButton}
+            items={breadcrumbsItems}
+            onState={this.onState}
+          />
           {siblings.length > 1 && (
-            <NavToolbar items={W.next(prev)} onState={this.onState} />
+            <NavToolbar
+              isItemActive={item => W.id(item) === W.id(node)}
+              items={W.next(prev)}
+              onState={this.onState}
+            />
           )}
           <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
         </ReactNative.View>
@@ -84,17 +97,51 @@ export class App extends React.Component<P, S> {
   }
 }
 
-function NavToolbar({items, onState}) {
+function BreadcrumbButton(props) {
+  return (
+    <ReactNative.TouchableOpacity onPress={props.onPress}>
+      <ReactNative.View style={{padding: 10, flexDirection: 'row'}}>
+        <ReactNative.Text style={{fontWeight: props.isActive ? '900' : '200'}}>
+          {props.title}
+        </ReactNative.Text>
+        <ReactNative.Text style={{paddingLeft: 15}}>→</ReactNative.Text>
+      </ReactNative.View>
+    </ReactNative.TouchableOpacity>
+  );
+}
+
+function Button(props) {
+  return (
+    <ReactNative.TouchableOpacity onPress={props.onPress}>
+      <ReactNative.View style={{padding: 10, flexDirection: 'row'}}>
+        <ReactNative.Text style={{fontWeight: props.isActive ? '900' : '200'}}>
+          {props.title}
+        </ReactNative.Text>
+      </ReactNative.View>
+    </ReactNative.TouchableOpacity>
+  );
+}
+
+function NavToolbar({items, onState, isItemActive, Button}) {
   const buttons = items.map((state, idx) => {
     const title = W.getTitle(state);
     const onPress = () => onState(state);
+    const isLast = idx === items.length - 1;
+    const isActive = isItemActive(state, idx);
     return (
-      <ReactNative.TouchableOpacity key={idx} onPress={onPress}>
-        <ReactNative.View style={{padding: 10}}>
-          <ReactNative.Text>{title}</ReactNative.Text>
-        </ReactNative.View>
-      </ReactNative.TouchableOpacity>
+      <Button
+        key={idx}
+        isActive={isActive}
+        isLast={isLast}
+        onPress={onPress}
+        title={title}
+      />
     );
   });
   return <ReactNative.View style={{flexDirection: 'row'}}>{buttons}</ReactNative.View>;
 }
+
+NavToolbar.defaultProps = {
+  Button: Button,
+  isItemActive: (_state, _idx) => false,
+};
