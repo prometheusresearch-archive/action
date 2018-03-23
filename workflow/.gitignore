@@ -3,3 +3,4 @@ _build
 lib
 *.bs.js
 ppx_let
+.merlin

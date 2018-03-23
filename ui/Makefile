@@ -1,7 +1,7 @@
 BIN = $(PWD)/../node_modules/.bin
 
 bootstrap:
-	@(cd node_modules && ln -s ../../workflow .)
+	@yarn
 
 serve-dev:
 	@$(BIN)/react-scripts start
