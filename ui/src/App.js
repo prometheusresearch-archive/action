@@ -5,16 +5,16 @@
 import * as React from 'react';
 import * as ReactNative from 'react-native-web';
 import * as W from 'workflow';
-import type {Result, State, UI} from 'workflow';
+import type {Result, RenderableState, State, UI} from 'workflow';
 import {Pick} from './Pick.js';
 import {View} from './View.js';
 
 type P = {
-  startState: Result<{+ui: UI, +state: State}>,
+  startState: Result<RenderableState>,
 };
 
 type S = {
-  state: Result<{+ui: UI, +state: State}>,
+  state: Result<RenderableState>,
 };
 
 export class App extends React.Component<P, S> {

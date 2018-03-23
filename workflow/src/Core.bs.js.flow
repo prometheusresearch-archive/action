@@ -7,9 +7,10 @@ export type Result<T> = {+type: 'Error', +error: string} | {+type: 'Ok', +value:
 export opaque type UI = mixed;
 export opaque type State = mixed;
 export opaque type QueryResult = mixed;
+export type RenderableState = {ui: ?UI, state: State};
 
-declare export var start: Result<{+ui: UI, +state: State}>;
-declare export function render(state: State): Result<{+ui: UI, +state: State}>;
+declare export var start: Result<RenderableState>;
+declare export function render(state: State): Result<RenderableState>;
 declare export function next(state: State): Array<State>;
 
 declare export function getData(state: State): QueryResult;
@@ -18,7 +19,7 @@ declare export function getTitle(state: State): QueryResult;
 declare export function pickValue(
   id: mixed,
   state: State,
-): Result<{+ui: UI, +state: State}>;
+): Result<RenderableState>;
 
 declare export function uiName(ui: UI): string;
 declare export function breadcrumbs(State): Array<State>;

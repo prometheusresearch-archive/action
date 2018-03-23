@@ -62,6 +62,15 @@ end
  *)
 module Option = struct
   include Js.Option
+
+  module List = struct
+
+    let rec filterNone = function
+      | [] -> []
+      | Some x::xs -> x::(filterNone xs)
+      | None::xs -> filterNone xs
+
+  end
 end
 
 (**
@@ -811,11 +820,32 @@ end = struct
           else return Value.null
         | _ -> return value
         end
-      | TypedQuery.Screen (q, { screenName; screenArgs; }) ->
-        begin match Value.classify value with
-        | Value.Null -> return Value.null
-        | _ ->
-          return (Value.ui (Value.UI.make ~name:screenName ~args:screenArgs ~typ value q))
+      | TypedQuery.Screen (query, { screenName; screenArgs; }) ->
+
+        let make value =
+          match Value.classify value with
+          | Value.Null -> return Value.null
+          | _ ->
+            return (Value.ui (Value.UI.make ~name:screenName ~args:screenArgs ~typ value query))
+        in
+
+        let%bind screen = Result.ofOption
+          ~err:{j|no such screen "$screenName"|j}
+          (Universe.lookupScreen screenName db.univ)
+        in
+        begin match screen.Screen.inputCard with
+        | Card.One ->
+          (* If package expects cardinality One we do a prefetch, ideally we
+           * should prefetch just exists(query) instead of query itself so we
+           * can minimize the work for db to do.
+           *)
+          let%bind prefetch = aux ~value query in
+          begin match Value.classify prefetch with
+          | Value.Null -> return Value.null
+          | _ -> make value
+          end
+        | Card.Opt
+        | Card.Many -> make value
         end
       | TypedQuery.Navigate (query, { navName; navArgs }) ->
         let args = Option.getWithDefault [] navArgs in
@@ -953,12 +983,12 @@ module WorkflowInterpreter (Db : DATABASE) : sig
   (**
    * Produce an initial state for the given database and workflow description.
    *)
-  val boot : db : Db.t -> TypedWorkflow.t -> ((t * Value.UI.t), string) Result.t
+  val boot : db : Db.t -> TypedWorkflow.t -> ((t * Value.UI.t option), string) Result.t
 
   (**
    * Render workflow state and return a new state and a UI screen to render.
    *)
-  val render : t -> ((t * Value.UI.t), string) Result.t
+  val render : t -> ((t * Value.UI.t option), string) Result.t
 
   val dataQuery : t -> (TypedQuery.t, string) Result.t
 
@@ -1001,6 +1031,13 @@ end = struct
       return q
     | _ -> error "no query"
 
+  let dataQuery (frame, _ as state) =
+    let open Result.Syntax in
+    let univ = Db.univ frame.db in
+    let%bind q = uiQuery state in
+    let%bind q = QueryTyper.nav ~univ "data" q in
+    return q
+
   let rec breadcrumbs (frame, _ as state) =
     match frame.prev with
     | Some prev -> state::(breadcrumbs prev)
@@ -1025,22 +1062,26 @@ end = struct
       args;
     } in frame, ui
 
-  let findRender (frame, _ as state) =
+  let findRender state =
     let open Result.Syntax in
 
-    let rec find (frame, _ as state) =
+    let rec aux (frame, _ as state) =
       let {workflow; db; query; _} = frame in
       match workflow with
       | TypedWorkflow.Next (first, _next) ->
         let state = make ~position:(First state) ~query ~db first in
-        find state
+        aux state
       | TypedWorkflow.Render _ ->
-        return state
+        let%bind q = uiQuery state in
+        let%bind ui = Db.execute frame.db q in
+        begin match Value.classify ui with
+        | Value.Null -> return None
+        | Value.UI _ -> return (Some state)
+        | _ -> error "not an ui"
+        end
     in
 
-    match frame.workflow with
-    | TypedWorkflow.Render _ -> return state
-    | _ -> find state
+    aux state
 
 
   let render state =
@@ -1053,14 +1094,17 @@ end = struct
       match Value.classify res, frame.args with
       | Value.UI ui, Some args ->
         let ui = Value.UI.setArgs ~args:(Some args) ui in
-        return ((frame, Some ui), ui)
+        return ((frame, Some ui), Some ui)
       | Value.UI ui, None ->
-        return ((frame, Some ui), ui)
+        return ((frame, Some ui), Some ui)
+      | Value.Null, _ ->
+        return ((frame, None), None)
       | _ -> error "expected UI, got data"
     in
 
-    let%bind state = findRender state in
-    render state
+    match%bind findRender state with
+    | Some state -> render state
+    | None -> return (state, None)
 
   let boot ~db workflow =
     let open Result.Syntax in
@@ -1086,7 +1130,8 @@ end = struct
           let state = make ~prev:currentState ~query ~position:(Next state) ~db w in
           findRender state
         in
-        Result.List.map ~f next
+        let%bind next = Result.List.map ~f next in
+        return (Option.List.filterNone next)
     in
 
     (* First we need to produce the output query for the current state *)
@@ -1103,7 +1148,9 @@ end = struct
 
   let step state =
     let open Result.Syntax in
-    match%bind next state with
+    let%bind next = next state in
+    Js.log2 "NEXT" (List.map show next |> Array.of_list);
+    match next with
     | [] -> return state
     | state::_ -> return state
 
@@ -1160,13 +1207,13 @@ module JsApi : sig
 
   type ui
   type state
+  type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
   type query
-  type uquery
 
-  val start : < state : state; ui : ui > Js.t JsResult.t
-  val render : state -> < state : state; ui : ui > Js.t JsResult.t
+  val start : renderableState JsResult.t
+  val render : state -> renderableState JsResult.t
 
-  val pickValue : float -> state -> < state : state; ui : ui > Js.t JsResult.t
+  val pickValue : float -> state -> renderableState JsResult.t
 
   val uiName : ui -> string
   val breadcrumbs : state -> state array
@@ -1185,8 +1232,8 @@ end = struct
 
   type ui = Value.UI.t
   type state = WorkflowInterpreter.t
+  type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
   type query = TypedQuery.t
-  type uquery = UntypedQuery.t
 
   let showQuery = TypedQuery.show
 
@@ -1332,19 +1379,18 @@ end = struct
       viewSite;
     ]
 
-  let start =
-    let v =
-      let open Result.Syntax in
-      let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-      let%bind state, ui = WorkflowInterpreter.boot ~db w in
-      return [%bs.obj { state; ui }]
-    in JsResult.ofResult v
-
   let toJS state =
     JsResult.ofResult (
       let open Result.Syntax in
       let%bind state, ui = state in
-      Result.Ok [%bs.obj { state; ui }]
+      Result.Ok [%bs.obj { state; ui = Js.Nullable.from_opt ui }]
+    )
+
+  let start =
+    let open Result.Syntax in
+    toJS (
+      let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
+      WorkflowInterpreter.boot ~db w
     )
 
   let breadcrumbs state =
