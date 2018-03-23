@@ -33,14 +33,14 @@
 
 "@opam/biniou@ >= 1.2.0":
   version "1.2.0"
-  uid "75e2067086f4880a4c4d0808064da986"
+  uid af4880e80be63bbb3043fb7184882eb8
   resolved "@opam/biniou@1.2.0-75e2067086f4880a4c4d0808064da986.tgz"
   dependencies:
     "@esy-ocaml/esy-installer" "^0.0.0"
     "@esy-ocaml/substs" "^0.0.1"
     "@opam/conf-which" "*"
     "@opam/easy-format" "*"
-    "@opam/jbuilder" "*"
+    "@opam/jbuilder" " >= 1.0.0-beta7"
   peerDependencies:
     ocaml " >= 4.2.3000"
 
@@ -110,6 +110,18 @@
     "@opam/ocamlfind" " >= 1.3.2"
   peerDependencies:
     ocaml " >= 4.2.3000"
+
+"@opam/menhir@*":
+  version "20171222.0.0"
+  uid b81a41f2c717acff8029cb6cef93f322
+  resolved "@opam/menhir@20171222.0.0-b81a41f2c717acff8029cb6cef93f322.tgz"
+  dependencies:
+    "@esy-ocaml/esy-installer" "^0.0.0"
+    "@esy-ocaml/substs" "^0.0.1"
+    "@opam/ocamlbuild" "*"
+    "@opam/ocamlfind" "*"
+  peerDependencies:
+    ocaml " >= 4.2.0"
 
 "@opam/merlin@*":
   version "3.0.5"

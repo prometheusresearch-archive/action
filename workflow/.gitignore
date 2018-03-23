@@ -3,4 +3,8 @@ _build
 lib
 *.bs.js
 ppx_let
+menhirLib
 .merlin
+src/Lexer.ml
+src/Parser.ml
+src/Parser.mli

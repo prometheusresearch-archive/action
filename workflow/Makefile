@@ -1,11 +1,14 @@
 bootstrap:
 	@esy install
 	@esy build
-	@$(MAKE) ppx_let
+	@$(MAKE) ppx_let menhirLib
 	@$(MAKE) build
 
 ppx_let:
-	ln -s $$(esy ocamlfind query ppx_let)/ppx $(@)
+	@ln -s $$(esy ocamlfind query ppx_let)/ppx $(@)
+
+menhirLib:
+	@cp -rf $$(esy ocamlfind query menhirLib) $(@)
 
 build:
 	esy ./node_modules/.bin/bsb -make-world

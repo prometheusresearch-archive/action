@@ -2,12 +2,46 @@
   "name": "Workflow",
   "namespace": true,
   "sources": [
-    "src"
+    {
+      "dir": "menhirLib"
+    },
+    {
+      "dir": "src",
+      "generators": [
+        {
+          "name": "ocamllex",
+          "edge": [
+            "Lexer.ml",
+            ":",
+            "Lexer.mll"
+          ]
+        },
+        {
+          "name": "menhir",
+          "edge": [
+            "Parser.ml",
+            "Parser.mli",
+            ":",
+            "Parser.mly"
+          ]
+        }
+      ]
+    }
   ],
   "package-specs": {
     "module": "commonjs",
     "in-source": true
   },
+  "generators": [
+    {
+      "name": "ocamllex",
+      "command": "ocamllex $in"
+    },
+    {
+      "name": "menhir",
+      "command": "menhir --explain --table $in"
+    }
+  ],
   "suffix": ".bs.js",
   "ppx-flags": [
     "./ppx_let"

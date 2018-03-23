@@ -1,5 +1,5 @@
 {
   "name": "workflow",
   "version": "1.0.0",
-  "main": "./src/Core.bs.js"
+  "main": "./src/JsApi.bs.js"
 }
