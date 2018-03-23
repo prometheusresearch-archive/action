@@ -1,4 +1,4 @@
-BIN = $(PWD)/../node_modules/.bin
+BIN = $(PWD)/node_modules/.bin
 
 bootstrap:
 	@yarn
