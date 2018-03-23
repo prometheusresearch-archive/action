@@ -982,10 +982,15 @@ end = struct
     db : Db.t;
     query : TypedQuery.t;
     workflow : TypedWorkflow.t;
-    parent: t option;
+    position: position;
     prev: t option;
     args : Arg.t list option;
   }
+
+  and position =
+    | Root
+    | First of t
+    | Next of t
 
   let uiQuery (frame, _) =
     let open Result.Syntax in
@@ -1010,21 +1015,12 @@ end = struct
     | None -> {j|$query <- ROOT|j}
     | Some prev -> let prev = show prev in {j|$query <- $prev|j}
 
-  let make ?prev ?ui ?args ~parent ?(query=TypedQuery.void) ~db workflow =
-    (* just a sanity check, consider encoding this at type level *)
-    begin
-    match parent, workflow with
-    | (Some ({workflow = TypedWorkflow.Render _; _}, _)), TypedWorkflow.Render _ ->
-      failwith "circular parent reference"
-    | (Some ({workflow = TypedWorkflow.Render _; _}, _)), TypedWorkflow.Next _ ->
-      failwith "Next depends on Render"
-    | _ -> ()
-    end;
+  let make ?prev ?ui ?args ~position ?(query=TypedQuery.void) ~db workflow =
     let frame = {
       query;
       db;
       workflow;
-      parent;
+      position;
       prev;
       args;
     } in frame, ui
@@ -1036,7 +1032,7 @@ end = struct
       let {workflow; db; query; _} = frame in
       match workflow with
       | TypedWorkflow.Next (first, _next) ->
-        let state = make ~parent:(Some state) ~query ~db first in
+        let state = make ~position:(First state) ~query ~db first in
         find state
       | TypedWorkflow.Render _ ->
         return state
@@ -1068,7 +1064,7 @@ end = struct
 
   let boot ~db workflow =
     let open Result.Syntax in
-    let state = make ~parent:None ~db workflow in
+    let state = make ~position:Root ~db workflow in
     Js.log2 "WorkflowInterpreter.boot: init:" (show state);
     let%bind state, ui = render state in
     Js.log2 "WorkflowInterpreter.boot: first render:" (show state);
@@ -1078,14 +1074,16 @@ end = struct
     let open Result.Syntax in
 
     let rec aux query (frame, _ as state) =
-      let {workflow; parent; db;} = frame in
-      match workflow, parent with
-      | TypedWorkflow.Render _, Some parent -> aux query parent
-      | TypedWorkflow.Render _, None -> return []
-      | TypedWorkflow.Next (_first, []), Some parent -> aux query parent
+      let {workflow; position; db;} = frame in
+      match workflow, position with
+      | TypedWorkflow.Render _, First parent -> aux query parent
+      | TypedWorkflow.Render _, Next _  -> return []
+      | TypedWorkflow.Render _, Root -> return []
+      | TypedWorkflow.Next (_first, []), First parent -> aux query parent
+      | TypedWorkflow.Next (_first, _), Next _ -> return []
       | TypedWorkflow.Next (_first, next), _ ->
         let f w =
-          let state = make ~prev:currentState ~query ~parent:(Some state) ~db w in
+          let state = make ~prev:currentState ~query ~position:(Next state) ~db w in
           findRender state
         in
         Result.List.map ~f next
