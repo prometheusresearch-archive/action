@@ -53,6 +53,7 @@ export class App extends React.Component<P, S> {
       );
     } else if (state.type === 'Ok') {
       const breadcrumbs = W.breadcrumbs(state.value.state);
+      const prev = breadcrumbs[1];
       const next = W.next(state.value.state);
       const {ui, state: node} = state.value;
       const name = W.uiName(ui);
@@ -71,8 +72,9 @@ export class App extends React.Component<P, S> {
       return (
         <ReactNative.View>
           <NavToolbar items={breadcrumbs.slice().reverse()} onState={this.onState} />
+          {prev != null && <NavToolbar items={W.next(prev)} onState={this.onState} />}
           <NavToolbar items={next} onState={this.onState} />
-          {screen}
+          <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
         </ReactNative.View>
       );
     }
