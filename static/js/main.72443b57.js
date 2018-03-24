@@ -41471,7 +41471,9 @@ exports.to_js_boolean = to_js_boolean;
 /* 298 */
 /***/ (function(module, exports) {
 
-module.exports.UIRepr = function UI(name, args, typ, value, query) {
+module.exports.UIRepr = UI;
+
+function UI(name, args, typ, value, query) {
   this.name = name;
   this.args = args;
   this.typ = typ;
@@ -53167,4 +53169,4 @@ TextareaAutosize.defaultProps = {
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=main.f16f5f9a.js.map
+//# sourceMappingURL=main.72443b57.js.map
