@@ -78,7 +78,7 @@ export class Workflow extends React.Component<P, S> {
         );
       }
       const breadcrumbItems = breadcrumbs
-        .slice()
+        .slice(1)
         .reverse()
         .map(item => ({
           title: String(W.getTitle(item)),

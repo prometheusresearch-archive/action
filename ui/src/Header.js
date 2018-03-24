@@ -80,14 +80,7 @@ export function Breadcrumb(props: {breadcrumb: Array<BreadcrumbItem>}) {
         alignItems: 'center',
       }}>
       {props.breadcrumb.map((item, idx) => {
-        const isActive = idx === props.breadcrumb.length - 1;
-        return (
-          <BreadcrumbButton
-            onPress={item.onPress}
-            isActive={isActive}
-            title={item.title}
-          />
-        );
+        return <BreadcrumbButton onPress={item.onPress} title={item.title} />;
       })}
     </View>
   );
