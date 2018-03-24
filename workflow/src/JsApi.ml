@@ -198,8 +198,17 @@ let workflow =
     |> screen "view"
   ) in
 
+  let viewName = render (
+    here
+    |> nav "name"
+    |> screen ~args:[Arg.string "title" "Name"] "view"
+  ) in
+
   pickIndividual |> andThen [
-    view;
+    view |> andThen [
+      viewName;
+      viewSite;
+    ];
     viewSite;
   ]
 

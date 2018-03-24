@@ -1101,14 +1101,14 @@ end = struct
       args;
     } in frame, ui
 
-  let findRender state =
+  let findRender startState =
     let open Result.Syntax in
 
     let rec aux (frame, _ as state) =
       let {workflow; db; query; _} = frame in
       match workflow with
       | TypedWorkflow.Next (first, _next) ->
-        let state = make ~position:(First state) ~query ~db first in
+        let state = make ?prev:frame.prev ~position:(First state) ~query ~db first in
         aux state
       | TypedWorkflow.Render _ ->
         let%bind q = uiQuery state in
@@ -1120,7 +1120,7 @@ end = struct
         end
     in
 
-    aux state
+    aux startState
 
 
   let render state =
@@ -1163,7 +1163,6 @@ end = struct
       | TypedWorkflow.Render _, Next _  -> return []
       | TypedWorkflow.Render _, Root -> return []
       | TypedWorkflow.Next (_first, []), First parent -> aux query parent
-      | TypedWorkflow.Next (_first, _), Next _ -> return []
       | TypedWorkflow.Next (_first, next), _ ->
         let f w =
           let state = make ~prev:currentState ~query ~position:(Next state) ~db w in
@@ -1183,7 +1182,8 @@ end = struct
       | _ -> return q
     in
 
-    aux q currentState
+    let%bind r = aux q currentState in
+    return r
 
   let step state =
     let open Result.Syntax in
