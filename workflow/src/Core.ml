@@ -294,7 +294,7 @@ module Query (P : sig type t end) = struct
     | Screen (parent, { screenName; screenArgs; }) ->
       let parent = show parent in
       let screenArgs = showArgs screenArgs in
-      {j|$parent.screen:$screenName$screenArgs|j}
+      {j|$parent:$screenName$screenArgs|j}
 end
 
 (**
