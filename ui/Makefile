@@ -8,3 +8,10 @@ serve-dev:
 
 check:
 	@$(BIN)/flow
+
+.PHONY: build
+build:
+	@$(BIN)/react-scripts build
+
+deploy:
+	@$(BIN)/gh-pages -d build

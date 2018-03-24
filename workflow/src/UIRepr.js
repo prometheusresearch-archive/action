@@ -1,4 +1,6 @@
-module.exports.UIRepr = function UI(name, args, typ, value, query) {
+module.exports.UIRepr = UI;
+
+function UI(name, args, typ, value, query) {
   this.name = name;
   this.args = args;
   this.typ = typ;
