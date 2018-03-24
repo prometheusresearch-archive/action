@@ -9,6 +9,11 @@ export opaque type State = mixed;
 export opaque type Value = mixed;
 export type Args = {[name: string]: string | number | boolean};
 export type RenderableState = {ui: ?UI, state: State};
+export type ParseResult = {
+  error: ?string,
+  ui: ?Result<RenderableState>,
+  data: ?Value,
+};
 
 declare export var start: Result<RenderableState>;
 declare export function id(state: State): string;
@@ -25,11 +30,4 @@ declare export function uiArgs(ui: UI): Args;
 declare export function breadcrumbs(State): Array<State>;
 declare export function next(State): Array<State>;
 
-declare export function parse(
-  string,
-): {
-  error: ?string,
-  ui: ?UI,
-  data: ?Value,
-  state: ?RenderableState,
-};
+declare export function parse(string): ParseResult;

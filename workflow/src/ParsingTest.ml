@@ -37,14 +37,14 @@ let () =
   parse "individual(x: 42.5)";
   parse "individual(x: \"hello\")";
   parse "individual(x: 1, y :2)";
-  parse "individual.screen:pick(x: 1, y :2)";
-  parse "render(individual.screen:pick)";
-  parse "render(individual.screen:pick) { render(screen:view) }";
+  parse "individual:pick(x: 1, y :2)";
+  parse "render(individual:pick)";
+  parse "render(individual:pick) { render(here:view) }";
   parse {|
 
-    render(individual.screen:pick) {
-      render(screen:view),
-      render(site.screen:view)
+    render(individual:pick) {
+      render(here:view),
+      render(site:view)
     }
 
   |}

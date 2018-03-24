@@ -8,9 +8,14 @@ import * as W from 'workflow';
 import type {Result, RenderableState, State, UI} from 'workflow';
 import {Pick} from './Pick.js';
 import {View} from './View.js';
+import {type BreadcrumbItem, Breadcrumb} from './Header.js';
 
 type P = {
   startState: Result<RenderableState>,
+  renderHeader?: ({
+    breadcrumb: Array<BreadcrumbItem>,
+    toolbar?: ?React.Node,
+  }) => React.Node,
 };
 
 type S = {
@@ -72,23 +77,28 @@ export class Workflow extends React.Component<P, S> {
           </ReactNative.View>
         );
       }
-      const breadcrumbsItems = breadcrumbs
+      const breadcrumbItems = breadcrumbs
         .slice()
-        .slice(1)
-        .reverse();
-      return (
-        <ReactNative.View>
+        .reverse()
+        .map(item => ({
+          title: String(W.getTitle(item)),
+          onPress: this.onState.bind(null, item),
+        }));
+
+      const navToolbar =
+        siblings.length > 1 ? (
           <NavToolbar
-            Button={BreadcrumbButton}
-            items={breadcrumbsItems}
+            isItemActive={item => W.id(item) === W.id(node)}
+            items={W.next(prev)}
             onState={this.onState}
           />
-          {siblings.length > 1 && (
-            <NavToolbar
-              isItemActive={item => W.id(item) === W.id(node)}
-              items={W.next(prev)}
-              onState={this.onState}
-            />
+        ) : null;
+      return (
+        <ReactNative.View>
+          {this.props.renderHeader != null ? (
+            this.props.renderHeader({breadcrumb: breadcrumbItems, toolbar: navToolbar})
+          ) : (
+            <Header breadcrumb={breadcrumbItems} toolbar={navToolbar} />
           )}
           <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
         </ReactNative.View>
@@ -97,24 +107,38 @@ export class Workflow extends React.Component<P, S> {
   }
 }
 
-function BreadcrumbButton(props) {
+function Header(props) {
   return (
-    <ReactNative.TouchableOpacity onPress={props.onPress}>
-      <ReactNative.View style={{padding: 10, flexDirection: 'row'}}>
-        <ReactNative.Text style={{fontWeight: props.isActive ? '900' : '200'}}>
-          {props.title}
-        </ReactNative.Text>
-        <ReactNative.Text style={{paddingLeft: 15}}>→</ReactNative.Text>
+    <ReactNative.View style={{padding: 10}}>
+      <ReactNative.View
+        style={{
+          boxShadow: '0px 1px 0px 0px #BBB',
+          borderRadius: 2,
+          flexDirection: 'column',
+          border: '1px solid #BBB',
+        }}>
+        {props.breadcrumb.length > 0 && (
+          <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
+            <Breadcrumb breadcrumb={props.breadcrumb} />
+          </ReactNative.View>
+        )}
+        {props.toolbar != null && (
+          <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
+            {props.toolbar}
+          </ReactNative.View>
+        )}
       </ReactNative.View>
-    </ReactNative.TouchableOpacity>
+    </ReactNative.View>
   );
 }
 
 function Button(props) {
   return (
     <ReactNative.TouchableOpacity onPress={props.onPress}>
-      <ReactNative.View style={{padding: 10, flexDirection: 'row'}}>
-        <ReactNative.Text style={{fontWeight: props.isActive ? '900' : '200'}}>
+      <ReactNative.View
+        style={{paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row'}}>
+        <ReactNative.Text
+          style={{fontSize: '9pt', fontWeight: props.isActive ? '600' : '200'}}>
           {props.title}
         </ReactNative.Text>
       </ReactNative.View>

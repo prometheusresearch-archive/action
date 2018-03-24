@@ -36,7 +36,6 @@ val parse :
   string
   -> <
     error : string Js.Nullable.t;
-    ui : ui Js.Nullable.t;
+    ui : renderableState Js.Nullable.t;
     data : Core.Value.t Js.Nullable.t;
-    state : renderableState Js.Nullable.t;
   > Js.t

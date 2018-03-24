@@ -26,7 +26,8 @@ rule read = parse
   | white      { read lexbuf }
   | newline    { next_line lexbuf; read lexbuf }
   | '/'        { VOID }
-  | "screen"   { SCREEN }
+  | "pick"     { PICK }
+  | "view"     { VIEW }
   | "render"   { RENDER }
   | "true"     { BOOL true }
   | "false"    { BOOL false }

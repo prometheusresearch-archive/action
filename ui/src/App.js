@@ -4,76 +4,59 @@
 
 import * as React from 'react';
 import {View, Text, TouchableOpacity} from 'react-native-web';
-import {Workflow} from './Workflow';
 import * as W from 'workflow';
+import {type ScreenConfig, type BreadcrumbItem, Header} from './Header.js';
+import {Console} from './Console.js';
+import {Workflow} from './Workflow';
 
 type ScreenId = 'start' | 'workflow' | 'console';
-
-type ScreenConfig = {
-  [id: ScreenId]: {
-    title: string,
-    Component: React.ComponentType<{}>,
-  },
-};
 
 type P = {};
 type S = {activeScreen: ScreenId};
 
 export class App extends React.Component<P, S> {
-  state = {activeScreen: 'start'};
+  state = {activeScreen: 'console'};
   onScreen = (activeScreen: ScreenId) => this.setState({activeScreen});
   render() {
     const {activeScreen} = this.state;
     const screen = screens[activeScreen];
+    const renderHeader = props => (
+      <Header
+        breadcrumb={props.breadcrumb}
+        screens={screens}
+        activeScreen={activeScreen}
+        onScreen={this.onScreen}
+        toolbar={props.toolbar}
+      />
+    );
     return (
       <View>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <View style={{padding: 10}}>
-            <Text style={{fontWeight: '900', fontSize: '22pt'}}>action</Text>
-          </View>
-          <View style={{flexDirection: 'row'}}>
-            {Object.keys(screens).map(id => {
-              const screen = screens[id];
-              return (
-                <MenuButton
-                  active={activeScreen === id}
-                  onPress={this.onScreen.bind(null, id)}>
-                  {screen.title}
-                </MenuButton>
-              );
-            })}
-          </View>
-        </View>
-        <View />
-        <View>
-          <screen.Component />
-        </View>
+        <screen.Component renderHeader={renderHeader} />
       </View>
     );
   }
 }
 
-function StartScreen() {
+function StartScreen(props) {
   return (
-    <View style={{padding: 10}}>
-      <Text>Hello</Text>
+    <View>
+      {props.renderHeader({breadcrumb: []})}
+      <View style={{padding: 10}}>
+        <Text>Hello</Text>
+      </View>
     </View>
   );
 }
 
-function WorkflowScreen() {
-  return <Workflow startState={W.start} />;
+function WorkflowScreen(props) {
+  return <Workflow startState={W.start} renderHeader={props.renderHeader} />;
 }
 
-function ConsoleScreen() {
-  return (
-    <View style={{padding: 10}}>
-      <Text>Hello</Text>
-    </View>
-  );
+function ConsoleScreen(props) {
+  return <Console renderHeader={props.renderHeader} />;
 }
 
-const screens: ScreenConfig = {
+const screens: ScreenConfig<ScreenId> = {
   start: {
     title: 'Start',
     Component: StartScreen,
@@ -84,16 +67,6 @@ const screens: ScreenConfig = {
   },
   console: {
     title: 'Query Console',
-    Component: WorkflowScreen,
+    Component: ConsoleScreen,
   },
 };
-
-function MenuButton({children, active, onPress}) {
-  return (
-    <TouchableOpacity onPress={onPress}>
-      <View style={{padding: 10}}>
-        <Text style={{fontWeight: active ? '900' : '400'}}>{children}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}

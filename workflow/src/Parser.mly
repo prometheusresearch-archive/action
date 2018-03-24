@@ -1,5 +1,6 @@
 %token VOID
-%token SCREEN
+%token PICK
+%token VIEW
 %token RENDER
 %token NULL
 %token DOT
@@ -51,18 +52,28 @@ workflowList:
 query:
   | VOID { S.void }
   | nav = nav { S.nav ?args:nav.args nav.name S.here }
-  | SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name S.here }
+  | COLON; nav = screen { S.screen ?args:nav.args nav.name S.here }
   | VOID; nav = nav { S.nav ?args:nav.args nav.name S.void }
-  | VOID; SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name S.void }
+  | VOID; COLON; nav = screen { S.screen ?args:nav.args nav.name S.void }
   | parent = query; DOT; nav = nav { S.nav ?args:nav.args nav.name parent }
-  | parent = query; DOT; SCREEN; COLON; nav = nav { S.screen ?args:nav.args nav.name parent }
+  | parent = query; COLON; nav = screen { S.screen ?args:nav.args nav.name parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
+  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.void }
+  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.void }
 
 nav:
   | name = ID { {name; args = None} }
   | name = ID; LEFT_PAREN; RIGHT_PAREN { {name; args = Some []} }
   | name = ID; LEFT_PAREN; args = argList; RIGHT_PAREN { {name; args = Some args} }
+
+screen:
+  | PICK { {name = "pick"; args = None} }
+  | VIEW { {name = "view"; args = None} }
+  | PICK; LEFT_PAREN; RIGHT_PAREN { {name = "pick"; args = Some []} }
+  | VIEW; LEFT_PAREN; RIGHT_PAREN { {name = "view"; args = Some []} }
+  | PICK; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "pick"; args = Some args} }
+  | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args = Some args} }
 
 arg:
   | name = ID; COLON; value = STRING { A.string name value }

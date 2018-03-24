@@ -886,7 +886,8 @@ end = struct
               Js.log3 "ERROR:" msg [%bs.obj { data = dataset; key = name; }];
               error msg
             end
-          | _ -> error "expected an object"
+          | Value.Null -> return Value.null
+          | _ -> error "cannot traverse this"
         in begin
         match Value.classify value with
         | Value.Object _ -> navigate navName value
@@ -912,19 +913,32 @@ end = struct
         | _ -> error {|Cannot navigate away from this value|}
         end
       | TypedQuery.Select (query, selection) ->
-        let%bind value = aux ~value query in
-        let%bind _, dataset =
-          let build state { TypedQuery. alias; query; } =
-            match state with
-            | Result.Ok (idx, dataset) ->
-              let%bind selectionValue = aux ~value query in
-              let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
-              Js.Dict.set dataset selectionAlias selectionValue;
-              return (idx + 1, dataset)
-            | Result.Error err -> error err
+        let selectFrom value =
+          let%bind _, dataset =
+            let build state { TypedQuery. alias; query; } =
+              match state with
+              | Result.Ok (idx, dataset) ->
+                let%bind selectionValue = aux ~value query in
+                let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
+                Js.Dict.set dataset selectionAlias selectionValue;
+                return (idx + 1, dataset)
+              | Result.Error err -> error err
+            in
+            Belt.List.reduce selection (Result.Ok (0, Js.Dict.empty ())) build
           in
-          Belt.List.reduce selection (Result.Ok (0, Js.Dict.empty ())) build
-        in return (Value.obj dataset)
+          return (Value.obj dataset)
+        in
+        let%bind value = aux ~value query in
+        begin match Value.classify value with
+        | Value.Object _ -> selectFrom value
+        | Value.Array items ->
+          let%bind items = Result.Array.map ~f:selectFrom items in
+          return (Value.array items)
+        | Value.Null ->
+          return Value.null
+        | _ ->
+          error "cannot select from here"
+        end
     in
     let%bind res = aux ~value:db.root query in
     Js.log2 "EXECUTE RESULT" res;
