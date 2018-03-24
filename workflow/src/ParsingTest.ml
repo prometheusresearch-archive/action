@@ -26,20 +26,26 @@ let () =
   parse "individual.site.title";
   parse "individual{}";
   parse "individual { site }";
+  parse "individual { site, }";
+  parse "individual { site: site, }";
+  parse "individual { site: site, name, }";
   parse "individual { site, site.title, individualName: name }";
   parse "individual()";
   parse "individual.site()";
   parse "individual { site() }";
   parse "individual { s: site() }";
   parse "individual(x: true)";
+  parse "individual(x: true,)";
   parse "individual(x: false)";
   parse "individual(x: 42)";
   parse "individual(x: 42.5)";
   parse "individual(x: \"hello\")";
   parse "individual(x: 1, y :2)";
+  parse "individual(x: 1, y: 2,)";
   parse "individual:pick(x: 1, y :2)";
   parse "render(individual:pick)";
   parse "render(individual:pick) { render(here:view) }";
+  parse "render(individual:pick) { render(here:view), }";
   parse {|
 
     render(individual:pick) {

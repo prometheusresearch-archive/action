@@ -1,0 +1,56 @@
+
+** Conflict (shift/reduce) in state 32.
+** Token involved: COLON
+** This state is reached from start after reading:
+
+LEFT_BRACE ID 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+LEFT_BRACE selectFieldList RIGHT_BRACE 
+           selectField 
+           (?)
+
+** In state 32, looking ahead at COLON, reducing production
+** nav -> ID 
+** is permitted because of the following sub-derivation:
+
+query 
+query COLON screen // lookahead token appears
+nav // lookahead token is inherited
+ID . 
+
+** In state 32, looking ahead at COLON, shifting is permitted
+** because of the following sub-derivation:
+
+ID . COLON query 
+
+** Conflict (shift/reduce) in state 1.
+** Token involved: COLON
+** This state is reached from start after reading:
+
+VOID 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 1, looking ahead at COLON, reducing production
+** query -> VOID 
+** is permitted because of the following sub-derivation:
+
+query COLON screen // lookahead token appears
+VOID . 
+
+** In state 1, looking ahead at COLON, shifting is permitted
+** because of the following sub-derivation:
+
+VOID . COLON screen 

@@ -47,6 +47,7 @@ workflow:
 
 workflowList:
   | w = workflow { [w] }
+  | w = workflow; COMMA { [w] }
   | w = workflow; COMMA; ws = workflowList { w::ws }
 
 query:
@@ -82,6 +83,7 @@ arg:
 
 argList:
   | a = arg { [a] }
+  | a = arg; COMMA { [a] }
   | a = arg; COMMA; as_ = argList { a::as_ }
 
 selectField:
@@ -90,6 +92,7 @@ selectField:
 
 selectFieldList:
   | f = selectField { [f] }
+  | f = selectField; COMMA { [f] }
   | f = selectField; COMMA; fs = selectFieldList { f::fs }
 
 %%
