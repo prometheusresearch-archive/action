@@ -57,14 +57,14 @@ function ConsoleScreen(props) {
 }
 
 const screens: ScreenConfig<ScreenId> = {
-  start: {
-    title: 'Start',
-    Component: StartScreen,
-  },
-  workflow: {
-    title: 'Predefined Workflow',
-    Component: WorkflowScreen,
-  },
+  // start: {
+  //   title: 'Start',
+  //   Component: StartScreen,
+  // },
+  // workflow: {
+  //   title: 'Predefined Workflow',
+  //   Component: WorkflowScreen,
+  // },
   console: {
     title: 'Query Console',
     Component: ConsoleScreen,

@@ -86,6 +86,10 @@ function Input(props) {
         borderColor: props.isError ? 'red' : '#bbb',
       }}>
       <Textarea
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
         minRows={3}
         style={{
           border: 'none',
