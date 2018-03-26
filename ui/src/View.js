@@ -21,8 +21,43 @@ export function View(props: P) {
       <ScreenTitle>{title}</ScreenTitle>
       <ReactNative.View>{props.toolbar}</ReactNative.View>
       <ReactNative.View>
-        <ReactNative.Text>{JSON.stringify(data, null, 2)}</ReactNative.Text>
+        <Data data={data} />
       </ReactNative.View>
     </ReactNative.View>
   );
+}
+
+function Data({data}) {
+  if (typeof data === 'string') {
+    return <ReactNative.Text>{String(data)}</ReactNative.Text>;
+  } else if (typeof data === 'number') {
+    return <ReactNative.Text>{String(data)}</ReactNative.Text>;
+  } else if (typeof data === 'boolean') {
+    return <ReactNative.Text>{String(data)}</ReactNative.Text>;
+  } else if (data == null) {
+    return <ReactNative.Text>-</ReactNative.Text>;
+  } else if (Array.isArray(data)) {
+    return data.map((data, idx) => <Data key={idx} data={data} />);
+  } else {
+    const fields = [];
+    for (const name in data) {
+      fields.push(
+        <ReactNative.View
+          key={name}
+          style={{flexDirection: 'row', padding: 5, alignItems: 'center'}}>
+          <ReactNative.View style={{flex: 1}}>
+            <ReactNative.Text style={{fontWeight: '600'}}>{name}</ReactNative.Text>
+          </ReactNative.View>
+          <ReactNative.View style={{flex: 3}}>
+            <Data data={data[name]} />
+          </ReactNative.View>
+        </ReactNative.View>,
+      );
+    }
+    return (
+      <ReactNative.View style={{flexDirection: 'column', padding: 5, maxWidth: 800}}>
+        {fields}
+      </ReactNative.View>
+    );
+  }
 }
