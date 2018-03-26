@@ -108,6 +108,11 @@ export class Workflow extends React.Component<P, S> {
 }
 
 function Header(props) {
+  const needBreadcrumb = props.breadcrumb.length > 0;
+  const needNav = props.toolbar != null;
+  if (!needNav && !needBreadcrumb) {
+    return null;
+  }
   return (
     <ReactNative.View style={{padding: 10}}>
       <ReactNative.View
@@ -117,12 +122,12 @@ function Header(props) {
           flexDirection: 'column',
           border: '1px solid #BBB',
         }}>
-        {props.breadcrumb.length > 0 && (
+        {needBreadcrumb && (
           <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
             <Breadcrumb breadcrumb={props.breadcrumb} />
           </ReactNative.View>
         )}
-        {props.toolbar != null && (
+        {needNav && (
           <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
             {props.toolbar}
           </ReactNative.View>
