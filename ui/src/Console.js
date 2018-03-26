@@ -41,7 +41,6 @@ export class Console extends React.Component<P, S> {
       const result = W.parse(value);
       let view = state.view;
       let error = null;
-      console.log(result);
       if (result.error != null) {
         error = result.error;
       } else if (result.ui != null) {
@@ -65,7 +64,13 @@ export class Console extends React.Component<P, S> {
             value={this.state.value}
             onValue={this.onValue}
           />
+          <TouchableOpacity onPress={this.onValue.bind(null, '')}>
+            <View style={{padding: 5}}>
+              <Text style={{color: '#444'}}>Clear Query</Text>
+            </View>
+          </TouchableOpacity>
         </View>
+        {this.state.value === '' && <Help onPress={this.onValue} />}
         {this.state.error != null && (
           <View style={{padding: 10}}>
             <Error message={this.state.error} />
@@ -75,6 +80,37 @@ export class Console extends React.Component<P, S> {
       </View>
     );
   }
+}
+
+function Help({onPress}) {
+  function Item({title, query}) {
+    return (
+      <View style={{padding: 5}}>
+        <Text>{title}:</Text>
+        <TouchableOpacity onPress={onPress.bind(null, query)}>
+          <View style={{padding: 5}}>
+            <Text style={{fontFamily: 'Menlo, monspace', color: '#444'}}>{query}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  return (
+    <View style={{padding: 10}}>
+      <View style={{padding: 5}}>
+        <Text style={{fontSize: '12pt', fontWeight: '600'}}>
+          Queries to try (enter them manually or click on them)
+        </Text>
+      </View>
+      <Item title="List of regions" query="region" />
+      <Item title="List of nations" query="region.nation" />
+      <Item title="Pick screen of all regions" query="region:pick" />
+      <Item
+        title="Simple workflow with regions"
+        query="render(region:pick) { render(:view) }"
+      />
+    </View>
+  );
 }
 
 function Input(props) {
