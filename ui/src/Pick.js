@@ -26,7 +26,7 @@ export function Pick(props: P) {
     <View>
       <ScreenTitle>{title}</ScreenTitle>
       <View>{props.toolbar}</View>
-      <View>
+      <View style={{padding: 5}}>
         <Table
           selectedId={props.args.id}
           data={data}
@@ -69,7 +69,8 @@ function Table(props) {
         <View
           style={{
             flexDirection: 'row',
-            backgroundColor: selectedId === data.id ? '#33ccff' : 'transparent',
+            backgroundColor:
+              data.id != null && selectedId === data.id ? '#33ccff' : 'transparent',
           }}>
           {cells}
         </View>

@@ -123,7 +123,7 @@ let viewScreen =
   let resolveTitle ~screenArgs ~args:_ value =
     let open Result.Syntax in
     let titleBase = Option.getWithDefault
-      (Arg.String "Pick")
+      (Arg.String "View")
       (Arg.findValueFromArgList ~name:"title" screenArgs)
     in
     let%bind value = resolveValue ~screenArgs ~args:[] value in

@@ -44,6 +44,7 @@ program:
 
 workflow:
   | RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render q }
+  | w = workflow; LEFT_BRACE; RIGHT_BRACE { w }
   | w = workflow; LEFT_BRACE; ws = workflowList; RIGHT_BRACE { W.andThen ws w }
 
 workflowList:
