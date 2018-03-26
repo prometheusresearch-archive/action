@@ -88,15 +88,19 @@ let pickScreen =
   in
   let resolveTitle ~screenArgs ~args:_ value =
     let open Result.Syntax in
+    let titleBase = Option.getWithDefault
+      (Arg.String "Pick")
+      (Arg.findValueFromArgList ~name:"title" screenArgs)
+    in
     let%bind value = resolveValue ~screenArgs ~args:[] value in
-    let title =
+    let titleSuffix =
       Value.get ~name:"id" value
       |> Option.alt (Value.get ~name:"title" value)
       |> Option.alt (Value.get ~name:"name" value)
     in
-    match title with
-    | Some title -> Result.Ok (Value.string {j|Pick ($title)|j})
-    | None -> Result.Ok (Value.string {j|Pick|j})
+    match titleBase, titleSuffix with
+    | Arg.String base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
+    | Arg.String base, None -> Result.Ok (Value.string {j|$base|j})
   in
   Screen.Syntax.(screen
     ~inputCard:Card.Many
@@ -118,15 +122,19 @@ let viewScreen =
   in
   let resolveTitle ~screenArgs ~args:_ value =
     let open Result.Syntax in
+    let titleBase = Option.getWithDefault
+      (Arg.String "Pick")
+      (Arg.findValueFromArgList ~name:"title" screenArgs)
+    in
     let%bind value = resolveValue ~screenArgs ~args:[] value in
-    let title =
+    let titleSuffix =
       Value.get ~name:"id" value
       |> Option.alt (Value.get ~name:"title" value)
       |> Option.alt (Value.get ~name:"name" value)
     in
-    match title with
-    | Some title -> Result.Ok (Value.string {j|View ($title)|j})
-    | None -> Result.Ok (Value.string {j|View|j})
+    match titleBase, titleSuffix with
+    | Arg.String base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
+    | Arg.String base, None -> Result.Ok (Value.string {j|$base|j})
   in
   Screen.Syntax.(screen
     ~inputCard:Card.One
@@ -177,37 +185,41 @@ let workflow =
   let pickRegion = render (
     here
     |> nav "region"
-    |> screen "pick"
+    |> screen ~args:Arg.[string "title" "Regions"] "pick"
   ) in
 
   let pickNation = render (
     here
     |> nav "nation"
-    |> screen "pick"
+    |> screen ~args:Arg.[string "title" "Nations"] "pick"
   ) in
 
   let pickCustomer = render (
     here
     |> nav "customer"
-    |> screen "pick"
+    |> screen ~args:Arg.[string "title" "Customers"] "pick"
   ) in
 
-  let view = render (
+  let view title = render (
     here
-    |> screen "view"
+    |> screen ~args:Arg.[string "title" title]"view"
   ) in
 
-  pickRegion |> andThen [
-    view |> andThen [
-      pickNation |> andThen [
-        view |> andThen [
-          pickCustomer |> andThen [
-            view;
-          ]
-        ]
-      ];
-    ];
-  ]
+  let pickViewCustomer = pickCustomer |> andThen [
+    view "View Customer"
+  ] in
+
+  let pickViewNation = pickNation |> andThen [
+    view "View Nation" |> andThen [ pickViewCustomer ];
+    pickViewCustomer
+  ] in
+
+  let pickViewRegion = pickRegion |> andThen [
+    view "View Region" |> andThen [ pickViewNation ];
+    pickViewNation
+  ] in
+
+  pickViewRegion
 
 let toJS state =
   JsResult.ofResult (
