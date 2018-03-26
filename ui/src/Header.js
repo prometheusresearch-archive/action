@@ -51,6 +51,7 @@ export function Header<ScreenId>(props: P<ScreenId>) {
               const screen = props.screens[id];
               return (
                 <NavButton
+                  key={id}
                   isActive={props.activeScreen === id}
                   onPress={props.onScreen.bind(null, id)}>
                   {screen.title}

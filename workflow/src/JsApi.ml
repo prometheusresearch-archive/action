@@ -71,6 +71,19 @@ let pickScreen =
           | _ -> false
           in
           Value.ofOption (Js.Array.find f value))
+    | Some (Arg.String id), Value.Array value ->
+      Result.Ok (
+        if Array.length value = 0
+        then Value.null
+        else
+          let f value = match Value.classify value with
+          | Value.Object obj -> begin match Js.Dict.get obj "id" with
+            | Some v -> (Obj.magic v) = id
+            | None -> false
+            end
+          | _ -> false
+          in
+          Value.ofOption (Js.Array.find f value))
     | _ -> Result.Error "invalid invocation"
   in
   let resolveTitle ~screenArgs ~args:_ value =
@@ -127,64 +140,56 @@ let viewScreen =
 
 let univ =
 
-  let site = Type.Syntax.(entity "site" [
-    hasOne "title" string;
+  let regionNationCustomer = Type.Syntax.(entity "customer" [
+    hasOne "name" string;
+    hasOne "comment" string;
+    hasOne "phone" string;
+    hasOne "acctbal" string;
   ]) in
 
-  let individual = Type.Syntax.(entity "individual" [
+  let regionNation = Type.Syntax.(entity "nation" [
     hasOne "name" string;
-    hasOpt "site" site;
+    hasOne "comment" string;
+    hasMany "customer" regionNationCustomer;
+  ]) in
+
+  let region = Type.Syntax.(entity "region" [
+    hasOne "name" string;
+    hasOne "comment" string;
+    hasMany "nation" regionNation;
   ]) in
 
   Universe.(
     empty
-    |> hasMany "individual" individual
+    |> hasMany "region" region
     |> hasScreen "pick" pickScreen
     |> hasScreen "view" viewScreen
   )
 
-let db = JSONDatabase.ofString ~univ {|
-  {
-    "individual": [
-      {
-        "id": 1,
-        "name": "Andrey Popp",
-        "site": {
-          "title": "RexDB Site"
-        }
-      },
-      {
-        "id": 2,
-        "name": "Oleksiy Golovko",
-        "site": {
-          "title": "Portal Site"
-        }
-      },
-      {
-        "id": 3,
-        "name": "Clark Evans",
-        "site": {
-          "title": "Portal Site"
-        }
-      },
-      {
-        "id": 4,
-        "name": "This individual has no site",
-        "site": null
-      }
-    ]
-  }
-|}
+external data : Js.Json.t = "data" [@@bs.module "./data.js"]
 
+let db = JSONDatabase.ofJson ~univ data
 
 let workflow =
   let open UntypedWorkflow.Syntax in
   let open UntypedQuery.Syntax in
 
-  let pickIndividual = render (
+  let pickRegion = render (
     here
-    |> nav "individual"
-    |> screen ~args:[Arg.stringList "fields" ["id"; "name"]] "pick"
+    |> nav "region"
+    |> screen "pick"
+  ) in
+
+  let pickNation = render (
+    here
+    |> nav "nation"
+    |> screen "pick"
+  ) in
+
+  let pickCustomer = render (
+    here
+    |> nav "customer"
+    |> screen "pick"
   ) in
 
   let view = render (
@@ -192,24 +197,16 @@ let workflow =
     |> screen "view"
   ) in
 
-  let viewSite = render (
-    here
-    |> nav "site"
-    |> screen "view"
-  ) in
-
-  let viewName = render (
-    here
-    |> nav "name"
-    |> screen ~args:[Arg.string "title" "Name"] "view"
-  ) in
-
-  pickIndividual |> andThen [
+  pickRegion |> andThen [
     view |> andThen [
-      viewName;
-      viewSite;
+      pickNation |> andThen [
+        view |> andThen [
+          pickCustomer |> andThen [
+            view;
+          ]
+        ]
+      ];
     ];
-    viewSite;
   ]
 
 let toJS state =

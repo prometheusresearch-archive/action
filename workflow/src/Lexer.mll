@@ -28,6 +28,7 @@ rule read = parse
   | '/'        { VOID }
   | "pick"     { PICK }
   | "view"     { VIEW }
+  | "count"    { COUNT }
   | "render"   { RENDER }
   | "true"     { BOOL true }
   | "false"    { BOOL false }

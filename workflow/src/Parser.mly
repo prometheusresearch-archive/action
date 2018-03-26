@@ -1,6 +1,7 @@
 %token VOID
 %token PICK
 %token VIEW
+%token COUNT
 %token RENDER
 %token NULL
 %token DOT
@@ -56,6 +57,8 @@ query:
   | COLON; nav = screen { S.screen ?args:nav.args nav.name S.here }
   | VOID; nav = nav { S.nav ?args:nav.args nav.name S.void }
   | VOID; COLON; nav = screen { S.screen ?args:nav.args nav.name S.void }
+  | COLON; COUNT { S.count S.void }
+  | parent = query; COLON; COUNT { S.count parent }
   | parent = query; DOT; nav = nav { S.nav ?args:nav.args nav.name parent }
   | parent = query; COLON; nav = screen { S.screen ?args:nav.args nav.name parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }

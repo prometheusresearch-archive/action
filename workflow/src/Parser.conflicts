@@ -20,7 +20,7 @@ LEFT_BRACE selectFieldList RIGHT_BRACE
 ** is permitted because of the following sub-derivation:
 
 query 
-query COLON screen // lookahead token appears
+query COLON COUNT // lookahead token appears
 nav // lookahead token is inherited
 ID . 
 
@@ -47,7 +47,7 @@ query
 ** query -> VOID 
 ** is permitted because of the following sub-derivation:
 
-query COLON screen // lookahead token appears
+query COLON COUNT // lookahead token appears
 VOID . 
 
 ** In state 1, looking ahead at COLON, shifting is permitted

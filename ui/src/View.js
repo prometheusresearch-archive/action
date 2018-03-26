@@ -37,7 +37,7 @@ function Data({data}) {
   } else if (data == null) {
     return <ReactNative.Text>-</ReactNative.Text>;
   } else if (Array.isArray(data)) {
-    return data.map((data, idx) => <Data key={idx} data={data} />);
+    return <ReactNative.Text>{data.length} items</ReactNative.Text>;
   } else {
     const fields = [];
     for (const name in data) {

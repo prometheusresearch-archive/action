@@ -235,9 +235,9 @@ module Query (P : sig type t end) = struct
     | Here
     | Select of (t * select)
     | Navigate of t * nav
-    | One of t
     | First of t
     | Chain of (t * t)
+    | Count of t
     | Screen of (t * screen)
 
   and nav = {
@@ -270,6 +270,9 @@ module Query (P : sig type t end) = struct
     match syn with
     | Void -> "void"
     | Here -> "here"
+    | Count parent ->
+      let parent = show parent in
+      {j|$parent:count|j}
     | Select (parent, fields) ->
       let parent = show parent in
       let fields =
@@ -285,8 +288,9 @@ module Query (P : sig type t end) = struct
       let parent = show parent in
       let this = navName in
       {j|$parent.$this$navArgs|j}
-    | One _ -> "one"
-    | First _ -> "first"
+    | First parent ->
+      let parent = show parent in
+      {j|$parent:first|j}
     | Chain (parent, this) ->
       let parent = show parent in
       let this = show this in
@@ -332,8 +336,8 @@ module UntypedQuery = struct
     let screen ?args name query =
       (), Screen (query, { screenName = name; screenArgs = args; })
 
-    let one query =
-      (), One query
+    let count query =
+      (), Count query
 
     let first query =
       (), First query
@@ -717,17 +721,17 @@ end = struct
         return ((Card.One, Type.Void), TypedQuery.Void)
       | UntypedQuery.Here ->
         return (ctyp, TypedQuery.Here)
+      | UntypedQuery.Count parent ->
+        let%bind parent = aux ~ctyp parent in
+        return ((Card.One, Type.Syntax.number), TypedQuery.Count parent)
       | UntypedQuery.Chain (parent, q) ->
         let%bind ((prevCard, _) as ctyp, _) as parent = aux ~ctyp parent in
         let%bind ((card, typ), _) as q = aux ~ctyp q in
         let ctyp = Card.merge prevCard card, typ in
         return (ctyp, TypedQuery.Chain (parent, q))
-      | UntypedQuery.One parent ->
-        let%bind parent = aux ~ctyp parent in
-        return (ctyp, TypedQuery.One parent)
       | UntypedQuery.First parent ->
         let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
-        return ((Card.Opt, parentType), TypedQuery.One parent)
+        return ((Card.Opt, parentType), TypedQuery.First parent)
       | UntypedQuery.Screen (parent, { screenName; screenArgs; }) ->
         let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
         let%bind screen = Result.ofOption
@@ -811,7 +815,9 @@ end = struct
     let root = Js.Json.parseExn data in
     { root = Value.ofJson root; univ }
 
-  let ofJson ~univ root = { root = Value.ofJson root; univ }
+  let ofJson ~univ root =
+    Js.log root;
+    { root = Value.ofJson root; univ }
 
   let univ db = db.univ
 
@@ -823,20 +829,17 @@ end = struct
       | TypedQuery.Void -> return db.root
       | TypedQuery.Here ->
         return value
+      | TypedQuery.Count query ->
+        let%bind value = aux ~value query in
+        begin match Value.classify value with
+        | Value.Null -> return (Value.number 0.)
+        | Value.Array items -> return (Value.number (float_of_int (Array.length items)))
+        | _ -> return (Value.number 1.)
+        end
       | TypedQuery.Chain (query, next) ->
         let%bind value = aux ~value query in
         let%bind value = aux ~value next in
         return value
-      | TypedQuery.One query ->
-        let%bind value = aux ~value query in
-        begin match Value.classify value with
-        | Value.Array items ->
-          if Array.length items = 1
-          then return (Array.get items 0)
-          else error "expected a single value but got multiple"
-        | Value.Null -> error "expected a single value but got null"
-        | _ -> return value
-        end
       | TypedQuery.First query ->
         let%bind value = aux ~value query in
         begin match Value.classify value with
@@ -876,6 +879,7 @@ end = struct
       | TypedQuery.Navigate (query, { navName; navArgs }) ->
         let args = Option.getWithDefault [] navArgs in
         let%bind value = aux ~value query in
+
         let navigate name dataset =
           match Value.classify dataset with
           | Value.Object obj ->
@@ -888,11 +892,19 @@ end = struct
             end
           | Value.Null -> return Value.null
           | _ -> error "cannot traverse this"
-        in begin
-        match Value.classify value with
+        in
+
+        begin match Value.classify value with
         | Value.Object _ -> navigate navName value
         | Value.Array items  ->
           let%bind items = Result.Array.map ~f:(navigate navName) items in
+          let items =
+            let f res item =
+              match Value.classify item with
+              | Value.Array item -> Belt.Array.concat res item
+              | _ -> ignore (Js.Array.push item res); res
+            in
+            Belt.Array.reduce items (Belt.Array.makeUninitializedUnsafe 0) f in
           return (Value.array items)
         | Value.Null ->
           return Value.null
@@ -912,6 +924,7 @@ end = struct
           in resolve ~screenArgs ~args value
         | _ -> error {|Cannot navigate away from this value|}
         end
+
       | TypedQuery.Select (query, selection) ->
         let selectFrom value =
           let%bind _, dataset =
