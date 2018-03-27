@@ -873,7 +873,7 @@ module type DATABASE = sig
 
   val univ : t -> Universe.t
 
-  val execute : t -> TypedQuery.t -> (Value.t, string) Result.t
+  val execute : ?value : Value.t -> db : t -> TypedQuery.t -> (Value.t, string) Result.t
 
 end
 
@@ -902,7 +902,7 @@ end = struct
 
   let univ db = db.univ
 
-  let execute db query =
+  let execute ?value ~db query =
     Js.log2 "EXECUTE" (TypedQuery.show query);
     let open Result.Syntax in
     let rec aux ~(value : Value.t) ((_card, typ), syn) =
@@ -1040,7 +1040,11 @@ end = struct
           error "cannot select from here"
         end
     in
-    let%bind res = aux ~value:db.root query in
+    let value = match value with
+    | Some value -> value
+    | None -> db.root
+    in
+    let%bind res = aux ~value query in
     Js.log2 "EXECUTE RESULT" res;
     return res
 
