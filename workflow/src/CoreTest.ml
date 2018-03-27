@@ -41,7 +41,7 @@ let renderFirstSite = UntypedQuery.Syntax.(
 let renderSiteByIndividual = UntypedQuery.Syntax.(
   void
   |> nav "individual"
-  |> screen ~args:[Arg.number "id" 1.] "pick"
+  |> screen ~args:[arg "id" (number 1.)] "pick"
   |> nav "value"
   |> nav "site"
   |> screen "view"
@@ -53,7 +53,7 @@ let renderSiteByIndividual = UntypedQuery.Syntax.(
 let getSiteTitleByIndividualViaView = UntypedQuery.Syntax.(
   void
   |> nav "individual"
-  |> screen ~args:[Arg.number "id" 1.] "pick"
+  |> screen ~args:[arg "id" (number 1.)] "pick"
   |> nav "value"
   |> nav "site"
   |> screen "view"
@@ -69,7 +69,7 @@ let getSiteTitleByIndividualViaViewViaBind2 = UntypedQuery.Syntax.(
   |> chain (
     here
     |> nav "individual"
-    |> screen ~args:[Arg.number "id" 1.] "pick"
+    |> screen ~args:[arg "id" (number 1.)] "pick"
     |> chain (
       here
       |> nav "value"
@@ -88,7 +88,7 @@ let getSiteTitleByIndividualViaViewViaBind2 = UntypedQuery.Syntax.(
 let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
   void
   |> nav "individual"
-  |> screen ~args:[Arg.number "id" 1.] "pick"
+  |> screen ~args:[arg "id" (number 1.)] "pick"
   |> chain (
     here
     |> nav "value"
@@ -108,7 +108,7 @@ let getSiteTitleByIndividualViaViewViaBind = UntypedQuery.Syntax.(
 let getSelectedIndividual = UntypedQuery.Syntax.(
   void
   |> nav "individual"
-  |> screen ~args:[Arg.number "id" 1.] "pick"
+  |> screen ~args:[arg "id" (number 1.)] "pick"
   |> nav "value"
 )
 
@@ -179,7 +179,7 @@ let () =
   runQuery db UntypedQuery.Syntax.(
     void
     |> nav "individual"
-    |> screen ~args:[Arg.number "id" 2.] "pick"
+    |> screen ~args:[arg "id" (number 2.)] "pick"
     |> select [
       field ~alias:"value" (here |> nav "value");
       field ~alias:"title" (here |> nav "title");

@@ -105,104 +105,6 @@ module Card = struct
 end
 
 (**
- * Argument is a value along with some label.
- *
- * TODO: We should only support queries as arguments.
- *)
-module Arg : sig
-
-  type t = {
-    name : string;
-    value : value;
-  }
-
-  and value =
-    | String of string
-    | Number of float
-    | Bool of bool
-    | StringList of string list
-
-  val string : string -> string -> t
-  val number : string -> float -> t
-  val bool : string -> bool -> t
-  val stringList : string -> string list -> t
-
-  val findValueFromArgList : name : string -> t list -> value option
-  val update : update : t list option -> t list option -> t list option
-
-  val show : t -> string
-
-end = struct
-
-  type t = {
-    name : string;
-    value : value;
-  }
-
-  and value =
-    | String of string
-    | Number of float
-    | Bool of bool
-    | StringList of string list
-
-  let make name value = { name; value }
-
-  let string name value = make name (String value)
-  let number name value = make name (Number value)
-  let bool name value = make name (Bool value)
-  let stringList name value = make name (StringList value)
-
-  let rec findValueFromArgList ~name args =
-    match args with
-    | [] -> None
-    | {name = argName; value}::args ->
-      if name = argName
-      then Some value
-      else findValueFromArgList ~name args
-
-  let update ~update args =
-    let argsToMap args =
-      let f update {name; value} =
-        Belt.Map.String.set update name value
-      in
-      Belt.List.reduce args (Belt.Map.String.empty) f
-    in
-    match update, args with
-    | Some update, Some args ->
-      let updateMap = argsToMap update in
-      let argsMap = argsToMap args in
-      let args =
-        let f {name; value} =
-          match Belt.Map.String.get updateMap name with
-          | None -> {name; value}
-          | Some value -> {name; value}
-        in
-        Belt.List.map args f
-      in
-      let args =
-        let f args {name; value} =
-          match Belt.Map.String.get argsMap name with
-          | Some _ -> args
-          | None -> {name;value}::args
-        in
-        Belt.List.reduce update args f
-      in
-      Some args
-    | Some update, None -> Some update
-    | None, Some args -> Some args
-    | None, None -> None
-
-  let show { name; value } =
-    let value = match value with
-    | String value -> {j|"$value"|j}
-    | StringList value -> let value = String.concat ", " value in {j|"$value"|j}
-    | Number value -> string_of_float value
-    | Bool value -> string_of_bool value
-    in {j|$name: $value|j}
-
-end
-
-(**
  * Represent available primitive value types.
  *)
 module ValueType = struct
@@ -239,15 +141,24 @@ module Query (P : sig type t end) = struct
     | Chain of (t * t)
     | Count of t
     | Screen of (t * screen)
+    | Const of const
+
+  and const =
+    | String of string
+    | Number of float
+    | Bool of bool
+
+  and arg = { argName : string; argValue : t }
 
   and nav = {
     navName : string;
-    navArgs : Arg.t list option;
+    navArgs : arg list option;
   }
 
   and screen = {
     screenName : string;
-    screenArgs : Arg.t list option;
+    screenArgs : arg list option;
+    screenParentCtyp : payload;
   }
 
   and select = field list
@@ -262,12 +173,15 @@ module Query (P : sig type t end) = struct
     | Some args ->
       let args =
         args
-        |> List.map Arg.show
+        |> List.map showArg
         |> String.concat ", "
       in {j|($args)|j}
     | None -> ""
     in
     match syn with
+    | Const (String v) -> {j|"$v"|j}
+    | Const (Number v) -> string_of_float v
+    | Const (Bool v) -> string_of_bool v
     | Void -> "void"
     | Here -> "here"
     | Count parent ->
@@ -299,6 +213,66 @@ module Query (P : sig type t end) = struct
       let parent = show parent in
       let screenArgs = showArgs screenArgs in
       {j|$parent:$screenName$screenArgs|j}
+
+  and showArg { argName; argValue } =
+    let argValue = show argValue in
+    {j|$argName: $argValue|j}
+
+
+  (**
+  * Argument is a value along with some label.
+  *
+  * TODO: We should only support queries as arguments.
+  *)
+  module Arg = struct
+
+    type t = arg
+
+    let make argName argValue = { argName; argValue }
+
+    let rec findValueFromArgList ~name args =
+      match args with
+      | [] -> None
+      | {argName; argValue}::args ->
+        if name = argName
+        then match argValue with
+          | (_, Const v) -> Some v
+          | (_, _) -> failwith "not implemented"
+        else findValueFromArgList ~name args
+
+    let update ~update args =
+      let argsToMap args =
+        let f update {argName; argValue} =
+          Belt.Map.String.set update argName argValue
+        in
+        Belt.List.reduce args (Belt.Map.String.empty) f
+      in
+      match update, args with
+      | Some update, Some args ->
+        let updateMap = argsToMap update in
+        let argsMap = argsToMap args in
+        let args =
+          let f {argName; argValue} =
+            match Belt.Map.String.get updateMap argName with
+            | None -> {argName; argValue}
+            | Some argValue -> {argName; argValue}
+          in
+          Belt.List.map args f
+        in
+        let args =
+          let f args {argName; argValue} =
+            match Belt.Map.String.get argsMap argName with
+            | Some _ -> args
+            | None -> {argName;argValue}::args
+          in
+          Belt.List.reduce update args f
+        in
+        Some args
+      | Some update, None -> Some update
+      | None, Some args -> Some args
+      | None, None -> None
+
+  end
 end
 
 (**
@@ -334,13 +308,25 @@ module UntypedQuery = struct
       { query; alias; }
 
     let screen ?args name query =
-      (), Screen (query, { screenName = name; screenArgs = args; })
+      (), Screen (query, { screenParentCtyp = (); screenName = name; screenArgs = args; })
 
     let count query =
       (), Count query
 
     let first query =
       (), First query
+
+    let string v =
+      (), Const (String v)
+
+    let number v =
+      (), Const (Number v)
+
+    let bool v =
+      (), Const (Bool v)
+
+    let arg argName argValue =
+      { argName; argValue; }
 
   end
 
@@ -477,7 +463,7 @@ module Value = struct
 
     val make :
       name : string
-      -> args : Arg.t list option
+      -> args : TypedQuery.Arg.t list option
       -> typ : Type.t
       -> value
       -> TypedQuery.t
@@ -486,8 +472,8 @@ module Value = struct
     val test : 'a -> bool
 
     val name : t -> string
-    val args : t -> Arg.t list option
-    val setArgs : args : Arg.t list option -> t -> t
+    val args : t -> TypedQuery.Arg.t list option
+    val setArgs : args : TypedQuery.Arg.t list option -> t -> t
     val query : t -> TypedQuery.t
     val value : t -> value
     val typ : t -> Type.t
@@ -495,14 +481,20 @@ module Value = struct
   end = struct
     type t = <
       name : string;
-      args : Arg.t list option;
+      args : TypedQuery.Arg.t list option;
       query : TypedQuery.t;
       value : value;
       typ : Type.t;
     > Js.t
 
-    external make : name : string -> args : Arg.t list option -> typ : Type.t -> value -> TypedQuery.t -> t =
-      "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
+    external make : name :
+      string
+      -> args : TypedQuery.Arg.t list option
+      -> typ : Type.t
+      -> value
+      -> TypedQuery.t
+      -> t
+      = "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
 
     let test_ : 'a -> bool = [%bs.raw {|
       function test(v) { return v instanceof UIRepr.UIRepr; }
@@ -517,7 +509,7 @@ module Value = struct
     let typ ui = ui##typ
 
     let setArgs ~args ui =
-      let args = Arg.update ~update:args ui##args in
+      let args = TypedQuery.Arg.update ~update:args ui##args in
       make ~name:ui##name ~args ~typ:ui##typ ui##value ui##query
   end
 
@@ -568,15 +560,15 @@ end
 module Screen = struct
 
   type t = {
-    args : Arg.t list option;
+    args : TypedQuery.Arg.t list option;
     fields : Type.t -> (Type.field * fieldResolver) list;
     inputCard : Card.t;
     navigate : string;
   }
 
   and fieldResolver =
-    screenArgs : Arg.t list
-    -> args : Arg.t list
+    screenArgs : TypedQuery.Arg.t list
+    -> args : TypedQuery.Arg.t list
     -> Value.t
     -> (Value.t, string) Result.t
 
@@ -676,9 +668,15 @@ module QueryTyper : sig
     -> UntypedQuery.t
     -> (TypedQuery.t, string) Result.t
 
+  val typeArgs :
+    ctyp : TypedQuery.payload
+    -> univ:Universe.t
+    -> UntypedQuery.arg list option
+    -> (TypedQuery.arg list option, string) Result.t
+
   val nav :
     univ:Universe.t
-    -> ?args : Arg.t list
+    -> ?args : TypedQuery.Arg.t list
     -> string
     -> TypedQuery.t
     -> (TypedQuery.t, string) Result.t
@@ -713,7 +711,19 @@ end = struct
     let fieldCard = Card.merge parentCard fieldCard in
     return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
 
-  let typeQuery ?(ctyp=rootCtyp) ~univ query =
+    let rec typeArgs ~ctyp ~univ (args : UntypedQuery.arg list option) =
+      let open Result.Syntax in
+      match args with
+      | None -> return None
+      | Some args ->
+          let typeArg { UntypedQuery. argName; argValue } =
+            let%bind argValue = typeQuery ~ctyp ~univ argValue in
+            return { TypedQuery. argName; argValue }
+          in
+        let%bind args = Result.List.map ~f:typeArg args in
+        return (Some args)
+
+  and typeQuery ?(ctyp=rootCtyp) ~univ query =
     let rec aux ~ctyp ((), query) =
       let open Result.Syntax in
       match query with
@@ -721,6 +731,21 @@ end = struct
         return ((Card.One, Type.Void), TypedQuery.Void)
       | UntypedQuery.Here ->
         return (ctyp, TypedQuery.Here)
+      | UntypedQuery.Const (UntypedQuery.String v) ->
+        return (
+          (Card.One, Type.Value { valueTyp = ValueType.StringTyp }),
+          TypedQuery.Const (TypedQuery.String v)
+        )
+      | UntypedQuery.Const (UntypedQuery.Number v) ->
+        return (
+          (Card.One, Type.Value { valueTyp = ValueType.NumberTyp }),
+          TypedQuery.Const (TypedQuery.Number v)
+        )
+      | UntypedQuery.Const (UntypedQuery.Bool v) ->
+        return (
+          (Card.One, Type.Value { valueTyp = ValueType.BoolTyp }),
+          TypedQuery.Const (TypedQuery.Bool v)
+        )
       | UntypedQuery.Count parent ->
         let%bind parent = aux ~ctyp parent in
         return ((Card.One, Type.Syntax.number), TypedQuery.Count parent)
@@ -733,7 +758,7 @@ end = struct
         let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
         return ((Card.Opt, parentType), TypedQuery.First parent)
       | UntypedQuery.Screen (parent, { screenName; screenArgs; }) ->
-        let%bind ((parentCard, parentTyp), _) as parent = aux ~ctyp parent in
+        let%bind ((parentCard, parentTyp) as parentCtyp, _) as parent = aux ~ctyp parent in
         let%bind screen = Result.ofOption
           ~err:{j|no such screen "$screenName"|j}
           (Universe.lookupScreen screenName univ)
@@ -749,11 +774,16 @@ end = struct
         | Card.Opt, Card.One
         | Card.Many, Card.Many ->
           let typ = Screen.typ ~name:screenName ~typ:parentTyp screen in
-          return ((Card.One, typ), TypedQuery.Screen (parent, { screenName; screenArgs; }))
+          let%bind screenArgs = typeArgs ~univ ~ctyp:parentCtyp screenArgs in
+          return (
+            (Card.One, typ),
+            TypedQuery.Screen (parent, { screenName; screenArgs; screenParentCtyp = parentCtyp})
+          )
         end
       | UntypedQuery.Navigate (parent, navigation) ->
         let { UntypedQuery. navName; navArgs } = navigation in
-        let%bind parent = aux ~ctyp parent in
+        let%bind (parentCtyp, _) as parent = aux ~ctyp parent in
+        let%bind navArgs = typeArgs ~ctyp:parentCtyp ~univ navArgs in
         nav ~univ ?args:navArgs navName parent
       | UntypedQuery.Select (parent, selection) ->
         let%bind parent = aux ~ctyp parent in
@@ -829,6 +859,12 @@ end = struct
       | TypedQuery.Void -> return db.root
       | TypedQuery.Here ->
         return value
+      | TypedQuery.Const (TypedQuery.String v) ->
+        return (Value.string v)
+      | TypedQuery.Const (TypedQuery.Number v) ->
+        return (Value.number v)
+      | TypedQuery.Const (TypedQuery.Bool v) ->
+        return (Value.bool v)
       | TypedQuery.Count query ->
         let%bind value = aux ~value query in
         begin match Value.classify value with
@@ -1060,7 +1096,7 @@ module WorkflowInterpreter (Db : DATABASE) : sig
 
   val uiQuery : t -> (TypedQuery.t, string) Result.t
 
-  val setArgs : args : Arg.t list option -> t -> t
+  val setArgs : args : UntypedQuery.Arg.t list option -> t -> (t, string) Result.t
 
   val step : t -> (t, string) Result.t
 
@@ -1080,7 +1116,7 @@ end = struct
     workflow : TypedWorkflow.t;
     position: position;
     prev: t option;
-    args : Arg.t list option;
+    args : TypedQuery.Arg.t list option;
   }
 
   and position =
@@ -1096,13 +1132,6 @@ end = struct
       let q = ctyp, TypedQuery.Chain (frame.query, q) in
       return q
     | _ -> error "no query"
-
-  let dataQuery (frame, _ as state) =
-    let open Result.Syntax in
-    let univ = Db.univ frame.db in
-    let%bind q = uiQuery state in
-    let%bind q = QueryTyper.nav ~univ "data" q in
-    return q
 
   let rec breadcrumbs (frame, _ as state) =
     match frame.prev with
@@ -1235,14 +1264,17 @@ end = struct
     return q
 
   let setArgs ~args (frame, ui) =
-    let workflow = match frame.workflow with
-    | TypedWorkflow.Render ((ct, TypedQuery.Screen (p, c)), n) ->
-      let c = { c with TypedQuery. screenArgs = Arg.update ~update:args c.screenArgs } in
-      TypedWorkflow.Render ((ct, TypedQuery.Screen (p, c)), n)
-    | _ -> frame.workflow
+    let open Result.Syntax in
+    let%bind frame = match frame.workflow with
+    | TypedWorkflow.Render ((ctyp, TypedQuery.Screen (p, ({ screenParentCtyp } as c))), n) ->
+      let univ = Db.univ frame.db in
+      let%bind args = QueryTyper.typeArgs ~ctyp:screenParentCtyp ~univ args in
+      let c = { c with TypedQuery. screenArgs = TypedQuery.Arg.update ~update:args c.screenArgs } in
+      let workflow = TypedWorkflow.Render ((ctyp, TypedQuery.Screen (p, c)), n) in
+      return { frame with args; workflow; }
+    | _ -> return frame
     in
-    let frame = { frame with args; workflow; } in
-    (frame, ui)
+    return (frame, ui)
 
 end
 

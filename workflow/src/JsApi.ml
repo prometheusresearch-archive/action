@@ -37,14 +37,13 @@ let uiArgs ui =
   match Value.UI.args ui with
   | None -> Js.Dict.empty ()
   | Some args ->
-    let f args {Arg. name; value} =
-      let value = match value with
-      | Arg.String v -> Js.Json.string v
-      | Arg.StringList v -> v |> Array.of_list |> Js.Json.stringArray
-      | Arg.Number v -> Js.Json.number v
-      | Arg.Bool v -> Js.Json.boolean (Js.Boolean.to_js_boolean v)
+    let f args {TypedQuery. argName; argValue} =
+      let argValue = match argValue with
+      | _, TypedQuery.Const (TypedQuery.String v) -> Js.Json.string v
+      | _, TypedQuery.Const (TypedQuery.Number v) -> Js.Json.number v
+      | _, TypedQuery.Const (TypedQuery.Bool v) -> Js.Json.boolean (Js.Boolean.to_js_boolean v)
       in
-      Js.Dict.set args name value;
+      Js.Dict.set args argName argValue;
       args
     in Belt.List.reduce args (Js.Dict.empty ()) f
 
@@ -54,11 +53,11 @@ let pickScreen =
     return value
   in
   let resolveValue ~screenArgs ~args:_ value =
-    let id = Arg.findValueFromArgList ~name:"id" screenArgs in
+    let id = TypedQuery.Arg.findValueFromArgList ~name:"id" screenArgs in
     match id, Value.classify value with
     | None, _ ->
       Result.Ok Value.null
-    | Some (Arg.Number id), Value.Array value ->
+    | Some (TypedQuery.Number id), Value.Array value ->
       Result.Ok (
         if Array.length value = 0
         then Value.null
@@ -71,7 +70,7 @@ let pickScreen =
           | _ -> false
           in
           Value.ofOption (Js.Array.find f value))
-    | Some (Arg.String id), Value.Array value ->
+    | Some (TypedQuery.String id), Value.Array value ->
       Result.Ok (
         if Array.length value = 0
         then Value.null
@@ -89,8 +88,8 @@ let pickScreen =
   let resolveTitle ~screenArgs ~args:_ value =
     let open Result.Syntax in
     let titleBase = Option.getWithDefault
-      (Arg.String "Pick")
-      (Arg.findValueFromArgList ~name:"title" screenArgs)
+      (TypedQuery.String "Pick")
+      (TypedQuery.Arg.findValueFromArgList ~name:"title" screenArgs)
     in
     let%bind value = resolveValue ~screenArgs ~args:[] value in
     let titleSuffix =
@@ -99,8 +98,8 @@ let pickScreen =
       |> Option.alt (Value.get ~name:"name" value)
     in
     match titleBase, titleSuffix with
-    | Arg.String base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
-    | Arg.String base, None -> Result.Ok (Value.string {j|$base|j})
+    | TypedQuery.String base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
+    | TypedQuery.String base, None -> Result.Ok (Value.string {j|$base|j})
   in
   Screen.Syntax.(screen
     ~inputCard:Card.Many
@@ -123,8 +122,8 @@ let viewScreen =
   let resolveTitle ~screenArgs ~args:_ value =
     let open Result.Syntax in
     let titleBase = Option.getWithDefault
-      (Arg.String "View")
-      (Arg.findValueFromArgList ~name:"title" screenArgs)
+      (TypedQuery.String "View")
+      (TypedQuery.Arg.findValueFromArgList ~name:"title" screenArgs)
     in
     let%bind value = resolveValue ~screenArgs ~args:[] value in
     let titleSuffix =
@@ -133,8 +132,8 @@ let viewScreen =
       |> Option.alt (Value.get ~name:"name" value)
     in
     match titleBase, titleSuffix with
-    | Arg.String base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
-    | Arg.String base, None -> Result.Ok (Value.string {j|$base|j})
+    | TypedQuery.String base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
+    | TypedQuery.String base, None -> Result.Ok (Value.string {j|$base|j})
   in
   Screen.Syntax.(screen
     ~inputCard:Card.One
@@ -185,24 +184,24 @@ let workflow =
   let pickRegion = render (
     here
     |> nav "region"
-    |> screen ~args:Arg.[string "title" "Regions"] "pick"
+    |> screen ~args:[arg "title" (string "Regions")] "pick"
   ) in
 
   let pickNation = render (
     here
     |> nav "nation"
-    |> screen ~args:Arg.[string "title" "Nations"] "pick"
+    |> screen ~args:[arg "title" (string "Nations")] "pick"
   ) in
 
   let pickCustomer = render (
     here
     |> nav "customer"
-    |> screen ~args:Arg.[string "title" "Customers"] "pick"
+    |> screen ~args:[arg "title" (string "Customers")] "pick"
   ) in
 
   let view title = render (
     here
-    |> screen ~args:Arg.[string "title" title]"view"
+    |> screen ~args:[arg "title" (string title)]"view"
   ) in
 
   let pickViewCustomer = pickCustomer |> andThen [
@@ -249,8 +248,8 @@ let render state =
 let pickValue id state =
   toJS (
     let open Result.Syntax in
-    let args = Some [Arg.number "id" id] in
-    let state = WorkflowInterpreter.setArgs ~args state in
+    let args = Some UntypedQuery.Syntax.[arg "id" (number id)] in
+    let%bind state = WorkflowInterpreter.setArgs ~args state in
     let%bind state = WorkflowInterpreter.step state in
     WorkflowInterpreter.render state
   )

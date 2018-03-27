@@ -21,11 +21,10 @@
 
   module S = Core.UntypedQuery.Syntax
   module W = Core.UntypedWorkflow.Syntax
-  module A = Core.Arg
 
   type nav = {
     name : string;
-    args : Core.Arg.t list option;
+    args : Core.UntypedQuery.arg list option;
   }
 
 %}
@@ -81,9 +80,9 @@ screen:
   | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args = Some args} }
 
 arg:
-  | name = ID; COLON; value = STRING { A.string name value }
-  | name = ID; COLON; value = NUMBER { A.number name value }
-  | name = ID; COLON; value = BOOL { A.bool name value }
+  | name = ID; COLON; value = STRING { S.arg name (S.string value) }
+  | name = ID; COLON; value = NUMBER { S.arg name (S.number value) }
+  | name = ID; COLON; value = BOOL { S.arg name (S.bool value) }
 
 argList:
   | a = arg { [a] }
