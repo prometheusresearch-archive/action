@@ -64,8 +64,8 @@ query:
   | parent = query; COLON; s = screen { S.screen ~args:s.args s.name parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
-  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.void }
-  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.void }
+  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
+  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
 
 nav:
   | name = ID { {name; args = []} }
