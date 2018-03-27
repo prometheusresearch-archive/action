@@ -138,7 +138,7 @@ let runQuery db query =
     let (_, typ), _ = query in
     Js.log2 "TYPE:" (Type.show typ);
     Js.log "RUNNING...";
-    let%bind result = JSONDatabase.execute db query in
+    let%bind result = JSONDatabase.execute ~db query in
     Js.log2 "RESULT:" result;
     return ()
   in

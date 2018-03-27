@@ -130,8 +130,6 @@ let viewScreen =
   let resolveTitle ~screenArgs ~args:_ ~execute here =
     let open Result.Syntax in
     let%bind value = execute here in
-    let titleQuery = StringMap.getExn screenArgs "title" in
-    let%bind titleBase = execute titleQuery in
     let%bind titleBase =
       let q = TypedQuery.unsafeLookupArg ~name:"title" screenArgs in
       let q = TypedQuery.unsafeChain here q in
@@ -272,7 +270,7 @@ let executeQuery q =
   let res =
     let open Result.Syntax in
     let%bind q = q in
-    let%bind data = JSONDatabase.execute db q in
+    let%bind data = JSONDatabase.execute ~db q in
     return data
   in match res with
   | Result.Ok data -> data
@@ -313,7 +311,7 @@ let parse s =
         makeWorkflow w
       | Core.ParseResult.Query q ->
         let%bind tq = QueryTyper.typeQuery ~univ q in
-        let%bind value = JSONDatabase.execute db tq in
+        let%bind value = JSONDatabase.execute ~db tq in
         match Value.classify value with
         | Value.UI _ -> makeUi q
         | _ -> makeData value
@@ -330,10 +328,11 @@ let uiName = Value.UI.name
 
 let uiArgs ui =
   let args = Value.UI.args ui in
+  let value = Value.UI.value ui in
   let baseQuery = Value.UI.query ui in
   let f args name argQuery =
     let query = TypedQuery.unsafeChain baseQuery argQuery in
-    let value = unwrapResult (JSONDatabase.execute db query) in
+    let value = unwrapResult (JSONDatabase.execute ~value ~db query) in
     Js.Dict.set args name value;
     args
   in StringMap.reduce args (Js.Dict.empty ()) f
