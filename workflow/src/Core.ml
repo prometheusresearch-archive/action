@@ -183,7 +183,10 @@ module Query (P : sig type t end) = struct
     let showArgs args =
       let args =
         let f acc name query =
-          let prefix = if acc = "" then "" else ", " in
+          let prefix = match acc with
+          | "" -> ""
+          | _ -> ", "
+          in
           let query = show query in
           {j|$prefix$name: $query|j}
         in
@@ -1221,7 +1224,7 @@ end = struct
         aux state
       | TypedWorkflow.Render _ ->
         let%bind q = uiQuery state in
-        let%bind ui = Db.execute frame.db q in
+        let%bind ui = Db.execute ~db:frame.db q in
         begin match Value.classify ui with
         | Value.Null -> return None
         | Value.UI _ -> return (Some state)
@@ -1237,7 +1240,7 @@ end = struct
     let render (frame, _ as state) =
       let%bind q = uiQuery state in
       Js.log2 "WorkflowInterpreter.render" (TypedQuery.show q);
-      let%bind res = Db.execute frame.db q in
+      let%bind res = Db.execute ~db:frame.db q in
       match Value.classify res with
       | Value.UI ui ->
         let ui = Value.UI.setArgs ~args:frame.args ui in

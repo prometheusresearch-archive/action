@@ -1,5 +1,5 @@
 
-** Conflict (shift/reduce) in state 27.
+** Conflict (shift/reduce) in state 14.
 ** Token involved: COLON
 ** This state is reached from start after reading:
 
@@ -15,7 +15,7 @@ LEFT_BRACE selectFieldList RIGHT_BRACE
            selectField 
            (?)
 
-** In state 27, looking ahead at COLON, reducing production
+** In state 14, looking ahead at COLON, reducing production
 ** query -> ID 
 ** is permitted because of the following sub-derivation:
 
@@ -23,7 +23,7 @@ query
 query COLON COUNT // lookahead token appears
 ID . 
 
-** In state 27, looking ahead at COLON, shifting is permitted
+** In state 14, looking ahead at COLON, shifting is permitted
 ** because of the following sub-derivation:
 
 ID . COLON query 

@@ -66,6 +66,10 @@ query:
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
   | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
   | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
+  | v = STRING { S.string v }
+  | v = NUMBER { S.number v }
+  | v = BOOL { S.bool v }
+  | NULL { S.null }
 
 nav:
   | name = ID { {name; args = []} }
@@ -81,9 +85,7 @@ screen:
   | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args} }
 
 arg:
-  | name = ID; COLON; value = STRING { S.arg name (S.string value) }
-  | name = ID; COLON; value = NUMBER { S.arg name (S.number value) }
-  | name = ID; COLON; value = BOOL { S.arg name (S.bool value) }
+  | name = ID; COLON; q = query { S.arg name q }
 
 argList:
   | a = arg { [a] }
