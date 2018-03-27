@@ -20,7 +20,7 @@ val pickValue : float -> state -> renderableState JsResult.t
 
 val id : state -> string
 val uiName : ui -> string
-val uiArgs : ui -> Js.Json.t Js.Dict.t
+val uiArgs : ui -> Core.Value.t Js.Dict.t
 val breadcrumbs : state -> state array
 val next : state -> state array
 
