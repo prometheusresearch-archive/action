@@ -15,3 +15,7 @@ build:
 
 watch:
 	esy ./node_modules/.bin/bsb -make-world -w
+
+test:
+	node ./src/CoreTest.bs.js
+	node ./src/ParsingTest.bs.js
