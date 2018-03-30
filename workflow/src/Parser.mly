@@ -1,7 +1,9 @@
 %token VOID
 %token PICK
 %token VIEW
+%token BAR_CHART
 %token COUNT
+%token FIRST
 %token RENDER
 %token NULL
 %token DOT
@@ -58,8 +60,10 @@ query:
   | COLON; nav = screen { S.screen ~args:nav.args nav.name S.here }
   | VOID; name = ID { S.nav name S.void }
   | VOID; COLON; s = screen { S.screen ~args:s.args s.name S.void }
-  | COLON; COUNT { S.count S.void }
+  | COLON; COUNT { S.count S.here }
   | parent = query; COLON; COUNT { S.count parent }
+  | COLON; FIRST { S.first S.here }
+  | parent = query; COLON; FIRST { S.first parent }
   | parent = query; DOT; name = ID { S.nav name parent }
   | parent = query; COLON; s = screen { S.screen ~args:s.args s.name parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
@@ -78,11 +82,14 @@ nav:
 
 screen:
   | PICK { {name = "pick"; args = [] } }
-  | VIEW { {name = "view"; args = [] } }
   | PICK; LEFT_PAREN; RIGHT_PAREN { {name = "pick"; args = [] } }
-  | VIEW; LEFT_PAREN; RIGHT_PAREN { {name = "view"; args = [] } }
   | PICK; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "pick"; args} }
+  | VIEW { {name = "view"; args = [] } }
+  | VIEW; LEFT_PAREN; RIGHT_PAREN { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args} }
+  | BAR_CHART { {name = "barChart"; args = [] } }
+  | BAR_CHART; LEFT_PAREN; RIGHT_PAREN { {name = "barChart"; args = [] } }
+  | BAR_CHART; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "barChart"; args} }
 
 arg:
   | name = ID; COLON; q = query { S.arg name q }

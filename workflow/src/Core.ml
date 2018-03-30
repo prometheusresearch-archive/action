@@ -578,7 +578,7 @@ module Screen = struct
     | Card.Opt, Card.Many
     | Card.Many, Card.One
     | Card.Many, Card.Opt ->
-      error "screen cannot be constructed due to cardinality mismatch"
+      error {j|screen "$name" cannot be constructed due to cardinality mismatch|j}
     | Card.One, Card.Opt
     | Card.One, Card.One
     | Card.Opt, Card.Opt
@@ -936,7 +936,7 @@ end = struct
         let%bind value = aux ~value query in
         begin match Value.classify value with
         | Value.Array items ->
-          if Array.length items = 1
+          if Array.length items > 0
           then return (Array.get items 0)
           else return Value.null
         | _ -> return value

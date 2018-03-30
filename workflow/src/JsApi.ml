@@ -157,6 +157,47 @@ let viewScreen =
     ])
   )
 
+let barChartScreen =
+  let resolveData ~screenArgs:_ ~args:_ ~execute here =
+    let open Result.Syntax in
+    let%bind value = execute here in
+    return value
+  in
+  let resolveValue ~screenArgs:_ ~args:_ ~execute here =
+    let open Result.Syntax in
+    let%bind value = execute here in
+    return value
+  in
+  let resolveTitle ~screenArgs ~args:_ ~execute here =
+    let open Result.Syntax in
+    let%bind value = execute here in
+    let%bind titleBase =
+      let q = TypedQuery.unsafeLookupArg ~name:"title" screenArgs in
+      let q = TypedQuery.unsafeChain here q in
+      execute q
+    in
+    let titleSuffix =
+      Value.get ~name:"id" value
+      |> Option.alt (Value.get ~name:"title" value)
+      |> Option.alt (Value.get ~name:"name" value)
+    in
+    match titleBase, titleSuffix with
+    | base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
+    | base, None -> Result.Ok (Value.string {j|$base|j})
+  in
+  Screen.Syntax.(screen
+    ~inputCard:Card.Many
+    ~navigate:"value"
+    ~args:[
+      arg "title" ~default:(Q.string "View") (one string);
+    ]
+    (fun entity -> [
+      has ~resolve:resolveTitle "title" (one string);
+      has ~resolve:resolveValue "value" (one entity);
+      has ~resolve:resolveData "data" (one entity);
+    ])
+  )
+
 let univ =
 
   let regionNationCustomer = Type.Syntax.(entity "customer" [
@@ -183,6 +224,7 @@ let univ =
     |> hasMany "region" region
     |> hasScreen "pick" pickScreen
     |> hasScreen "view" viewScreen
+    |> hasScreen "barChart" barChartScreen
   )
 
 external data : Js.Json.t = "data" [@@bs.module "./data.js"]
