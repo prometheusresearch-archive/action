@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native-web';
+import {View, ScrollView, Text, TouchableOpacity} from 'react-native-web';
 import * as W from 'workflow';
 import {type ScreenConfig, type BreadcrumbItem, Header} from './Header.js';
 import {Console} from './Console.js';
@@ -30,9 +30,9 @@ export class App extends React.Component<P, S> {
       />
     );
     return (
-      <View>
+      <ScrollView>
         <screen.Component renderHeader={renderHeader} />
-      </View>
+      </ScrollView>
     );
   }
 }

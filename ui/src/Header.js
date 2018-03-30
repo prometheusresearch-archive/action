@@ -60,11 +60,9 @@ export function Header<ScreenId>(props: P<ScreenId>) {
             })}
           </View>
         </View>
-        {props.breadcrumb.length > 0 && (
-          <View style={{borderTop: '1px solid #bbb'}}>
-            <Breadcrumb breadcrumb={props.breadcrumb} />
-          </View>
-        )}
+        <View style={{borderTop: '1px solid #bbb'}}>
+          <Breadcrumb breadcrumb={props.breadcrumb} />
+        </View>
         {props.toolbar != null && (
           <View style={{borderTop: '1px solid #bbb'}}>{props.toolbar}</View>
         )}
@@ -80,6 +78,7 @@ export function Breadcrumb(props: {breadcrumb: Array<BreadcrumbItem>}) {
         flexDirection: 'row',
         alignItems: 'center',
       }}>
+      <BreadcrumbButton title="⌂" />
       {props.breadcrumb.map((item, idx) => {
         return <BreadcrumbButton onPress={item.onPress} title={item.title} />;
       })}
