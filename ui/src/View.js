@@ -45,7 +45,7 @@ function Data({data}) {
         <ReactNative.View
           key={name}
           style={{flexDirection: 'row', padding: 5, alignItems: 'center'}}>
-          <ReactNative.View style={{flex: 1}}>
+          <ReactNative.View style={{flex: 1, minWidth: 200}}>
             <ReactNative.Text style={{fontWeight: '600'}}>{name}</ReactNative.Text>
           </ReactNative.View>
           <ReactNative.View style={{flex: 3}}>

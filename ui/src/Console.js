@@ -118,10 +118,37 @@ function Help({onPress}) {
         title="More complex workflow with regions"
         query={outdent`
           render(region:pick(title: "Regions")) {
+
             render(:view),
             render(nation:pick(title: "Nations")) {
+
               render(:view),
+              render(customer:pick(title: "Customers")) {
+                render(:view),
+              }
+
             }
+
+          }
+        `}
+      />
+      <Item
+        title="Workflow with custom view"
+        query={outdent`
+          render(region:pick(title: "Regions")) {
+
+            render(:view(
+              title: "Region"
+            )),
+
+            render({
+              nationCount: nation:count,
+              customerCount: nation.customer:count,
+              name: name,
+            }:view(
+              title: "Region Statistics"
+            ))
+
           }
         `}
       />

@@ -4,6 +4,7 @@
 
 import * as React from 'react';
 import * as ReactNative from 'react-native-web';
+import MediaQuery from 'react-responsive';
 import * as W from 'workflow';
 import type {Result, RenderableState, State, UI} from 'workflow';
 import {Pick} from './Pick.js';
@@ -85,9 +86,10 @@ export class Workflow extends React.Component<P, S> {
           onPress: this.onState.bind(null, item),
         }));
 
-      const navToolbar =
+      const navToolbar = layout =>
         siblings.length > 1 ? (
           <NavToolbar
+            layout={layout}
             isItemActive={item => W.id(item) === W.id(node)}
             items={W.next(prev)}
             onState={this.onState}
@@ -95,12 +97,32 @@ export class Workflow extends React.Component<P, S> {
         ) : null;
       return (
         <ReactNative.View>
-          {this.props.renderHeader != null ? (
-            this.props.renderHeader({breadcrumb: breadcrumbItems, toolbar: navToolbar})
-          ) : (
-            <Header breadcrumb={breadcrumbItems} toolbar={navToolbar} />
-          )}
-          <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
+          <MediaQuery maxWidth={736}>
+            {smallScreen => (
+              <React.Fragment>
+                {this.props.renderHeader != null ? (
+                  this.props.renderHeader({
+                    breadcrumb: breadcrumbItems,
+                    toolbar: navToolbar('horizontal'),
+                  })
+                ) : (
+                  <Header
+                    breadcrumb={breadcrumbItems}
+                    toolbar={smallScreen && navToolbar('horizontal')}
+                  />
+                )}
+                <ReactNative.View style={{flexDirection: 'row'}}>
+                  {!smallScreen && (
+                    <ReactNative.View
+                      style={{paddingVertical: 20, paddingHorizontal: 10, minWidth: 250}}>
+                      {navToolbar('vertical')}
+                    </ReactNative.View>
+                  )}
+                  <ReactNative.View style={{padding: 10}}>{screen}</ReactNative.View>
+                </ReactNative.View>
+              </React.Fragment>
+            )}
+          </MediaQuery>
         </ReactNative.View>
       );
     }
@@ -109,7 +131,7 @@ export class Workflow extends React.Component<P, S> {
 
 function Header(props) {
   const needBreadcrumb = props.breadcrumb.length > 0;
-  const needNav = props.toolbar != null;
+  const needNav = Boolean(props.toolbar);
   if (!needNav && !needBreadcrumb) {
     return null;
   }
@@ -151,7 +173,7 @@ function Button(props) {
   );
 }
 
-function NavToolbar({items, onState, isItemActive, Button}) {
+function NavToolbar({items, onState, isItemActive, layout = 'horizontal', Button}) {
   const buttons = items.map((state, idx) => {
     const title = W.getTitle(state);
     const onPress = () => onState(state);
@@ -167,7 +189,11 @@ function NavToolbar({items, onState, isItemActive, Button}) {
       />
     );
   });
-  return <ReactNative.View style={{flexDirection: 'row'}}>{buttons}</ReactNative.View>;
+  return (
+    <ReactNative.View style={{flexDirection: layout === 'horizontal' ? 'row' : 'column'}}>
+      {buttons}
+    </ReactNative.View>
+  );
 }
 
 NavToolbar.defaultProps = {
