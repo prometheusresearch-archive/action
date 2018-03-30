@@ -3,6 +3,7 @@
  */
 
 import * as React from 'react';
+import outdent from 'outdent/lib/index';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import {type BreadcrumbItem} from './Header.js';
 import Textarea from 'react-textarea-autosize';
@@ -66,7 +67,7 @@ export class Console extends React.Component<P, S> {
           />
           <TouchableOpacity onPress={this.onValue.bind(null, '')}>
             <View style={{padding: 5}}>
-              <Text style={{color: '#444'}}>Clear Query</Text>
+              <Text style={{color: '#666'}}>⌫ Clear Query</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -86,9 +87,9 @@ function Help({onPress}) {
   function Item({title, query}) {
     return (
       <View style={{padding: 5}}>
-        <Text>{title}:</Text>
+        <Text style={{fontWeight: 600}}>{title}:</Text>
         <TouchableOpacity onPress={onPress.bind(null, query)}>
-          <View style={{padding: 5}}>
+          <View style={{padding: 10}}>
             <Text style={{fontFamily: 'Menlo, monspace', color: '#444'}}>{query}</Text>
           </View>
         </TouchableOpacity>
@@ -107,7 +108,22 @@ function Help({onPress}) {
       <Item title="Pick screen of all regions" query="region:pick" />
       <Item
         title="Simple workflow with regions"
-        query="render(region:pick) { render(:view) }"
+        query={outdent`
+          render(region:pick(title: "Regions")) {
+            render(:view)
+          }
+        `}
+      />
+      <Item
+        title="More complex workflow with regions"
+        query={outdent`
+          render(region:pick(title: "Regions")) {
+            render(:view),
+            render(nation:pick(title: "Nations")) {
+              render(:view),
+            }
+          }
+        `}
       />
     </View>
   );
