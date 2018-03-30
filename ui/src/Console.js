@@ -93,7 +93,7 @@ export class Console extends React.Component<P, S> {
             <Error message={this.state.error} />
           </View>
         )}
-        <View style={{padding: 10}}>{this.state.view}</View>
+        <View style={{padding: 10, paddingBottom: 300}}>{this.state.view}</View>
       </View>
     );
   }
