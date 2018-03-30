@@ -78,7 +78,12 @@ export function Breadcrumb(props: {breadcrumb: Array<BreadcrumbItem>}) {
         flexDirection: 'row',
         alignItems: 'center',
       }}>
-      <BreadcrumbButton title="⌂" />
+      <View style={{paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row'}}>
+        <Text style={{marginTop: -1, fontSize: '10pt', color: '#888', fontWeight: '400'}}>
+          ⌂
+        </Text>
+        <Text style={{fontSize: '9pt', fontWeight: '200', paddingLeft: 15}}>›</Text>
+      </View>
       {props.breadcrumb.map((item, idx) => {
         return <BreadcrumbButton onPress={item.onPress} title={item.title} />;
       })}
