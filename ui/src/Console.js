@@ -72,6 +72,7 @@ export class Console extends React.Component<P, S> {
     return (
       <View>
         {this.props.renderHeader({breadcrumb: []})}
+        <Help value={this.state.value} onPress={this.onValue} />
         <View style={{padding: 10}}>
           <View style={{paddingVertical: 5}}>
             <Hint message="Enter action expression and see the evaluated result" />
@@ -87,7 +88,6 @@ export class Console extends React.Component<P, S> {
             </View>
           </TouchableOpacity>
         </View>
-        {this.state.value === '' && <Help onPress={this.onValue} />}
         {this.state.error != null && (
           <View style={{padding: 10}}>
             <Error message={this.state.error} />
@@ -99,51 +99,45 @@ export class Console extends React.Component<P, S> {
   }
 }
 
-function Help({onPress}) {
+function Help({value, onPress}) {
   function Item({title, query}) {
-    return (
-      <View style={{padding: 5}}>
-        <Text style={{fontWeight: 600}}>{title}:</Text>
-        <TouchableOpacity onPress={onPress.bind(null, query)}>
-          <View style={{padding: 10}}>
-            <Text style={{fontFamily: 'Menlo, monspace', color: '#444'}}>{query}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
+    return <option value={query}>{title}</option>;
   }
+  const onChange = e => {
+    onPress(e.target.value || '');
+  };
   return (
     <View style={{padding: 10}}>
       <View style={{padding: 5}}>
-        <Text style={{fontSize: '12pt', fontWeight: '600'}}>
-          Queries to try (enter them manually or click on them)
-        </Text>
+        <Text style={{fontSize: '11pt', fontWeight: '400'}}>Example queries:</Text>
       </View>
-      <Item title="Data: List of regions" query="region" />
-      <Item title="Data: List of nations" query="region.nation" />
-      <Item title="Data: First region" query="region:first" />
-      <Item title="Screen: List of all regions" query="region:pick" />
-      <Item title="Screen: View first region" query="region:first:view" />
-      <Item
-        title="Screen: Basic customers per region report"
-        query={outdent`
+      <select style={{fontSize: '11pt'}} value={value} onChange={onChange}>
+        <Item title="" query="" />
+        <Item title="Data: List of regions" query="region" />
+        <Item title="Data: List of nations" query="region.nation" />
+        <Item title="Data: First region" query="region:first" />
+        <Item title="Screen: List of all regions" query="region:pick" />
+        <Item title="Screen: View first region" query="region:first:view" />
+        <Item
+          title="Screen: Basic customers per region report"
+          query={outdent`
           region {
             label: name,
             value: nation.customer:count
           }:barChart(title: "Customers per Region")
         `}
-      />
-      <Item
-        title="Workflow: Simple workflow with regions"
-        query={outdent`
+        />
+        <Item
+          title="Workflow: Simple workflow with regions"
+          query={outdent`
           render(region:pick(title: "Regions")) {
             render(:view)
           }
         `}
-      />
-      <Item
-        title="Workflow: Nested workflow with regions"
-        query={outdent`
+        />
+        <Item
+          title="Workflow: Nested workflow with regions"
+          query={outdent`
           render(region:pick(title: "Regions")) {
 
             render(:view),
@@ -158,10 +152,10 @@ function Help({onPress}) {
 
           }
         `}
-      />
-      <Item
-        title="Workflow: Custom data views"
-        query={outdent`
+        />
+        <Item
+          title="Workflow: Custom data views"
+          query={outdent`
           render(region:pick(title: "Regions")) {
 
             render(:view(
@@ -185,7 +179,8 @@ function Help({onPress}) {
 
           }
         `}
-      />
+        />
+      </select>
     </View>
   );
 }
@@ -204,6 +199,7 @@ function Input(props) {
         autocapitalize="off"
         spellcheck="false"
         minRows={3}
+        maxRows={15}
         style={{
           border: 'none',
           padding: 15,
