@@ -9,6 +9,7 @@ import * as W from 'workflow';
 import type {Result, RenderableState, State, UI} from 'workflow';
 import {Pick} from './Pick.js';
 import {View} from './View.js';
+import {BarChart} from './BarChart.js';
 import {type BreadcrumbItem, Breadcrumb} from './Header.js';
 
 type P = {
@@ -71,6 +72,8 @@ export class Workflow extends React.Component<P, S> {
         screen = <Pick toolbar={toolbar} state={node} args={args} onPick={this.onPick} />;
       } else if (name === 'view') {
         screen = <View toolbar={toolbar} state={node} args={args} />;
+      } else if (name === 'barChart') {
+        screen = <BarChart toolbar={toolbar} state={node} args={args} />;
       } else {
         screen = (
           <ReactNative.View>

@@ -32,26 +32,42 @@ const initialState = {
 };
 
 export class Console extends React.Component<P, S> {
-  state = initialState;
+  constructor(props: P) {
+    super(props);
+    this.state = this.getStateFromQuery('');
+  }
+
+  getStateFromQuery = (value: string) => {
+    if (value == '') {
+      return initialState;
+    }
+    const result = W.parse(value);
+    let view = null;
+    let error = null;
+    if (result.error != null) {
+      error = result.error;
+    } else if (result.ui != null) {
+      view = <Workflow key={value} startState={result.ui} />;
+    } else {
+      view = <Data data={result.data} />;
+    }
+    return {error, view, value, result};
+  };
+
+  onClear = () => {
+    this.setState(this.getStateFromQuery(''));
+  };
 
   onValue = (value: string) => {
     this.setState(state => {
-      if (value == '') {
-        return initialState;
+      const nextState = this.getStateFromQuery(value);
+      if (nextState.view == null) {
+        nextState.view = state.view;
       }
-      const result = W.parse(value);
-      let view = state.view;
-      let error = null;
-      if (result.error != null) {
-        error = result.error;
-      } else if (result.ui != null) {
-        view = <Workflow key={value} startState={result.ui} />;
-      } else {
-        view = <Data data={result.data} />;
-      }
-      return {...state, error, view, value, result};
+      return nextState;
     });
   };
+
   render() {
     return (
       <View>
@@ -65,7 +81,7 @@ export class Console extends React.Component<P, S> {
             value={this.state.value}
             onValue={this.onValue}
           />
-          <TouchableOpacity onPress={this.onValue.bind(null, '')}>
+          <TouchableOpacity onPress={this.onClear}>
             <View style={{padding: 5}}>
               <Text style={{color: '#666'}}>⌫ Clear Query</Text>
             </View>
@@ -103,11 +119,22 @@ function Help({onPress}) {
           Queries to try (enter them manually or click on them)
         </Text>
       </View>
-      <Item title="List of regions" query="region" />
-      <Item title="List of nations" query="region.nation" />
-      <Item title="Pick screen of all regions" query="region:pick" />
+      <Item title="Data: List of regions" query="region" />
+      <Item title="Data: List of nations" query="region.nation" />
+      <Item title="Data: First region" query="region:first" />
+      <Item title="Screen: List of all regions" query="region:pick" />
+      <Item title="Screen: View first region" query="region:first:view" />
       <Item
-        title="Simple workflow with regions"
+        title="Screen: Basic customers per region report"
+        query={outdent`
+          region {
+            label: name,
+            value: nation.customer:count
+          }:barChart(title: "Customers per Region")
+        `}
+      />
+      <Item
+        title="Workflow: Simple workflow with regions"
         query={outdent`
           render(region:pick(title: "Regions")) {
             render(:view)
@@ -115,7 +142,7 @@ function Help({onPress}) {
         `}
       />
       <Item
-        title="More complex workflow with regions"
+        title="Workflow: Nested workflow with regions"
         query={outdent`
           render(region:pick(title: "Regions")) {
 
@@ -133,7 +160,7 @@ function Help({onPress}) {
         `}
       />
       <Item
-        title="Workflow with custom view"
+        title="Workflow: Custom data views"
         query={outdent`
           render(region:pick(title: "Regions")) {
 
@@ -147,6 +174,13 @@ function Help({onPress}) {
               name: name,
             }:view(
               title: "Region Statistics"
+            )),
+
+            render(nation {
+              label: name,
+              value: customer:count,
+            }:barChart(
+              title: "Customers per Nation"
             ))
 
           }
