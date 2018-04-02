@@ -86,7 +86,7 @@ let () =
       field ~alias:"regionName" (name "name")
     ]
     |> where [
-      ("name", here |> nav "name")
+      define "name" (here |> nav "name");
     ]
   );
   runQuery Q.(
@@ -97,11 +97,11 @@ let () =
       field ~alias:"nationName" (
         name "name"
         |> where [
-          ("name", here |> nav "nation" |> nav "name")
+          define "name" (here |> nav "nation" |> nav "name");
         ]
       );
     ]
     |> where [
-      ("name", here |> nav "name")
+      define "name" (here |> nav "name");
     ]
   );

@@ -13,6 +13,7 @@
 %token RIGHT_BRACE
 %token LEFT_PAREN
 %token RIGHT_PAREN
+%token <string> NAME
 %token <string> ID
 %token <string> STRING
 %token <float> NUMBER
@@ -74,6 +75,7 @@ query:
   | v = NUMBER { S.number v }
   | v = BOOL { S.bool v }
   | NULL { S.null }
+  | name = NAME { S.name name }
 
 nav:
   | name = ID { {name; args = []} }

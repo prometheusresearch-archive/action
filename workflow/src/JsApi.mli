@@ -13,7 +13,6 @@ type state
 type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
 type query
 
-val start : renderableState JsResult.t
 val render : state -> renderableState JsResult.t
 
 val pickValue : float -> state -> renderableState JsResult.t

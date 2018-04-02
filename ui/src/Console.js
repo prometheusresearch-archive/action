@@ -34,11 +34,11 @@ const initialState = {
 export class Console extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
-    this.state = this.getStateFromQuery('');
+    this.state = this.getStateFromQuery('render(region:pick) { render(value:view) }');
   }
 
   getStateFromQuery = (value: string) => {
-    if (value == '') {
+    if (value === '') {
       return initialState;
     }
     const result = W.parse(value);
@@ -194,10 +194,10 @@ function Input(props) {
         borderColor: props.isError ? 'red' : '#bbb',
       }}>
       <Textarea
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        spellcheck="false"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck="false"
         minRows={3}
         maxRows={15}
         style={{

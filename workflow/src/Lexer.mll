@@ -21,6 +21,7 @@ let float = digit* frac? exp?
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
+let name = ['$'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule read = parse
   | white      { read lexbuf }
@@ -42,6 +43,7 @@ rule read = parse
   | '.'        { DOT }
   | ','        { COMMA }
   | id         { ID (Lexing.lexeme lexbuf) }
+  | name       { NAME (Lexing.lexeme lexbuf) }
   | float      { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }
   | '"'        { read_string (Buffer.create 17) lexbuf }
   | _          { read lexbuf }

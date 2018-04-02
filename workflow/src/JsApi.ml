@@ -45,11 +45,18 @@ let pickScreen =
       arg "title" ~default:(Q.string "Pick") (one string);
     ]
     Q.(
+      let parent = name "parent" in
+      let title = name "title" in
+      let value = name "value" in
+      let id = name "id" in
       void
       |> select [
-        field ~alias:"data" (name "parent");
-        field ~alias:"value" (name "parent");
-        field ~alias:"title" (name "title");
+        field ~alias:"data" parent;
+        field ~alias:"value" value;
+        field ~alias:"title" title;
+      ]
+      |> where [
+        arg "value" (parent |> locate id);
       ]
     )
   )
@@ -66,6 +73,8 @@ let viewScreen =
         field ~alias:"data" (name "parent");
         field ~alias:"value" (name "parent");
         field ~alias:"title" (name "title");
+      ]
+      |> where [
       ]
     )
   )
@@ -119,61 +128,11 @@ external data : Js.Json.t = "data" [@@bs.module "./data.js"]
 
 let db = JSONDatabase.ofJson ~univ data
 
-let workflow =
-  let open UntypedWorkflow.Syntax in
-  let open UntypedQuery.Syntax in
-
-  let pickRegion = render (
-    here
-    |> nav "region"
-    |> screen ~args:[arg "title" (string "Regions")] "pick"
-  ) in
-
-  let pickNation = render (
-    here
-    |> nav "nation"
-    |> screen ~args:[arg "title" (string "Nations")] "pick"
-  ) in
-
-  let pickCustomer = render (
-    here
-    |> nav "customer"
-    |> screen ~args:[arg "title" (string "Customers")] "pick"
-  ) in
-
-  let view title = render (
-    here
-    |> screen ~args:[arg "title" (string title)]"view"
-  ) in
-
-  let pickViewCustomer = pickCustomer |> andThen [
-    view "View Customer"
-  ] in
-
-  let pickViewNation = pickNation |> andThen [
-    view "View Nation" |> andThen [ pickViewCustomer ];
-    pickViewCustomer
-  ] in
-
-  let pickViewRegion = pickRegion |> andThen [
-    view "View Region" |> andThen [ pickViewNation ];
-    pickViewNation
-  ] in
-
-  pickViewRegion
-
 let toJS state =
   JsResult.ofResult (
     let open Result.Syntax in
     let%bind state, ui = state in
     Result.Ok [%bs.obj { state; ui = Js.Nullable.from_opt ui }]
-  )
-
-let start =
-  let open Result.Syntax in
-  toJS (
-    let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-    WorkflowInterpreter.boot ~db w
   )
 
 let breadcrumbs state =

@@ -4,8 +4,6 @@
 
 import * as React from 'react';
 import {View, Text, TouchableOpacity} from 'react-native-web';
-import {Workflow} from './Workflow';
-import * as W from 'workflow';
 
 export type ScreenConfig<ScreenId> = {
   [id: ScreenId]: {
@@ -33,6 +31,11 @@ type P<ScreenId> = {
 };
 
 export function Header<ScreenId>(props: P<ScreenId>) {
+  const borderStyle = {
+    borderTopWidth: 1,
+    borderTopStyle: 'solid',
+    borderTopColor: '#bbb',
+  };
   return (
     <View style={{padding: 10}}>
       <View
@@ -40,7 +43,9 @@ export function Header<ScreenId>(props: P<ScreenId>) {
           boxShadow: '0px 1px 0px 0px #BBB',
           borderRadius: 2,
           flexDirection: 'column',
-          border: '1px solid #BBB',
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderColor: '#bbb',
         }}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <View style={{paddingLeft: 20, paddingRight: 20, paddingVertical: 10}}>
@@ -60,12 +65,10 @@ export function Header<ScreenId>(props: P<ScreenId>) {
             })}
           </View>
         </View>
-        <View style={{borderTop: '1px solid #bbb'}}>
+        <View style={{...borderStyle}}>
           <Breadcrumb breadcrumb={props.breadcrumb} />
         </View>
-        {props.toolbar != null && (
-          <View style={{borderTop: '1px solid #bbb'}}>{props.toolbar}</View>
-        )}
+        {props.toolbar != null && <View style={{...borderStyle}}>{props.toolbar}</View>}
       </View>
     </View>
   );

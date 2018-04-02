@@ -4,9 +4,8 @@
 import * as React from 'react';
 import {Bar} from '@vx/shape';
 import {Group} from '@vx/group';
-import {letterFrequency} from '@vx/mock-data';
 import {scaleBand, scaleLinear} from '@vx/scale';
-import {extent, max} from 'd3-array';
+import {max} from 'd3-array';
 import {withScreenSize} from '@vx/responsive';
 import {Text} from '@vx/text';
 import {PatternLines} from '@vx/pattern';
@@ -15,13 +14,6 @@ import type {State} from 'workflow';
 import * as W from 'workflow';
 import {ScreenTitle} from './ScreenTitle.js';
 import {View} from 'react-native-web';
-
-const data = letterFrequency.slice(5);
-
-function round(value, precision) {
-  var multiplier = Math.pow(10, precision || 0);
-  return Math.round(value * multiplier) / multiplier;
-}
 
 // accessors
 const x = d => d.label;
