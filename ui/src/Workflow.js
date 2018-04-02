@@ -65,7 +65,7 @@ export class Workflow extends React.Component<P, S> {
       const next = W.next(state.value.state);
       const {ui, state: node} = state.value;
       const name = W.uiName(ui);
-      const args = W.uiArgs(ui);
+      const args = {};
       let screen = null;
       const toolbar = <NavToolbar items={next} onState={this.onState} />;
       if (name === 'pick') {

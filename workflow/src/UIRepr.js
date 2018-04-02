@@ -1,11 +1,12 @@
 module.exports.UIRepr = UI;
 
-function UI(name, args, typ, value, query) {
+function UI(name, args, typ, value, query, outQuery) {
   this.name = name;
   this.args = args;
   this.typ = typ;
-  this.query = query;
   this.value = value;
+  this.query = query;
+  this.outQuery = outQuery;
 }
 
 UI.prototype.inspect = function() {
