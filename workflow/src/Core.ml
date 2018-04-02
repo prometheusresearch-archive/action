@@ -155,6 +155,8 @@ module Query (P : sig type t end) = struct
     | Count of t
     | Screen of (t * screen)
     | Const of const
+    | Let of (t * (string * t) list)
+    | Name of string
 
   and const =
     | String of string
@@ -169,7 +171,7 @@ module Query (P : sig type t end) = struct
   and screen = {
     screenName : string;
     screenArgs : args;
-    screenParentCtyp : payload;
+    screenParentCtx : payload;
   }
 
   and select = field list
@@ -228,6 +230,18 @@ module Query (P : sig type t end) = struct
       let parent = show parent in
       let screenArgs = showArgs screenArgs in
       {j|$parent:$screenName$screenArgs|j}
+    | Name name ->
+      "$" ^ name
+    | Let (parent, bindings) ->
+      let parent = show parent in
+      let bindings =
+        let f (name, query) =
+          "$" ^ name ^ " = " ^ (show query)
+        in
+        Belt.List.map bindings f
+        |> String.concat ", "
+      in
+      {j|$parent:let($bindings)|j}
 
   let unsafeLookupArg ~name args =
     StringMap.getExn args name
@@ -277,7 +291,7 @@ module UntypedQuery = struct
 
     let screen ?(args=[]) name query =
       let screenArgs = Arg.toMap args in
-      (), Screen (query, { screenParentCtyp = (); screenName = name; screenArgs; })
+      (), Screen (query, { screenParentCtx = (); screenName = name; screenArgs; })
 
     let count query =
       (), Count query
@@ -424,16 +438,23 @@ module Type = struct
 
 end
 
+module Context = struct
+
+  type t = bindings * Type.ct
+
+  and bindings = UntypedQuery.t StringMap.t
+
+  let void = StringMap.empty, (Card.One, Type.Void)
+
+end
 
 (**
  * Query with type and cardinality information attached.
  *)
 module TypedQuery = struct
   include Query(struct
-    type t = Type.ct
+    type t = Context.t
   end)
-
-  let void = (Card.One, Type.Void), Void
 
   let unsafeChain base next =
     let ctyp, _ = next in
@@ -570,9 +591,9 @@ module Screen = struct
     -> TypedQuery.t
     -> (Value.t, string) Result.t
 
-  let typScreen ~name ~ctyp screen =
+  let typScreen ~name ~ctx screen =
     let open Result.Syntax in
-    let card, typ = ctyp in
+    let bindings, (card, typ) = ctx in
     match (screen.inputCard, card) with
     | Card.One, Card.Many
     | Card.Opt, Card.Many
@@ -586,8 +607,11 @@ module Screen = struct
     | Card.Many, Card.Many ->
       let fields = Belt.List.map (screen.fields typ) (fun (field, _) -> field)
       in return (
-        Card.One,
-        Type.Screen { screenName = name; screenFields = fields; screenNavigate = screen.navigate }
+        bindings,
+        (
+          Card.One,
+          Type.Screen { screenName = name; screenFields = fields; screenNavigate = screen.navigate }
+        )
       )
 
   let lookupField ~name ~typ screen =
@@ -680,13 +704,13 @@ end
 module QueryTyper : sig
 
   val typeQuery :
-    ?ctyp : TypedQuery.payload
+    ?ctx : TypedQuery.payload
     -> univ:Universe.t
     -> UntypedQuery.t
     -> (TypedQuery.t, string) Result.t
 
   val typeArgs :
-    ?ctyp : TypedQuery.payload
+    ?ctx : TypedQuery.payload
     -> univ:Universe.t
     -> argTyps : Type.args
     -> UntypedQuery.args
@@ -694,7 +718,7 @@ module QueryTyper : sig
 
   (** Same as typeArgs but doesn't set default values for missing args *)
   val typeArgsPartial :
-    ?ctyp : TypedQuery.payload
+    ?ctx : TypedQuery.payload
     -> univ:Universe.t
     -> argTyps : Type.args
     -> UntypedQuery.args
@@ -725,127 +749,135 @@ end = struct
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ -> error "cannot extract field"
 
-  let rootCtyp = Card.One, Type.Void
-
   let nav ~univ name parent =
     let open Result.Syntax in
     let navigation = { TypedQuery. navName = name; } in
-    let (parentCard, parentTyp), _parentSyn = parent in
+    let (bindings, (parentCard, parentTyp)), _parentSyn = parent in
     let%bind field = extractField ~univ name parentTyp in
     let fieldCard, fieldTyp = field.fieldCtyp in
     let fieldCard = Card.merge parentCard fieldCard in
-    return ((fieldCard, fieldTyp), TypedQuery.Navigate (parent, navigation))
+    return ((bindings, (fieldCard, fieldTyp)), TypedQuery.Navigate (parent, navigation))
 
-    let rec typeArgsImpl
-      ?(ctyp=rootCtyp)
-      ~updateWithDefaultValues
-      ~univ
-      ~argTyps
-      args
-      =
-      let open Result.Syntax in
-      (** Type check all passed args first *)
-      let%bind args =
-        let f args name query =
+  let rec typeArgsImpl
+    ?(ctx=Context.void)
+    ~updateWithDefaultValues
+    ~univ
+    ~argTyps
+    args
+    =
+    let open Result.Syntax in
+    (** Type check all passed args first *)
+    let%bind args =
+      let f args name query =
+        let%bind args = args in
+        match StringMap.get argTyps name with
+        | None -> error {j|unknown arg "$name"|j}
+        | Some _ ->
+          let%bind query = typeQuery ~ctx ~univ query in
+          let args = StringMap.set args name query in
+          return args
+      in StringMap.reduce args (return StringMap.empty) f
+    in
+    (** Now check if we didn't miss any required arg, add default values *)
+    let%bind args =
+      if updateWithDefaultValues
+      then
+        let f args name { Type. argCtyp = _; argDefault } =
           let%bind args = args in
-          match StringMap.get argTyps name with
-          | None -> error {j|unknown arg "$name"|j}
-          | Some _ ->
-            let%bind query = typeQuery ~ctyp ~univ query in
-            let args = StringMap.set args name query in
-            return args
-        in StringMap.reduce args (return StringMap.empty) f
-      in
-      (** Now check if we didn't miss any required arg, add default values *)
-      let%bind args =
-        if updateWithDefaultValues
-        then
-          let f args name { Type. argCtyp = _; argDefault } =
-            let%bind args = args in
-            match StringMap.get args name with
-            | None ->
-              begin match argDefault with
-              | None -> error {j|missing required arg "$name"|j}
-              | Some query ->
-                let%bind query = typeQuery ~ctyp ~univ query in
-                let args = StringMap.set args name query in
-                return args
-              end
-            | Some _ -> return args
-          in StringMap.reduce argTyps (return args) f
-        else return args
-      in
-      return args
+          match StringMap.get args name with
+          | None ->
+            begin match argDefault with
+            | None -> error {j|missing required arg "$name"|j}
+            | Some query ->
+              let%bind query = typeQuery ~ctx ~univ query in
+              let args = StringMap.set args name query in
+              return args
+            end
+          | Some _ -> return args
+        in StringMap.reduce argTyps (return args) f
+      else return args
+    in
+    return args
 
-  and typeQuery ?(ctyp=rootCtyp) ~univ query =
-    let rec aux ~ctyp ((), query) =
+  and typeQuery ?(ctx=Context.void) ~univ query =
+    let rec aux ~ctx ((), query) =
+      let bindings, _ctyp = ctx in
       let open Result.Syntax in
       match query with
       | UntypedQuery.Void ->
-        return ((Card.One, Type.Void), TypedQuery.Void)
+        return ((bindings, (Card.One, Type.Void)), TypedQuery.Void)
       | UntypedQuery.Here ->
-        return (ctyp, TypedQuery.Here)
+        return (ctx, TypedQuery.Here)
       | UntypedQuery.Const (UntypedQuery.String v) ->
         return (
-          (Card.One, Type.Value Type.String),
+          (bindings, (Card.One, Type.Value Type.String)),
           TypedQuery.Const (TypedQuery.String v)
         )
       | UntypedQuery.Const (UntypedQuery.Number v) ->
         return (
-          (Card.One, Type.Value Type.Number),
+          (bindings, (Card.One, Type.Value Type.Number)),
           TypedQuery.Const (TypedQuery.Number v)
         )
       | UntypedQuery.Const (UntypedQuery.Bool v) ->
         return (
-          (Card.One, Type.Value Type.Bool),
+          (bindings, (Card.One, Type.Value Type.Bool)),
           TypedQuery.Const (TypedQuery.Bool v)
         )
       | UntypedQuery.Const (UntypedQuery.Null) ->
         return (
-          (Card.One, Type.Value Type.Null),
+          (bindings, (Card.One, Type.Value Type.Null)),
           TypedQuery.Const (TypedQuery.Null)
         )
       | UntypedQuery.Count parent ->
-        let%bind parent = aux ~ctyp parent in
-        return ((Card.One, Type.Syntax.number), TypedQuery.Count parent)
+        let%bind parent = aux ~ctx parent in
+        return (
+          (bindings, (Card.One, Type.Syntax.number)),
+          TypedQuery.Count parent
+        )
       | UntypedQuery.Chain (parent, q) ->
-        let%bind ((prevCard, _) as ctyp, _) as parent = aux ~ctyp parent in
-        let%bind ((card, typ), _) as q = aux ~ctyp q in
+        let%bind ((_, (prevCard, _)) as ctx, _) as parent = aux ~ctx parent in
+        let%bind ((bindings, (card, typ)), _) as q = aux ~ctx q in
         let ctyp = Card.merge prevCard card, typ in
-        return (ctyp, TypedQuery.Chain (parent, q))
+        return (
+          (bindings, ctyp),
+          TypedQuery.Chain (parent, q)
+        )
       | UntypedQuery.First parent ->
-        let%bind ((_, parentType), _) as parent = aux ~ctyp parent in
-        return ((Card.Opt, parentType), TypedQuery.First parent)
+        let%bind ((_, (_, parentType)), _) as parent = aux ~ctx parent in
+        return (
+          (bindings, (Card.Opt, parentType)),
+          TypedQuery.First parent
+        )
       | UntypedQuery.Screen (parent, { screenName; screenArgs; }) ->
-        let%bind (parentCtyp, _) as parent = aux ~ctyp parent in
+        let%bind (parentCtx, _) as parent = aux ~ctx parent in
         let%bind screen = Result.ofOption
           ~err:{j|no such screen "$screenName"|j}
           (Universe.lookupScreen screenName univ)
         in
-        let%bind ctyp = Screen.typScreen ~name:screenName ~ctyp:parentCtyp screen in
+        let%bind ctx = Screen.typScreen ~name:screenName ~ctx:parentCtx screen in
         let%bind screenArgs = typeArgsImpl
           ~updateWithDefaultValues:true
           ~univ
-          ~ctyp:parentCtyp
+          ~ctx:parentCtx
           ~argTyps:screen.args screenArgs
         in
         return (
-          ctyp,
-          TypedQuery.Screen (parent, { screenName; screenArgs; screenParentCtyp = parentCtyp})
+          ctx,
+          TypedQuery.Screen (parent, { screenName; screenArgs; screenParentCtx = parentCtx})
         )
       | UntypedQuery.Navigate (parent, navigation) ->
         let { UntypedQuery. navName; } = navigation in
-        let%bind parent = aux ~ctyp parent in
+        let%bind parent = aux ~ctx parent in
         nav ~univ navName parent
       | UntypedQuery.Select (parent, selection) ->
-        let%bind parent = aux ~ctyp parent in
-        let parentCtyp, _parentSyn = parent in
-        let parentCard, _parentTyp = parentCtyp in
+        let%bind parent = aux ~ctx parent in
+        let parentCtx, _parentSyn = parent in
+        let parentBindings, (parentCard, _parentTyp) = parentCtx in
         let checkField fields { UntypedQuery. alias; query } =
           match fields with
           | Result.Ok (fields, selection, index) ->
-            let%bind query = aux ~ctyp:parentCtyp query in
-            let (fieldCard, fieldTyp), _ = query in
+            let%bind query = aux ~ctx:parentCtx query in
+            let (_fieldBindings, (fieldCard, fieldTyp)), _fieldSyn = query in
             let fieldName = Option.getWithDefault (string_of_int index) alias in
             let fieldCard = Card.merge parentCard fieldCard in
             let fieldCtyp = fieldCard, fieldTyp in
@@ -860,8 +892,8 @@ end = struct
           Belt.List.reduce selection init checkField
         in
         let typ = Type.Record fields in
-        return ((parentCard, typ), TypedQuery.Select (parent, selection))
-    in aux ~ctyp query
+        return ((parentBindings, (parentCard, typ)), TypedQuery.Select (parent, selection))
+    in aux ~ctx query
 
   let typeArgs = typeArgsImpl ~updateWithDefaultValues:true
   let typeArgsPartial = typeArgsImpl ~updateWithDefaultValues:false
@@ -908,7 +940,7 @@ end = struct
   let execute ?value ~db query =
     Js.log2 "EXECUTE" (TypedQuery.show query);
     let open Result.Syntax in
-    let rec aux ~(value : Value.t) ((_card, typ), syn) =
+    let rec aux ~(value : Value.t) ((_bindings, (_card, typ)), syn) =
       match syn with
       | TypedQuery.Void -> return db.root
       | TypedQuery.Here ->
@@ -1095,16 +1127,21 @@ module TypedWorkflow = struct
   end)
 end
 
-module WorkflowTyper = struct
+module WorkflowTyper : sig
 
-  let rootCtyp = Card.One, Type.Void
+  val typeWorkflow :
+    univ : Universe.t
+    -> UntypedWorkflow.t
+    -> (TypedWorkflow.t, string) Result.t
+
+end = struct
 
   let typeWorkflow ~univ w =
     let open Result.Syntax in
-    let rec aux ~ctyp w =
+    let rec aux ~ctx w =
       match w with
       | UntypedWorkflow.Render q ->
-        let%bind ((_, typ) as ctyp, _) as tq = QueryTyper.typeQuery ~univ ~ctyp q in
+        let%bind ((_bindings, (_card, typ)) as ctx, _) as tq = QueryTyper.typeQuery ~univ ~ctx q in
         begin match typ with
         | Type.Void | Type.Entity _ | Type.Record _ | Type.Value _ ->
           let typ = Type.show typ in
@@ -1112,21 +1149,21 @@ module WorkflowTyper = struct
           error msg
         | Type.Screen { screenNavigate; _ } ->
           let q = UntypedQuery.Syntax.(here |> nav screenNavigate) in
-          let%bind screenOutputCtyp, _ = QueryTyper.typeQuery ~univ ~ctyp q in
-          return (TypedWorkflow.Render (tq, screenNavigate), screenOutputCtyp)
+          let%bind screenOutCtx, _ = QueryTyper.typeQuery ~univ ~ctx q in
+          return (TypedWorkflow.Render (tq, screenNavigate), screenOutCtx)
         end
       | UntypedWorkflow.Next (first, next) ->
-        let%bind first, ctyp = aux ~ctyp first in
+        let%bind first, ctx = aux ~ctx first in
         let%bind next, _ =
-          let f (next, ctyp) w =
-            let%bind w, _ = aux ~ctyp w in
-            return (w::next, ctyp)
+          let f (next, ctx) w =
+            let%bind w, _ = aux ~ctx w in
+            return (w::next, ctx)
           in
-          Result.List.foldLeft ~f ~init:([], ctyp) next
+          Result.List.foldLeft ~f ~init:([], ctx) next
         in
-        return (TypedWorkflow.Next (first, List.rev next), ctyp)
+        return (TypedWorkflow.Next (first, List.rev next), ctx)
     in
-    let%bind tw, _ = aux w ~ctyp:rootCtyp in
+    let%bind tw, _ = aux w ~ctx:Context.void in
     return tw
 
 end
@@ -1203,7 +1240,15 @@ end = struct
     | None -> {j|$query <- ROOT|j}
     | Some prev -> let prev = show prev in {j|$query <- $prev|j}
 
-  let make ?prev ?ui ?(args=StringMap.empty) ~position ?(query=TypedQuery.void) ~db workflow =
+  let make
+    ?prev
+    ?ui
+    ?(args=StringMap.empty)
+    ?(query=(Context.void, TypedQuery.Void))
+    ~position
+    ~db
+    workflow
+    =
     let frame = {
       query;
       db;
@@ -1319,13 +1364,13 @@ end = struct
   let setArgs ~args (frame, ui) =
     let open Result.Syntax in
     let%bind frame = match frame.workflow with
-    | TypedWorkflow.Render ((ctyp, TypedQuery.Screen (p, ({ screenParentCtyp; screenName; _ } as c))), n) ->
+    | TypedWorkflow.Render ((ctyp, TypedQuery.Screen (p, ({ screenParentCtx; screenName; _ } as c))), n) ->
       let univ = Db.univ frame.db in
       let%bind screen = Result.ofOption
         ~err:{j|no such screen "$screenName"|j}
         (Universe.lookupScreen screenName univ)
       in
-      let%bind args = QueryTyper.typeArgsPartial ~ctyp:screenParentCtyp ~univ ~argTyps:screen.args args in
+      let%bind args = QueryTyper.typeArgsPartial ~ctx:screenParentCtx ~univ ~argTyps:screen.args args in
       Js.log2 "BEFORE" (StringMap.toArray c.screenArgs);
       Js.log2 "UPDATe" (StringMap.toArray args);
       let c = { c with TypedQuery. screenArgs = TypedQuery.updateArgs ~update:args c.screenArgs } in

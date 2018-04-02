@@ -135,7 +135,7 @@ let runQuery db query =
     let open Result.Syntax in
     Js.log "TYPING...";
     let%bind query = QueryTyper.typeQuery ~univ query in
-    let (_, typ), _ = query in
+    let (_, (_, typ)), _ = query in
     Js.log2 "TYPE:" (Type.show typ);
     Js.log "RUNNING...";
     let%bind result = JSONDatabase.execute ~db query in
