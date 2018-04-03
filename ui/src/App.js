@@ -3,9 +3,9 @@
  */
 
 import * as React from 'react';
-import {View, ScrollView, Text, TouchableOpacity} from 'react-native-web';
+import {View, ScrollView, Text} from 'react-native-web';
 import * as W from 'workflow';
-import {type ScreenConfig, type BreadcrumbItem, Header} from './Header.js';
+import {type ScreenConfig, Header} from './Header.js';
 import {Console} from './Console.js';
 import {Workflow} from './Workflow';
 
@@ -37,7 +37,7 @@ export class App extends React.Component<P, S> {
   }
 }
 
-function StartScreen(props) {
+export function StartScreen(props) {
   return (
     <View>
       {props.renderHeader({breadcrumb: []})}
@@ -48,11 +48,11 @@ function StartScreen(props) {
   );
 }
 
-function WorkflowScreen(props) {
+export function WorkflowScreen(props) {
   return <Workflow startState={W.start} renderHeader={props.renderHeader} />;
 }
 
-function ConsoleScreen(props) {
+export function ConsoleScreen(props) {
   return <Console renderHeader={props.renderHeader} />;
 }
 

@@ -3,7 +3,7 @@
  *)
 open Core
 
-module Q = Core.UntypedQuery.Syntax
+module Q = Core.Query.Syntax
 module T = Core.Type.Syntax
 module S = Core.Screen.Syntax
 
@@ -38,164 +38,62 @@ let id state =
 
 let pickScreen =
 
-  let currentValue ~screenArgs ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    let idQuery =
-      let argQuery = TypedQuery.unsafeLookupArg ~name:"id" screenArgs in
-      TypedQuery.unsafeChain here argQuery
-    in
-    let%bind id = execute idQuery in
-
-    match Value.classify id, Value.classify value with
-    | Value.String id, Value.Array value ->
-      Result.Ok (
-        if Array.length value = 0
-        then Value.null
-        else
-          let f value = match Value.classify value with
-          | Value.Object obj -> begin match Js.Dict.get obj "id" with
-            | Some v -> (Obj.magic v) = id
-            | None -> false
-            end
-          | _ -> false
-          in
-          Value.ofOption (Js.Array.find f value))
-    | Value.Number id, Value.Array value ->
-      Result.Ok (
-        if Array.length value = 0
-        then Value.null
-        else
-          let f value = match Value.classify value with
-          | Value.Object obj -> begin match Js.Dict.get obj "id" with
-            | Some v -> (Obj.magic v) = id
-            | None -> false
-            end
-          | _ -> false
-          in
-          Value.ofOption (Js.Array.find f value))
-    | _ -> return Value.null
-  in
-
-  let resolveData ~screenArgs:_ ~args:_ ~execute here =
-    execute here
-  in
-  let resolveValue ~screenArgs ~args:_ ~execute here =
-    currentValue ~screenArgs ~execute here
-  in
-  let resolveTitle ~screenArgs ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = currentValue ~screenArgs ~execute here in
-    let%bind titleBase =
-      let q = TypedQuery.unsafeLookupArg ~name:"title" screenArgs in
-      let q = TypedQuery.unsafeChain here q in
-      execute q
-    in
-    let titleSuffix =
-      Value.get ~name:"id" value
-      |> Option.alt (Value.get ~name:"title" value)
-      |> Option.alt (Value.get ~name:"name" value)
-      |> Option.getWithDefault Value.null
-    in
-    match Value.classify titleBase, Value.classify titleSuffix with
-    | Value.String base, Value.String title -> return (Value.string {j|$base ($title)|j})
-    | Value.String base, Value.Null -> return (Value.string {j|$base|j})
-    | _ -> return (Value.string {j|Pick|j})
-  in
   Screen.Syntax.(screen
     ~inputCard:Card.Many
-    ~navigate:"value"
     ~args:[
       arg "id" ~default:Q.null (one number);
       arg "title" ~default:(Q.string "Pick") (one string);
     ]
-    (fun entity -> [
-      has ~resolve:resolveTitle "title" (one string);
-      has ~resolve:resolveValue "value" (opt entity);
-      has ~resolve:resolveData "data" (many entity);
-    ])
+    Q.(
+      let parent = name "parent" in
+      let title = name "title" in
+      let id = name "id" in
+      let base = void |> select [
+          field ~alias:"data" parent;
+          field ~alias:"value" (parent |> locate id);
+        ]
+      in
+      void
+      |> select [
+        field ~alias:"data" parent;
+        field ~alias:"value" (base |> nav "value");
+        field ~alias:"title" title;
+      ]
+    )
   )
 
 let viewScreen =
-  let resolveData ~screenArgs:_ ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    return value
-  in
-  let resolveValue ~screenArgs:_ ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    return value
-  in
-  let resolveTitle ~screenArgs ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    let%bind titleBase =
-      let q = TypedQuery.unsafeLookupArg ~name:"title" screenArgs in
-      let q = TypedQuery.unsafeChain here q in
-      execute q
-    in
-    let titleSuffix =
-      Value.get ~name:"id" value
-      |> Option.alt (Value.get ~name:"title" value)
-      |> Option.alt (Value.get ~name:"name" value)
-    in
-    match titleBase, titleSuffix with
-    | base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
-    | base, None -> Result.Ok (Value.string {j|$base|j})
-  in
   Screen.Syntax.(screen
     ~inputCard:Card.One
-    ~navigate:"value"
     ~args:[
       arg "title" ~default:(Q.string "View") (one string);
     ]
-    (fun entity -> [
-      has ~resolve:resolveTitle "title" (one string);
-      has ~resolve:resolveValue "value" (one entity);
-      has ~resolve:resolveData "data" (one entity);
-    ])
+    Q.(
+      void
+      |> select [
+        field ~alias:"data" (name "parent");
+        field ~alias:"value" (name "parent");
+        field ~alias:"title" (name "title");
+      ]
+      |> where [
+      ]
+    )
   )
 
 let barChartScreen =
-  let resolveData ~screenArgs:_ ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    return value
-  in
-  let resolveValue ~screenArgs:_ ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    return value
-  in
-  let resolveTitle ~screenArgs ~args:_ ~execute here =
-    let open Result.Syntax in
-    let%bind value = execute here in
-    let%bind titleBase =
-      let q = TypedQuery.unsafeLookupArg ~name:"title" screenArgs in
-      let q = TypedQuery.unsafeChain here q in
-      execute q
-    in
-    let titleSuffix =
-      Value.get ~name:"id" value
-      |> Option.alt (Value.get ~name:"title" value)
-      |> Option.alt (Value.get ~name:"name" value)
-    in
-    match titleBase, titleSuffix with
-    | base, Some title -> Result.Ok (Value.string {j|$base ($title)|j})
-    | base, None -> Result.Ok (Value.string {j|$base|j})
-  in
   Screen.Syntax.(screen
     ~inputCard:Card.Many
-    ~navigate:"value"
     ~args:[
       arg "title" ~default:(Q.string "View") (one string);
     ]
-    (fun entity -> [
-      has ~resolve:resolveTitle "title" (one string);
-      has ~resolve:resolveValue "value" (one entity);
-      has ~resolve:resolveData "data" (one entity);
-    ])
+    Q.(
+      void
+      |> select [
+        field ~alias:"data" (name "parent");
+        field ~alias:"value" (name "parent");
+        field ~alias:"title" (name "title");
+      ]
+    )
   )
 
 let univ =
@@ -231,61 +129,11 @@ external data : Js.Json.t = "data" [@@bs.module "./data.js"]
 
 let db = JSONDatabase.ofJson ~univ data
 
-let workflow =
-  let open UntypedWorkflow.Syntax in
-  let open UntypedQuery.Syntax in
-
-  let pickRegion = render (
-    here
-    |> nav "region"
-    |> screen ~args:[arg "title" (string "Regions")] "pick"
-  ) in
-
-  let pickNation = render (
-    here
-    |> nav "nation"
-    |> screen ~args:[arg "title" (string "Nations")] "pick"
-  ) in
-
-  let pickCustomer = render (
-    here
-    |> nav "customer"
-    |> screen ~args:[arg "title" (string "Customers")] "pick"
-  ) in
-
-  let view title = render (
-    here
-    |> screen ~args:[arg "title" (string title)]"view"
-  ) in
-
-  let pickViewCustomer = pickCustomer |> andThen [
-    view "View Customer"
-  ] in
-
-  let pickViewNation = pickNation |> andThen [
-    view "View Nation" |> andThen [ pickViewCustomer ];
-    pickViewCustomer
-  ] in
-
-  let pickViewRegion = pickRegion |> andThen [
-    view "View Region" |> andThen [ pickViewNation ];
-    pickViewNation
-  ] in
-
-  pickViewRegion
-
 let toJS state =
   JsResult.ofResult (
     let open Result.Syntax in
     let%bind state, ui = state in
     Result.Ok [%bs.obj { state; ui = Js.Nullable.from_opt ui }]
-  )
-
-let start =
-  let open Result.Syntax in
-  toJS (
-    let%bind w = WorkflowTyper.typeWorkflow ~univ workflow in
-    WorkflowInterpreter.boot ~db w
   )
 
 let breadcrumbs state =
@@ -300,9 +148,16 @@ let render state =
   toJS (WorkflowInterpreter.render state)
 
 let pickValue id state =
+  let id = match Js.Json.classify id with
+  | Js.Json.JSONNumber id -> Q.number id
+  | Js.Json.JSONString id -> Q.string id
+  | _ -> Js.Exn.raiseError "invalid id for pickValue"
+  in
+  Js.log2 "pickValue.id" id;
   toJS (
     let open Result.Syntax in
-    let args = StringMap.(empty |> fun m -> set m "id" (UntypedQuery.Syntax.number id)) in
+    let args = StringMap.(empty |> fun m -> set m "id" id) in
+    Js.log2 "pickValue" (Query.showArgs args);
     let%bind state = WorkflowInterpreter.setArgs ~args state in
     let%bind state = WorkflowInterpreter.step state in
     WorkflowInterpreter.render state
@@ -367,15 +222,3 @@ let parse s =
   | Result.Error err -> makeError err
 
 let uiName = Value.UI.name
-
-let uiArgs ui =
-  let args = Value.UI.args ui in
-  let value = Value.UI.value ui in
-  let baseQuery = Value.UI.query ui in
-  let f args name argQuery =
-    let query = TypedQuery.unsafeChain baseQuery argQuery in
-    let value = unwrapResult (JSONDatabase.execute ~value ~db query) in
-    Js.Dict.set args name value;
-    args
-  in StringMap.reduce args (Js.Dict.empty ()) f
-

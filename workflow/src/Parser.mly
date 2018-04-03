@@ -13,6 +13,7 @@
 %token RIGHT_BRACE
 %token LEFT_PAREN
 %token RIGHT_PAREN
+%token <string> NAME
 %token <string> ID
 %token <string> STRING
 %token <float> NUMBER
@@ -21,13 +22,13 @@
 
 %{
 
-  module S = Core.UntypedQuery.Syntax
+  module S = Core.Query.Syntax
   module W = Core.UntypedWorkflow.Syntax
   module StringMap = Belt.Map.String
 
   type nav = {
     name : string;
-    args : Core.UntypedQuery.Syntax.Arg.t list;
+    args : Core.Query.Syntax.Arg.t list;
   }
 
 %}
@@ -74,6 +75,7 @@ query:
   | v = NUMBER { S.number v }
   | v = BOOL { S.bool v }
   | NULL { S.null }
+  | name = NAME { S.name name }
 
 nav:
   | name = ID { {name; args = []} }

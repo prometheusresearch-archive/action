@@ -34,11 +34,15 @@ const initialState = {
 export class Console extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
-    this.state = this.getStateFromQuery('');
+    this.state = this.getStateFromQuery(outdent`
+      render(region:pick(title: "Regions")) {
+        render(value:view)
+      }
+    `);
   }
 
   getStateFromQuery = (value: string) => {
-    if (value == '') {
+    if (value === '') {
       return initialState;
     }
     const result = W.parse(value);
@@ -131,7 +135,7 @@ function Help({value, onPress}) {
           title="Workflow: Simple workflow with regions"
           query={outdent`
           render(region:pick(title: "Regions")) {
-            render(:view)
+            render(value:view)
           }
         `}
         />
@@ -140,12 +144,12 @@ function Help({value, onPress}) {
           query={outdent`
           render(region:pick(title: "Regions")) {
 
-            render(:view),
-            render(nation:pick(title: "Nations")) {
+            render(value:view),
+            render(value.nation:pick(title: "Nations")) {
 
-              render(:view),
-              render(customer:pick(title: "Customers")) {
-                render(:view),
+              render(value:view),
+              render(value.customer:pick(title: "Customers")) {
+                render(value:view),
               }
 
             }
@@ -158,11 +162,11 @@ function Help({value, onPress}) {
           query={outdent`
           render(region:pick(title: "Regions")) {
 
-            render(:view(
+            render(value:view(
               title: "Region"
             )),
 
-            render({
+            render(value {
               nationCount: nation:count,
               customerCount: nation.customer:count,
               name: name,
@@ -170,7 +174,7 @@ function Help({value, onPress}) {
               title: "Region Statistics"
             )),
 
-            render(nation {
+            render(value.nation {
               label: name,
               value: customer:count,
             }:barChart(
@@ -194,10 +198,10 @@ function Input(props) {
         borderColor: props.isError ? 'red' : '#bbb',
       }}>
       <Textarea
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        spellcheck="false"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck="false"
         minRows={3}
         maxRows={15}
         style={{

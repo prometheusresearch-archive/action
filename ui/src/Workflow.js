@@ -6,7 +6,7 @@ import * as React from 'react';
 import * as ReactNative from 'react-native-web';
 import MediaQuery from 'react-responsive';
 import * as W from 'workflow';
-import type {Result, RenderableState, State, UI} from 'workflow';
+import type {Result, RenderableState, State} from 'workflow';
 import {Pick} from './Pick.js';
 import {View} from './View.js';
 import {BarChart} from './BarChart.js';
@@ -65,7 +65,7 @@ export class Workflow extends React.Component<P, S> {
       const next = W.next(state.value.state);
       const {ui, state: node} = state.value;
       const name = W.uiName(ui);
-      const args = W.uiArgs(ui);
+      const args = {};
       let screen = null;
       const toolbar = <NavToolbar items={next} onState={this.onState} />;
       if (name === 'pick') {
@@ -134,6 +134,16 @@ export class Workflow extends React.Component<P, S> {
 
 function Header(props) {
   const needNav = Boolean(props.toolbar);
+  const borderTopStyle = {
+    borderTopWidth: 1,
+    borderTopStyle: 'solid',
+    borderTopColor: '#bbb',
+  };
+  const borderStyle = {
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#bbb',
+  };
   return (
     <ReactNative.View style={{padding: 10}}>
       <ReactNative.View
@@ -141,15 +151,13 @@ function Header(props) {
           boxShadow: '0px 1px 0px 0px #BBB',
           borderRadius: 2,
           flexDirection: 'column',
-          border: '1px solid #BBB',
+          ...borderStyle,
         }}>
-        <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
+        <ReactNative.View style={{...borderTopStyle}}>
           <Breadcrumb breadcrumb={props.breadcrumb} />
         </ReactNative.View>
         {needNav && (
-          <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
-            {props.toolbar}
-          </ReactNative.View>
+          <ReactNative.View style={{...borderTopStyle}}>{props.toolbar}</ReactNative.View>
         )}
       </ReactNative.View>
     </ReactNative.View>
