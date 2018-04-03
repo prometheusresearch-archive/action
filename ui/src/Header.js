@@ -88,7 +88,7 @@ export function Breadcrumb(props: {breadcrumb: Array<BreadcrumbItem>}) {
         <Text style={{fontSize: '9pt', fontWeight: '200', paddingLeft: 15}}>›</Text>
       </View>
       {props.breadcrumb.map((item, idx) => {
-        return <BreadcrumbButton onPress={item.onPress} title={item.title} />;
+        return <BreadcrumbButton key={idx} onPress={item.onPress} title={item.title} />;
       })}
     </View>
   );

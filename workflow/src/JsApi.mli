@@ -15,7 +15,7 @@ type query
 
 val render : state -> renderableState JsResult.t
 
-val pickValue : float -> state -> renderableState JsResult.t
+val pickValue : Js.Json.t -> state -> renderableState JsResult.t
 
 val id : state -> string
 val uiName : ui -> string

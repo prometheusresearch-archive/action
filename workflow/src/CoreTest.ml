@@ -35,7 +35,6 @@ let typeWorkflow w =
 let () =
 
   (* Navigation *)
-
   runQuery Q.(
     void
     |> nav "region"
@@ -56,7 +55,6 @@ let () =
   );
 
   (* Select *)
-
   runQuery Q.(
     here
     |> select [
@@ -104,4 +102,30 @@ let () =
     |> where [
       define "name" (here |> nav "name");
     ]
+  );
+
+  (* Screens *)
+  runQuery Q.(
+    here
+    |> nav "region"
+    |> screen "pick"
+  );
+  runQuery Q.(
+    here
+    |> nav "region"
+    |> screen "pick"
+    |> nav "value"
+  );
+  runQuery Q.(
+    here
+    |> nav "region"
+    |> screen ~args:[arg "id" (string "ASIA")] "pick"
+    |> nav "value"
+  );
+  runQuery Q.(
+    here
+    |> nav "region"
+    |> screen ~args:[arg "id" (string "ASIA")] "pick"
+    |> nav "value"
+    |> screen "view"
   );

@@ -47,16 +47,17 @@ let pickScreen =
     Q.(
       let parent = name "parent" in
       let title = name "title" in
-      let value = name "value" in
       let id = name "id" in
+      let base = void |> select [
+          field ~alias:"data" parent;
+          field ~alias:"value" (parent |> locate id);
+        ]
+      in
       void
       |> select [
         field ~alias:"data" parent;
-        field ~alias:"value" value;
+        field ~alias:"value" (base |> nav "value");
         field ~alias:"title" title;
-      ]
-      |> where [
-        arg "value" (parent |> locate id);
       ]
     )
   )
@@ -147,9 +148,16 @@ let render state =
   toJS (WorkflowInterpreter.render state)
 
 let pickValue id state =
+  let id = match Js.Json.classify id with
+  | Js.Json.JSONNumber id -> Q.number id
+  | Js.Json.JSONString id -> Q.string id
+  | _ -> Js.Exn.raiseError "invalid id for pickValue"
+  in
+  Js.log2 "pickValue.id" id;
   toJS (
     let open Result.Syntax in
-    let args = StringMap.(empty |> fun m -> set m "id" (Q.number id)) in
+    let args = StringMap.(empty |> fun m -> set m "id" id) in
+    Js.log2 "pickValue" (Query.showArgs args);
     let%bind state = WorkflowInterpreter.setArgs ~args state in
     let%bind state = WorkflowInterpreter.step state in
     WorkflowInterpreter.render state
