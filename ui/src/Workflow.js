@@ -134,6 +134,16 @@ export class Workflow extends React.Component<P, S> {
 
 function Header(props) {
   const needNav = Boolean(props.toolbar);
+  const borderTopStyle = {
+    borderTopWidth: 1,
+    borderTopStyle: 'solid',
+    borderTopColor: '#bbb',
+  };
+  const borderStyle = {
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#bbb',
+  };
   return (
     <ReactNative.View style={{padding: 10}}>
       <ReactNative.View
@@ -141,15 +151,13 @@ function Header(props) {
           boxShadow: '0px 1px 0px 0px #BBB',
           borderRadius: 2,
           flexDirection: 'column',
-          border: '1px solid #BBB',
+          ...borderStyle,
         }}>
-        <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
+        <ReactNative.View style={{...borderTopStyle}}>
           <Breadcrumb breadcrumb={props.breadcrumb} />
         </ReactNative.View>
         {needNav && (
-          <ReactNative.View style={{borderTop: '1px solid #bbb'}}>
-            {props.toolbar}
-          </ReactNative.View>
+          <ReactNative.View style={{...borderTopStyle}}>{props.toolbar}</ReactNative.View>
         )}
       </ReactNative.View>
     </ReactNative.View>
