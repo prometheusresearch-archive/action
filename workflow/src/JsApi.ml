@@ -3,7 +3,7 @@
  *)
 open Core
 
-module Q = Core.UntypedQuery.Syntax
+module Q = Core.Query.Syntax
 module T = Core.Type.Syntax
 module S = Core.Screen.Syntax
 
@@ -149,7 +149,7 @@ let render state =
 let pickValue id state =
   toJS (
     let open Result.Syntax in
-    let args = StringMap.(empty |> fun m -> set m "id" (UntypedQuery.Syntax.number id)) in
+    let args = StringMap.(empty |> fun m -> set m "id" (Q.number id)) in
     let%bind state = WorkflowInterpreter.setArgs ~args state in
     let%bind state = WorkflowInterpreter.step state in
     WorkflowInterpreter.render state

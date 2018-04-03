@@ -5,7 +5,7 @@ let () =
       let res = Parser.start Lexer.read filebuf in
       match res with
       | Core.ParseResult.Query q ->
-        Js.log2 "QUERY" (Core.UntypedQuery.show q)
+        Js.log2 "QUERY" (Core.Query.show q)
       | Core.ParseResult.Workflow w ->
         Js.log2 "WORKFLOW" (Core.UntypedWorkflow.show w)
     with

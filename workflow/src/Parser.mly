@@ -22,13 +22,13 @@
 
 %{
 
-  module S = Core.UntypedQuery.Syntax
+  module S = Core.Query.Syntax
   module W = Core.UntypedWorkflow.Syntax
   module StringMap = Belt.Map.String
 
   type nav = {
     name : string;
-    args : Core.UntypedQuery.Syntax.Arg.t list;
+    args : Core.Query.Syntax.Arg.t list;
   }
 
 %}

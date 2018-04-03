@@ -132,7 +132,7 @@ module ArgSyntax (D : sig type t end) = struct
     Belt.List.reduce args StringMap.empty build
 end
 
-module Const = struct
+module ConstExpr = struct
 
   type t =
     | String of string
@@ -149,27 +149,12 @@ end
  * example location of the query sources parsed from source files or type
  * information.
  *)
-module Query (
-  Cfg : sig
-
-    type context
-
-    type name
-
-    type 'q binding
-
-    val showName : name -> string
-  end
-) = struct
-
+module Query = struct
 
   type t = context * syntax
 
-  and context = Cfg.context
-
-  and binding = t Cfg.binding
-
-  and name = Cfg.name
+  (* This is going to be used for location info *)
+  and context = unit
 
   and syntax =
     | Void
@@ -179,12 +164,12 @@ module Query (
     | First of t
     | Count of t
     | Screen of (t * screen)
-    | Const of Const.t
+    | Const of ConstExpr.t
     | Where of (t * args)
-    | Name of name
+    | Name of string
     | Locate of (t * t)
 
-  and args = binding StringMap.t
+  and args = t StringMap.t
 
   and nav = { navName : string; }
 
@@ -200,21 +185,20 @@ module Query (
     query: t
   }
 
-  let showSyntax ~showBinding q =
-    let showArgs args =
+  let show q =
+    let rec showArgs args =
       let args =
         let f acc name query =
           let prefix = match acc with
           | "" -> ""
           | _ -> ", "
           in
-          let query = showBinding query in
+          let query = show query in
           {j|$prefix$name: $query|j}
         in
         StringMap.reduce args "" f
       in {j|($args)|j}
-    in
-    let rec show (_, syn) =
+    and show (_, syn) =
       match syn with
       | Const (String v) -> {j|"$v"|j}
       | Const (Number v) -> string_of_float v
@@ -247,7 +231,7 @@ module Query (
         let screenArgs = showArgs screenArgs in
         {j|$parent:$screenName$screenArgs|j}
       | Name name ->
-        "$" ^ (Cfg.showName name)
+        "$" ^ name
       | Locate (parent, id) ->
         let parent = show parent in
         let id = show id in
@@ -268,26 +252,6 @@ module Query (
     | Some _, Some u -> Some u
     | None, None -> None
     in StringMap.merge args update merge
-end
-
-(**
- * Untype query.
- *)
-module UntypedQuery = struct
-
-  include Query(struct
-
-    type context = unit
-
-    type name = string
-
-    type 'q binding = 'q
-
-    let showName name = name
-  end)
-
-  let rec show q = showSyntax ~showBinding q
-  and showBinding b = show b
 
   let rec chain ((), rootSyn as root) ((), syn) =
     let syn = match syn with
@@ -304,11 +268,6 @@ module UntypedQuery = struct
     | Locate (parent, id) -> Locate (chain root parent, chain root id)
     in (), syn
 
-  let inspect q = show q
-
-  (**
-   * A set of combinators to construct queries programmatically.
-   *)
   module Syntax = struct
 
     module Arg = ArgSyntax(struct type nonrec t = t end)
@@ -385,7 +344,7 @@ module Type = struct
     screenName : string;
     screenIn : ct;
     screenOut : ct;
-    screenOutQuery : UntypedQuery.t;
+    screenOutQuery : Query.t;
   }
 
   and value =
@@ -407,7 +366,7 @@ module Type = struct
 
   and arg = {
     argCtyp : ct;
-    argDefault : UntypedQuery.t option;
+    argDefault : Query.t option;
   }
 
   and args = arg StringMap.t
@@ -493,14 +452,14 @@ module Context = struct
 
   type t = scope * Type.ct
 
-  and scope = UntypedQuery.t StringMap.t
+  and scope = Query.t StringMap.t
 
   let void = StringMap.empty, (Card.One, Type.Void)
 
   let inspect (scope, ctyp) =
     let scope =
       let f dict k v =
-        Js.Dict.set dict k (UntypedQuery.inspect v);
+        Js.Dict.set dict k (Query.show v);
         dict
       in
       StringMap.reduce scope (Js.Dict.empty ()) f
@@ -513,42 +472,66 @@ end
  * Query with type and cardinality information attached.
  *)
 module TypedQuery = struct
-  include Query(struct
 
-    type context = Context.t
+  type t = context * syntax
 
-    type name = string * Context.t
+  and context = Context.t
 
-    type 'q binding = UntypedQuery.binding
+  and syntax =
+    | Void
+    | Here
+    | Select of (t * select)
+    | Navigate of t * nav
+    | First of t
+    | Count of t
+    | Screen of (t * screen)
+    | Const of ConstExpr.t
+    | Where of (t * args)
+    | Name of (string * Context.t)
+    | Locate of (t * t)
 
-    let showName (name, _) = name
-  end)
+  and args = Query.t StringMap.t
 
-  let rec show q = showSyntax ~showBinding q
-  and showBinding = UntypedQuery.showBinding
+  and nav = { navName : string; }
+
+  and screen = {
+    screenName : string;
+    screenArgs : args;
+  }
+
+  and select = field list
+
+  and field = {
+    alias : string option;
+    query: t
+  }
 
   let void = Context.void, Void
 
   let rec stripTypes (q : t) =
     match q with
-    | _, Void -> (), UntypedQuery.Void
-    | _, Here -> (), UntypedQuery.Here
+    | _, Void -> (), Query.Void
+    | _, Here -> (), Query.Here
     | _, Select (parent, fields) ->
       let fields =
-        let f {alias; query} = {UntypedQuery. alias; query = stripTypes query} in
+        let f {alias; query} = {Query. alias; query = stripTypes query} in
         List.map f fields
       in
-      (), UntypedQuery.Select (stripTypes parent, fields)
+      (), Query.Select (stripTypes parent, fields)
     | _, Navigate (parent, { navName }) ->
-      (), UntypedQuery.Navigate (stripTypes parent, {UntypedQuery. navName })
-    | _, First parent -> (), UntypedQuery.First (stripTypes parent)
-    | _, Count parent -> (), UntypedQuery.Count (stripTypes parent)
+      (), Query.Navigate (stripTypes parent, {Query. navName })
+    | _, First parent -> (), Query.First (stripTypes parent)
+    | _, Count parent -> (), Query.Count (stripTypes parent)
     | _, Screen (parent, { screenName; screenArgs; }) ->
-      (), UntypedQuery.Screen (stripTypes parent, {UntypedQuery. screenName; screenArgs; })
-    | _, Const v -> (), UntypedQuery.Const v
-    | _, Where (parent, bindings) -> (), UntypedQuery.Where (stripTypes parent, bindings)
-    | _, Name (name, _) -> (), UntypedQuery.Name name
+      (), Query.Screen (stripTypes parent, {Query. screenName; screenArgs; })
+    | _, Const v -> (), Query.Const v
+    | _, Where (parent, bindings) -> (), Query.Where (stripTypes parent, bindings)
+    | _, Name (name, _) -> (), Query.Name name
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
+
+  let show q =
+    Query.show (stripTypes q)
+
 end
 
 (**
@@ -575,7 +558,7 @@ module Value = struct
       -> typ : Type.t
       -> value : value
       -> query : TypedQuery.t
-      -> outQuery : UntypedQuery.t
+      -> outQuery : Query.t
       -> t
 
     val test : 'a -> bool
@@ -584,7 +567,7 @@ module Value = struct
     val args : t -> TypedQuery.args
     val setArgs : args : TypedQuery.args -> t -> t
     val query : t -> TypedQuery.t
-    val outQuery : t -> UntypedQuery.t
+    val outQuery : t -> Query.t
     val value : t -> value
     val typ : t -> Type.t
 
@@ -593,7 +576,7 @@ module Value = struct
       name : string;
       args : TypedQuery.args;
       query : TypedQuery.t;
-      outQuery : UntypedQuery.t;
+      outQuery : Query.t;
       value : value;
       typ : Type.t;
     > Js.t
@@ -604,7 +587,7 @@ module Value = struct
       -> typ : Type.t
       -> value : value
       -> query : TypedQuery.t
-      -> outQuery : UntypedQuery.t
+      -> outQuery : Query.t
       -> t
       = "UIRepr" [@@bs.new] [@@bs.module "./UIRepr"]
 
@@ -622,7 +605,7 @@ module Value = struct
     let typ ui = ui##typ
 
     let setArgs ~args ui =
-      let args = TypedQuery.updateArgs ~update:args ui##args in
+      let args = Query.updateArgs ~update:args ui##args in
       make ~name:ui##name ~args ~typ:ui##typ ~value:ui##value ~query:ui##query ~outQuery:ui##outQuery
   end
 
@@ -675,7 +658,7 @@ module Screen = struct
   type t = {
     args : Type.arg StringMap.t;
     inputCard : Card.t;
-    grow : UntypedQuery.t;
+    grow : Query.t;
   }
 
   module Syntax = struct
@@ -766,18 +749,18 @@ module QueryTyper : sig
   val typeQuery :
     ?ctx : TypedQuery.context
     -> univ:Universe.t
-    -> UntypedQuery.t
+    -> Query.t
     -> (TypedQuery.t, string) Result.t
 
   val checkArgs :
     argTyps : Type.args
-    -> UntypedQuery.args
+    -> Query.args
     -> (TypedQuery.args, string) Result.t
 
   (** Same as checkArgs but doesn't set default values for missing args *)
   val checkArgsPartial :
     argTyps : Type.args
-    -> UntypedQuery.args
+    -> Query.args
     -> (TypedQuery.args, string) Result.t
 
   val nav :
@@ -857,17 +840,17 @@ end = struct
     return args
 
   and typeQuery ?(ctx=Context.void) ~univ query =
-    Js.log2 "typeQuery query" (UntypedQuery.show query);
+    Js.log2 "typeQuery query" (Query.show query);
     Js.log2 "typeQuery ctx" (Context.inspect ctx);
     let rec aux ~ctx ((), query) =
       let scope, ctyp = ctx in
       let open Result.Syntax in
       match query with
-      | UntypedQuery.Void ->
+      | Query.Void ->
         return ((scope, (Card.One, Type.Void)), TypedQuery.Void)
-      | UntypedQuery.Here ->
+      | Query.Here ->
         return (ctx, TypedQuery.Here)
-      | UntypedQuery.Locate (parent, id) ->
+      | Query.Locate (parent, id) ->
         let%bind ((bindings, (card, typ)), _) as parent = aux ~ctx parent in
         begin match card with
         | Card.Many ->
@@ -876,7 +859,7 @@ end = struct
         | _ ->
           error {j|locate can only be applied to queries with cardinality many|j}
         end
-      | UntypedQuery.Name name ->
+      | Query.Name name ->
         begin match StringMap.get scope name with
         | Some query ->
           let%bind nextCtx, _syn = aux ~ctx query in
@@ -885,7 +868,7 @@ end = struct
           Js.log (Context.inspect ctx);
           error {j|referencing unknown binding "$name"|j}
         end
-      | UntypedQuery.Where (parent, bindings) ->
+      | Query.Where (parent, bindings) ->
         let nextScope =
           let f scope name query =
             StringMap.set scope name query
@@ -897,39 +880,39 @@ end = struct
           (scope, parentCtyp),
           TypedQuery.Where (parent, bindings)
         )
-      | UntypedQuery.Const (Const.String v) ->
+      | Query.Const (ConstExpr.String v) ->
         return (
           (scope, (Card.One, Type.Value Type.String)),
-          TypedQuery.Const (Const.String v)
+          TypedQuery.Const (ConstExpr.String v)
         )
-      | UntypedQuery.Const (Const.Number v) ->
+      | Query.Const (ConstExpr.Number v) ->
         return (
           (scope, (Card.One, Type.Value Type.Number)),
-          TypedQuery.Const (Const.Number v)
+          TypedQuery.Const (ConstExpr.Number v)
         )
-      | UntypedQuery.Const (Const.Bool v) ->
+      | Query.Const (ConstExpr.Bool v) ->
         return (
           (scope, (Card.One, Type.Value Type.Bool)),
-          TypedQuery.Const (Const.Bool v)
+          TypedQuery.Const (ConstExpr.Bool v)
         )
-      | UntypedQuery.Const (Const.Null) ->
+      | Query.Const (ConstExpr.Null) ->
         return (
           (scope, (Card.One, Type.Value Type.Null)),
-          TypedQuery.Const (Const.Null)
+          TypedQuery.Const (ConstExpr.Null)
         )
-      | UntypedQuery.Count parent ->
+      | Query.Count parent ->
         let%bind parent = aux ~ctx parent in
         return (
           (scope, (Card.One, Type.Syntax.number)),
           TypedQuery.Count parent
         )
-      | UntypedQuery.First parent ->
+      | Query.First parent ->
         let%bind ((_, (_, parentType)), _) as parent = aux ~ctx parent in
         return (
           (scope, (Card.Opt, parentType)),
           TypedQuery.First parent
         )
-      | UntypedQuery.Screen (parent, { screenName; screenArgs; }) ->
+      | Query.Screen (parent, { screenName; screenArgs; }) ->
         let parentUntyped = parent in
         let%bind (parentCtx, _) as parent = aux ~ctx parent in
 
@@ -966,8 +949,8 @@ end = struct
               let bindings = StringMap.reduce screenArgs bindings StringMap.set in
               bindings
             in
-            let outQuery = (), UntypedQuery.Where (screen.grow, bindings) in
-            Js.log2 "SSS" (UntypedQuery.show outQuery);
+            let outQuery = (), Query.Where (screen.grow, bindings) in
+            Js.log2 "SSS" (Query.show outQuery);
             let%bind (_, screenOut), _ = aux ~ctx:parentCtx outQuery in
             Js.log "SSS";
             return (
@@ -983,15 +966,15 @@ end = struct
           ctx,
           TypedQuery.Screen (parent, { screenName; screenArgs; })
         )
-      | UntypedQuery.Navigate (parent, navigation) ->
-        let { UntypedQuery. navName; } = navigation in
+      | Query.Navigate (parent, navigation) ->
+        let { Query. navName; } = navigation in
         let%bind parent = aux ~ctx parent in
         nav ~univ navName parent
-      | UntypedQuery.Select (parent, selection) ->
+      | Query.Select (parent, selection) ->
         let%bind parent = aux ~ctx parent in
         let parentCtx, _parentSyn = parent in
         let parentScope, (parentCard, _parentTyp) = parentCtx in
-        let checkField fields { UntypedQuery. alias; query } =
+        let checkField fields { Query. alias; query } =
           match fields with
           | Result.Ok (fields, selection, index) ->
             let%bind query = aux ~ctx:parentCtx query in
@@ -1078,13 +1061,13 @@ end = struct
       | _, TypedQuery.Where (parent, _bindings) ->
         aux ~value parent
 
-      | Type.Value Type.String, TypedQuery.Const (Const.String v) ->
+      | Type.Value Type.String, TypedQuery.Const (ConstExpr.String v) ->
         return (Value.string v)
-      | Type.Value Type.Number, TypedQuery.Const (Const.Number v) ->
+      | Type.Value Type.Number, TypedQuery.Const (ConstExpr.Number v) ->
         return (Value.number v)
-      | Type.Value Type.Bool, TypedQuery.Const (Const.Bool v) ->
+      | Type.Value Type.Bool, TypedQuery.Const (ConstExpr.Bool v) ->
         return (Value.bool v)
-      | Type.Value Type.Null, TypedQuery.Const (Const.Null) ->
+      | Type.Value Type.Null, TypedQuery.Const (ConstExpr.Null) ->
         return (Value.null)
       | _, TypedQuery.Const _ ->
         error "invalid type for const"
@@ -1261,7 +1244,7 @@ end) = struct
 end
 
 module UntypedWorkflow = struct
-  include Workflow(UntypedQuery)
+  include Workflow(Query)
 
   module Syntax = struct
     let render q = Render q
@@ -1294,8 +1277,8 @@ end = struct
     let rec aux ~parent w =
       match w with
       | UntypedWorkflow.Render q ->
-        Js.log2 "TYPING" (UntypedQuery.show q);
-        let q = UntypedQuery.chain parent q in
+        Js.log2 "TYPING" (Query.show q);
+        let q = Query.chain parent q in
         let%bind q = QueryTyper.typeQuery ~univ q in
         Js.log2 "TYPING OK" (TypedQuery.show q);
         begin match q with
@@ -1317,7 +1300,7 @@ end = struct
         in
         return (TypedWorkflow.Next (first, List.rev next), parent)
     in
-    let%bind tw, _ = aux ~parent:UntypedQuery.Syntax.void w in
+    let%bind tw, _ = aux ~parent:Query.Syntax.void w in
     return tw
 
 end
@@ -1345,7 +1328,7 @@ module WorkflowInterpreter (Db : DATABASE) : sig
 
   val uiQuery : t -> (TypedQuery.t, string) Result.t
 
-  val setArgs : args : UntypedQuery.args -> t -> (t, string) Result.t
+  val setArgs : args : Query.args -> t -> (t, string) Result.t
 
   val step : t -> (t, string) Result.t
 
@@ -1533,7 +1516,7 @@ end = struct
       let%bind args = QueryTyper.checkArgsPartial ~argTyps:screen.args args in
       let c = {
         c with TypedQuery.
-        screenArgs = TypedQuery.updateArgs ~update:args c.screenArgs
+        screenArgs = Query.updateArgs ~update:args c.screenArgs
       } in
       let workflow = TypedWorkflow.Render (ctyp, TypedQuery.Screen (p, c)) in
       return { frame with args; workflow; }
@@ -1546,5 +1529,5 @@ end
 module ParseResult = struct
   type t =
     | Workflow of UntypedWorkflow.t
-    | Query of UntypedQuery.t
+    | Query of Query.t
 end

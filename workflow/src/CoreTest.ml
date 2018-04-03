@@ -1,6 +1,6 @@
 open Core
 
-module Q = UntypedQuery.Syntax
+module Q = Query.Syntax
 
 let univ = JsApi.univ
 let db = JsApi.db
@@ -14,7 +14,7 @@ let runResult result = match result with
 let runQuery query =
   Js.log "--- RUNNING QUERY ---";
   let result =
-    Js.log2 "QUERY:" (UntypedQuery.show query);
+    Js.log2 "QUERY:" (Query.show query);
     let open Result.Syntax in
     Js.log "TYPING...";
     let%bind query = QueryTyper.typeQuery ~univ query in
