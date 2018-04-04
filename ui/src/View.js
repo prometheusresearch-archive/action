@@ -14,8 +14,16 @@ type P = {
 };
 
 export function View(props: P) {
-  const data = W.getData(props.state);
-  const title = W.getTitle(props.state);
+  const {title, data, type} = W.query(
+    props.state,
+    `
+      {
+        title: title,
+        data: data,
+        type: data:meta.type,
+      }
+    `,
+  );
   return (
     <ReactNative.View>
       <ScreenTitle>{title}</ScreenTitle>

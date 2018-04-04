@@ -27,8 +27,15 @@ type P = {
 };
 
 export const BarChart = withScreenSize(({state, width = 400, height = 400}: P) => {
-  const data = W.getData(state);
-  const title = W.getTitle(state);
+  const {title, data} = W.query(
+    state,
+    `
+      {
+        title: title,
+        data: data,
+      }
+    `,
+  );
   if (width < 10) return null;
 
   // bounds

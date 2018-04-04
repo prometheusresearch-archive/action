@@ -16,12 +16,20 @@ type P = {
 };
 
 export function Pick(props: P) {
-  const data = W.getData(props.state);
-  const title = W.getTitle(props.state);
+  const {title, data, type} = W.query(
+    props.state,
+    `
+      {
+        title: title,
+        data: data,
+        type: data:meta.type,
+      }
+    `,
+  );
   const onSelect = id => {
     props.onPick(id);
   };
-  const fields = props.args.fields || inferFields(data[0]);
+  const fields = fieldsFromType(type);
   return (
     <View>
       <ScreenTitle>{title}</ScreenTitle>
@@ -38,26 +46,35 @@ export function Pick(props: P) {
   );
 }
 
-function inferFields(item) {
-  const fields = [];
-  for (const name in item) {
-    const value = item[name];
-    if (typeof value === 'object') {
-      continue;
+function fieldsFromType(type) {
+  switch (type.type) {
+    case 'entity': {
+      const fields = [];
+      for (const key in type.fields) {
+        fields.push(key);
+      }
+      return fields;
     }
-    fields.push(name);
+    case 'record': {
+      const fields = [];
+      for (const key in type.fields) {
+        fields.push(key);
+      }
+      return fields;
+    }
+    default:
+      return [];
   }
-  return fields;
 }
 
 function Table(props) {
   const {data, onSelect, fields, selectedId} = props;
   const rows = data.map(data => {
     const cells = [];
-    for (const key of fields) {
+    for (const field of fields) {
       cells.push(
-        <View key={key} style={{padding: 5}}>
-          <Text>{String(data[key])}</Text>
+        <View key={field} style={{padding: 5}}>
+          <Text>{String(data[field])}</Text>
         </View>,
       );
     }

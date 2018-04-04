@@ -85,7 +85,7 @@ export class Workflow extends React.Component<P, S> {
         .slice(1)
         .reverse()
         .map(item => ({
-          title: String(W.getTitle(item)),
+          title: String(W.query(item, 'title')),
           onPress: this.onState.bind(null, item),
         }));
 
@@ -180,7 +180,7 @@ function Button(props) {
 
 function NavToolbar({items, onState, isItemActive, layout = 'horizontal', Button}) {
   const buttons = items.map((state, idx) => {
-    const title = W.getTitle(state);
+    const title = W.query(state, `title`);
     const onPress = () => onState(state);
     const isLast = idx === items.length - 1;
     const isActive = isItemActive(state, idx);
