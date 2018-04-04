@@ -1017,7 +1017,6 @@ module Value = struct
     let typ ui = ui##typ
 
     let setArgs ~args ui =
-      Js.log2 "UI.setArgs" (Query.showArgs args);
       let args = Query.updateArgs ~update:args ui##args in
       make
         ~univ:ui##univ
@@ -1113,7 +1112,6 @@ end = struct
   let univ db = db.univ
 
   let execute ?value ~db query =
-    Js.log2 "EXECUTE" (TypedQuery.show query);
     let open Result.Syntax in
     let rec aux ~(value : Value.t) ((_bindings, (_card, typ)), syn) =
       match typ, syn with
@@ -1294,7 +1292,6 @@ end = struct
     | None -> db.root
     in
     let%bind res = aux ~value query in
-    Js.log2 "EXECUTE RESULT" res;
     return res
 
 end
@@ -1501,7 +1498,6 @@ end = struct
 
     let render (frame, _ as state) =
       let%bind q = uiQuery state in
-      Js.log2 "WorkflowInterpreter.render" (TypedQuery.show q);
       let%bind res = Db.execute ~db:frame.db q in
       match Value.classify res with
       | Value.UI ui ->
@@ -1519,9 +1515,7 @@ end = struct
   let boot ~db workflow =
     let open Result.Syntax in
     let state = make ~position:Root ~db workflow in
-    Js.log2 "WorkflowInterpreter.boot: init:" (show state);
     let%bind state, ui = render state in
-    Js.log2 "WorkflowInterpreter.boot: first render:" (show state);
     return (state, ui)
 
   let next (_, _ as currentState) =
@@ -1550,7 +1544,6 @@ end = struct
   let step state =
     let open Result.Syntax in
     let%bind next = next state in
-    Js.log2 "NEXT" (List.map show next |> Array.of_list);
     match next with
     | [] -> return state
     | state::_ -> return state
@@ -1570,7 +1563,6 @@ end = struct
     return q
 
   let setArgs ~args (frame, ui) =
-    Js.log2 "WorkflowInterpreter.setArgs" (Query.showArgs args);
     let open Result.Syntax in
     let%bind frame = match frame.workflow with
     | TypedWorkflow.Render (ctyp, Query.Screen (p, c)) ->

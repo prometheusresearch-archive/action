@@ -26,6 +26,10 @@
           ]
         }
       ]
+    },
+    {
+      "dir": "src/__tests__",
+      "type": "dev"
     }
   ],
   "package-specs": {
@@ -41,6 +45,9 @@
       "name": "menhir",
       "command": "menhir --explain --table $in"
     }
+  ],
+  "bs-dev-dependencies": [
+    "@glennsl/bs-jest"
   ],
   "suffix": ".bs.js",
   "ppx-flags": [

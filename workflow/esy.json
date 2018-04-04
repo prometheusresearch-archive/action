@@ -4,6 +4,7 @@
   "description": "",
   "esy": {},
   "devDependencies": {
+    "@glennsl/bs-jest": "^0.4.2",
     "@opam/merlin": "*",
     "@opam/menhir": "*",
     "bs-platform": "^2.2.0",
