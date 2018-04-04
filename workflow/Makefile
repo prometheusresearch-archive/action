@@ -20,6 +20,8 @@ build:
 watch:
 	@esy $(NODE_MODULE_BIN)/node_modules/.bin/bsb -make-world -w
 
-test:
-	@node $(PROJECT_DIR)/src/CoreTest.bs.js
-	@node $(PROJECT_DIR)/src/ParsingTest.bs.js
+test: build
+	@$(NODE_MODULE_BIN)/jest
+
+test-watch:
+	@$(NODE_MODULE_BIN)/jest --watch
