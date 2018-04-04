@@ -18,3 +18,4 @@
 - [ ] Add pretty-printer
 - [ ] Allow editing workflow "live"
 - [ ] Compilation into SQL
+- [ ] Better query/workflow editing experience
