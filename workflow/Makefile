@@ -15,10 +15,12 @@ menhirLib:
 	@cp -rf $$(esy ocamlfind query menhirLib) $(@)
 
 build:
-	@esy $(NODE_MODULE_BIN)/node_modules/.bin/bsb -make-world
+	@esy $(NODE_MODULE_BIN)/bsb -make-world
 
 watch:
-	@esy $(NODE_MODULE_BIN)/node_modules/.bin/bsb -make-world -w
+	echo $(PROJECT_DIR)
+	echo $(NODE_MODULE_BIN)
+	esy $(NODE_MODULE_BIN)/bsb -make-world -w
 
 test: build
 	@$(NODE_MODULE_BIN)/jest
