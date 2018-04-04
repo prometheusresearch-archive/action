@@ -172,6 +172,7 @@ module Query = struct
     | Where of (t * args)
     | Name of string
     | Locate of (t * t)
+    | Meta of t
 
   and args = t StringMap.t
 
@@ -213,6 +214,9 @@ module Query = struct
     | Count parent ->
       let parent = show parent in
       {j|$parent:count|j}
+    | Meta parent ->
+      let parent = show parent in
+      {j|$parent:meta|j}
     | Select (parent, fields) ->
       let parent = show parent in
       let fields =
@@ -307,6 +311,9 @@ module Query = struct
     let locate id parent =
       (), Locate (parent, id)
 
+    let meta parent =
+      (), Meta parent
+
     let arg = Arg.make
     let define = Arg.make
 
@@ -338,10 +345,11 @@ module Type = struct
     | Number
     | Bool
     | Null
+    | Abstract
 
   and entity = {
     entityName : string;
-    entityFields : field list option;
+    entityFields : field list;
   }
 
   and field = {
@@ -377,11 +385,27 @@ module Type = struct
     | Number -> "number"
     | Bool -> "bool"
     | Null -> "null"
+    | Abstract -> "abstract"
 
   and showCt (card, typ) =
     let card = Card.show card in
     let typ = show typ in
     {j|$card $typ|j}
+
+  let ctyp =
+    Card.One,
+    Record [
+      {
+        fieldName = "card";
+        fieldCtyp = Card.One, Value String;
+        fieldArgs = StringMap.empty;
+      };
+      {
+        fieldName = "type";
+        fieldCtyp = Card.One, Value Abstract;
+        fieldArgs = StringMap.empty;
+      };
+    ]
 
   (**
    * Combinators to define a type system.
@@ -398,7 +422,7 @@ module Type = struct
         ArgSyntax.make name arg
     end
 
-    let entity name fields = Entity {entityName = name; entityFields = Some fields}
+    let entity name fields = Entity {entityName = name; entityFields = fields}
 
     let has ?(card=Card.One) ?(args=[]) name typ =
       let fieldArgs = Arg.ArgSyntax.toMap args in
@@ -461,6 +485,7 @@ module TypedQuery = struct
     | Where of (t * Query.args)
     | Name of (string * t)
     | Locate of (t * t)
+    | Meta of t
 
   and nav = { navName : string; }
 
@@ -496,6 +521,7 @@ module TypedQuery = struct
     | _, Where (parent, bindings) -> (), Query.Where (stripTypes parent, bindings)
     | _, Name (name, _) -> (), Query.Name name
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
+    | _, Meta parent -> (), Query.Meta (stripTypes parent)
 
   let show q =
     Query.show (stripTypes q)
@@ -688,9 +714,7 @@ end = struct
     | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
     | Type.Screen { screenOut = _, typ; _ } ->
       extractField ~univ fieldName typ
-    | Type.Entity {entityName; entityFields = None} ->
-      error {j|cannot extract field "$fieldName" from entity "$entityName"|j}
-    | Type.Entity {entityName = _; entityFields = Some fields} -> findInFieldList fields
+    | Type.Entity {entityName = _; entityFields} -> findInFieldList entityFields
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ ->
       error {j|cannot extract field "$fieldName" from value|j}
@@ -762,6 +786,10 @@ end = struct
         | _ ->
           error {j|locate can only be applied to queries with cardinality many|j}
         end
+
+      | Query.Meta parent ->
+        let%bind (scope, _ctyp), _ as parent = aux ~here ~ctx parent in
+        return ((scope, Type.ctyp), TypedQuery.Meta parent)
 
       | Query.Name name ->
         begin match StringMap.get scope name with
@@ -1042,6 +1070,64 @@ module Value = struct
     | Some v -> v
     | None -> null
 
+  let rec ofCard card =
+    match card with
+    | Card.One -> string "one"
+    | Card.Opt -> string "opt"
+    | Card.Many -> string "many"
+
+  and ofTyp typ =
+    let simpleType name =
+      obj Js.Dict.(
+        let dict = empty () in
+        set dict "type" (string name);
+        dict
+      )
+    in
+    match typ with
+    | Type.Void -> simpleType "void"
+    | Type.Screen _ -> simpleType "screen"
+    | Type.Entity { Type. entityName; entityFields } ->
+      let fields =
+        let f dict {Type. fieldName;fieldCtyp} =
+          Js.Dict.set dict fieldName (ofCtyp fieldCtyp);
+          dict
+        in
+        Belt.List.reduce entityFields (Js.Dict.empty ()) f
+      in
+      obj Js.Dict.(
+        let dict = empty () in
+        set dict "type" (string "entity");
+        set dict "name" (string entityName);
+        set dict "fields" (obj fields);
+        dict
+      )
+    | Type.Record fields ->
+      let fields =
+        let f dict {Type. fieldName;fieldCtyp} =
+          Js.Dict.set dict fieldName (ofCtyp fieldCtyp);
+          dict
+        in
+        Belt.List.reduce fields (Js.Dict.empty ()) f
+      in
+      obj Js.Dict.(
+        let dict = empty () in
+        set dict "type" (string "record");
+        set dict "fields" (obj fields);
+        dict
+      )
+    | Type.Value Type.String -> simpleType "string"
+    | Type.Value Type.Number -> simpleType "number"
+    | Type.Value Type.Bool -> simpleType "bool"
+    | Type.Value Type.Null -> simpleType "null"
+    | Type.Value Type.Abstract -> simpleType "abstract"
+
+  and ofCtyp (card, typ) = obj Js.Dict.(
+    empty ()
+    |> (fun obj -> set obj "card" (ofCard card); obj)
+    |> (fun obj -> set obj "type" (ofTyp typ); obj)
+  )
+
   type tagged =
     | Object of t Js.Dict.t
     | Array of t array
@@ -1285,6 +1371,9 @@ end = struct
           Js.log3 "ERROR:" "expected array but got" (Js.typeof parent);
           error {j|expected array|j}
         end
+
+      | _, TypedQuery.Meta ((_,ctyp),_) ->
+        return (Value.ofCtyp ctyp)
 
     in
     let value = match value with

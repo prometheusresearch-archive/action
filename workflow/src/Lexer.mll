@@ -32,6 +32,7 @@ rule read = parse
   | "barChart" { BAR_CHART }
   | "count"    { COUNT }
   | "first"    { FIRST }
+  | "meta"     { META }
   | "render"   { RENDER }
   | "true"     { BOOL true }
   | "false"    { BOOL false }

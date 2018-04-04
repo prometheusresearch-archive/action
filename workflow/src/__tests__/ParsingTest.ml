@@ -28,9 +28,7 @@ let () =
     expectParseOk "\n/";
     expectParseOk "/\n";
     expectParseOk "/individual";
-    expectParseOk "individual";
-    expectParseOk "individual.site";
-    expectParseOk "individual.site.title";
+    expectParseOk "individual"; expectParseOk "individual.site"; expectParseOk "individual.site.title";
     expectParseOk "individual{}";
     expectParseOk "individual { site }";
     expectParseOk "individual { site, }";
@@ -46,6 +44,11 @@ let () =
     expectParseOk "individual:pick(x: \"hello\")";
     expectParseOk "individual:pick(x: 1, y :2)";
     expectParseOk "individual:pick(x: 1, y: 2,)";
+
+    expectParseOk ":meta";
+    expectParseOk "individual:meta";
+    expectParseOk "individual.nation:meta";
+
     expectParseOk "render(individual:pick)";
     expectParseOk "render(individual:pick) { render(here:view) }";
     expectParseOk "render(individual:pick) { render(here:view), }";

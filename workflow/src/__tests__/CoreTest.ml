@@ -169,3 +169,29 @@ let () =
       );
     end;
   end;
+
+  describe "meta" begin fun () ->
+    test "region:meta" begin fun () ->
+      expectQueryOk Q.(
+        here
+        |> nav "region"
+        |> meta
+      );
+    end;
+    test "region:meta.card" begin fun () ->
+      expectQueryOk Q.(
+        here
+        |> nav "region"
+        |> meta
+        |> nav "card"
+      );
+    end;
+    test "region:meta.type" begin fun () ->
+      expectQueryOk Q.(
+        here
+        |> nav "region"
+        |> meta
+        |> nav "type"
+      );
+    end;
+  end;

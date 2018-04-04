@@ -3,6 +3,7 @@
 %token VIEW
 %token BAR_CHART
 %token COUNT
+%token META
 %token FIRST
 %token RENDER
 %token NULL
@@ -63,6 +64,8 @@ query:
   | VOID; COLON; s = screen { S.screen ~args:s.args s.name S.void }
   | COLON; COUNT { S.count S.here }
   | parent = query; COLON; COUNT { S.count parent }
+  | COLON; META { S.meta S.here }
+  | parent = query; COLON; META { S.meta parent }
   | COLON; FIRST { S.first S.here }
   | parent = query; COLON; FIRST { S.first parent }
   | parent = query; DOT; name = ID { S.nav name parent }
