@@ -43,10 +43,12 @@ let pickScreen =
     ~args:[
       arg "id" ~default:Q.null (one number);
       arg "title" ~default:(Q.string "Pick") (one string);
+      arg "fields" ~default:(Q.here) (one string);
     ]
     Q.(
       let parent = name "parent" in
       let title = name "title" in
+      let fields = name "fields" in
       let id = name "id" in
       let base = void |> select [
           field ~alias:"data" parent;
@@ -56,8 +58,9 @@ let pickScreen =
       void
       |> select [
         field ~alias:"data" parent;
+        field ~alias:"dataForUI" (parent |> grow fields);
         field ~alias:"value" (base |> nav "value");
-        field ~alias:"title" title;
+        field ~alias:"title" (base |> grow title);
       ]
     )
   )
@@ -74,8 +77,6 @@ let viewScreen =
         field ~alias:"data" (name "parent");
         field ~alias:"value" (name "parent");
         field ~alias:"title" (name "title");
-      ]
-      |> where [
       ]
     )
   )

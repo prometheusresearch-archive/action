@@ -173,6 +173,7 @@ module Query = struct
     | Name of string
     | Locate of (t * t)
     | Meta of t
+    | Grow of (t * t)
 
   and args = t StringMap.t
 
@@ -217,6 +218,10 @@ module Query = struct
     | Meta parent ->
       let parent = show parent in
       {j|$parent:meta|j}
+    | Grow (parent, next) ->
+      let parent = show parent in
+      let next = show next in
+      {j|$parent:$next|j}
     | Select (parent, fields) ->
       let parent = show parent in
       let fields =
@@ -313,6 +318,9 @@ module Query = struct
 
     let meta parent =
       (), Meta parent
+
+    let grow next parent =
+      (), Grow (parent, next)
 
     let arg = Arg.make
     let define = Arg.make
@@ -486,6 +494,7 @@ module TypedQuery = struct
     | Name of (string * t)
     | Locate of (t * t)
     | Meta of t
+    | Grow of (t * t)
 
   and nav = { navName : string; }
 
@@ -522,6 +531,7 @@ module TypedQuery = struct
     | _, Name (name, _) -> (), Query.Name name
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
     | _, Meta parent -> (), Query.Meta (stripTypes parent)
+    | _, Grow (parent, next) -> (), Query.Grow (stripTypes parent, stripTypes next)
 
   let show q =
     Query.show (stripTypes q)
@@ -790,6 +800,11 @@ end = struct
       | Query.Meta parent ->
         let%bind (scope, _ctyp), _ as parent = aux ~here ~ctx parent in
         return ((scope, Type.ctyp), TypedQuery.Meta parent)
+
+      | Query.Grow (parent, next) ->
+        let%bind ctx, _ as parent = aux ~here ~ctx parent in
+        let%bind ctx, _ as next = aux ~here ~ctx next in
+        return (ctx, TypedQuery.Grow (parent, next))
 
       | Query.Name name ->
         begin match StringMap.get scope name with
@@ -1093,7 +1108,7 @@ module Value = struct
           Js.Dict.set dict fieldName (ofCtyp fieldCtyp);
           dict
         in
-        Belt.List.reduce entityFields (Js.Dict.empty ()) f
+        Belt.List.reduceReverse entityFields (Js.Dict.empty ()) f
       in
       obj Js.Dict.(
         let dict = empty () in
@@ -1108,7 +1123,7 @@ module Value = struct
           Js.Dict.set dict fieldName (ofCtyp fieldCtyp);
           dict
         in
-        Belt.List.reduce fields (Js.Dict.empty ()) f
+        Belt.List.reduceReverse fields (Js.Dict.empty ()) f
       in
       obj Js.Dict.(
         let dict = empty () in
@@ -1374,6 +1389,11 @@ end = struct
 
       | _, TypedQuery.Meta ((_,ctyp),_) ->
         return (Value.ofCtyp ctyp)
+
+      | _, TypedQuery.Grow (parent, next) ->
+        let%bind value = aux ~value parent in
+        let%bind value = aux ~value next in
+        return value
 
     in
     let value = match value with

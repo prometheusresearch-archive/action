@@ -21,8 +21,8 @@ export function Pick(props: P) {
     `
       {
         title: title,
-        data: data,
-        type: data:meta.type,
+        data: dataForUI,
+        type: dataForUI:meta.type,
       }
     `,
   );
