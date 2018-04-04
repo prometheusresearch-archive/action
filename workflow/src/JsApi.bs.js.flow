@@ -22,6 +22,7 @@ declare export function next(state: State): Array<State>;
 
 declare export function getData(state: State): Value;
 declare export function getTitle(state: State): Value;
+declare export function query(state: State, query: string): Value;
 
 declare export function pickValue(id: mixed, state: State): Result<RenderableState>;
 

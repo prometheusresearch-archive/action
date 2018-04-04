@@ -22,8 +22,8 @@ val uiName : ui -> string
 val breadcrumbs : state -> state array
 val next : state -> state array
 
-val getData : state -> Core.Value.t
-val getTitle : state -> Core.Value.t
+(** Query against the current state *)
+val query : state -> string -> Core.Value.t
 
 val db : Core.JSONDatabase.t
 val univ : Core.Universe.t

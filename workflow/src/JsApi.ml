@@ -133,7 +133,7 @@ let toJS state =
   JsResult.ofResult (
     let open Result.Syntax in
     let%bind state, ui = state in
-    Result.Ok [%bs.obj { state; ui = Js.Nullable.from_opt ui }]
+    Result.Ok [%bs.obj { state; ui = Js.Nullable.fromOption ui }]
   )
 
 let breadcrumbs state =
@@ -173,11 +173,31 @@ let executeQuery q =
   | Result.Ok data -> data
   | Result.Error err -> Js.Exn.raiseError err
 
-let getData state =
-  executeQuery (WorkflowInterpreter.dataQuery state)
+let parseQuery q =
+  let open Result.Syntax in
+  let filebuf = Lexing.from_string q in
+  try
+    match Parser.start Lexer.read filebuf with
+    | Core.ParseResult.Workflow _ ->
+      error "expected query"
+    | Core.ParseResult.Query q ->
+      return q
+  with
+  | Lexer.Error msg ->
+    error msg
+  | Parser.Error ->
+    error "Syntax Error"
 
-let getTitle state =
-  executeQuery (WorkflowInterpreter.titleQuery state)
+
+let query state q =
+  executeQuery (
+    let open Result.Syntax in
+    let%bind q = parseQuery q in
+    let%bind base = WorkflowInterpreter.uiQuery state in
+    let%bind q = QueryTyper.growQuery ~univ ~base q in
+    Js.log3 "QUERY" (WorkflowInterpreter.show state) (TypedQuery.show q);
+    return q
+  )
 
 let parse s =
   let module N = Js.Nullable in
