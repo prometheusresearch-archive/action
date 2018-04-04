@@ -1,17 +1,19 @@
-BIN = $(PWD)/node_modules/.bin
+include ../Makefile.inc
+
+NODE_MODULE_BIN = $(PROJECT_DIR)/node_modules/.bin
 
 bootstrap:
 	@yarn
 
 serve-dev:
-	@$(BIN)/react-scripts start
+	@$(NODE_MODULE_BIN)/react-scripts start
 
 check:
-	@$(BIN)/flow
+	@$(NODE_MODULE_BIN)/flow
 
 .PHONY: build
 build:
-	@$(BIN)/react-scripts build
+	@$(NODE_MODULE_BIN)/react-scripts build
 
 deploy:
-	@$(BIN)/gh-pages -d build
+	@$(NODE_MODULE_BIN)/gh-pages -d build

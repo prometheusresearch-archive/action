@@ -1,3 +1,7 @@
+include ../Makefile.inc
+
+NODE_MODULE_BIN = $(PROJECT_DIR)/node_modules/.bin
+
 bootstrap:
 	@esy install
 	@esy build
@@ -11,11 +15,11 @@ menhirLib:
 	@cp -rf $$(esy ocamlfind query menhirLib) $(@)
 
 build:
-	esy ./node_modules/.bin/bsb -make-world
+	@esy $(NODE_MODULE_BIN)/node_modules/.bin/bsb -make-world
 
 watch:
-	esy ./node_modules/.bin/bsb -make-world -w
+	@esy $(NODE_MODULE_BIN)/node_modules/.bin/bsb -make-world -w
 
 test:
-	node ./src/CoreTest.bs.js
-	node ./src/ParsingTest.bs.js
+	@node $(PROJECT_DIR)/src/CoreTest.bs.js
+	@node $(PROJECT_DIR)/src/ParsingTest.bs.js
