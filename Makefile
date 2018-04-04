@@ -7,3 +7,7 @@ watch-workflow:
 
 serve:
 	@$(MAKE) -C ui/ serve-dev
+
+test:
+	@$(MAKE) -C workflow/ test
+
