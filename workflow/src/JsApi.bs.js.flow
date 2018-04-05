@@ -9,11 +9,42 @@ export opaque type State = mixed;
 export opaque type Value = mixed;
 export type Args = {[name: string]: string | number | boolean};
 export type RenderableState = {ui: ?UI, state: State};
+
 export type ParseResult = {
   error: ?string,
   ui: ?Result<RenderableState>,
   data: ?Value,
 };
+
+export type Card = 'one' | 'opt' | 'many';
+
+export type Type =
+  | {type: 'string'}
+  | {type: 'number'}
+  | {type: 'void'}
+  | {type: 'bool'}
+  | {type: 'null'}
+  | {type: 'abstract'}
+  | {type: 'screen'}
+  | {type: 'entity', name: string}
+  | {type: 'record', fields: {[name: string]: CType}}
+
+export type CType = {
+  card: Card,
+  type: Type,
+};
+
+export type EntityType = {
+  name: string,
+  fields: {
+    [name: string]: CType
+  }
+}
+
+export type Meta = {
+  type: CType,
+  registry: {[name: string]: EntityType}
+}
 
 declare export var start: Result<RenderableState>;
 declare export function id(state: State): string;

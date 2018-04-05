@@ -91,8 +91,6 @@ end
 
 module StringMap = struct
   include Belt.Map.String
-
-  let mergeSimple a b = reduce b a set
 end
 
 module MutStringMap = struct
@@ -1136,7 +1134,7 @@ module Value = struct
               Js.Dict.set fields fieldName fieldRepr;
               fields
             in
-            Belt.List.reduceReverse entityFields (Js.Dict.empty ()) f
+            Belt.List.reduce entityFields (Js.Dict.empty ()) f
           in
 
           obj Js.Dict.(
@@ -1186,7 +1184,7 @@ module Value = struct
             Js.Dict.set fields fieldName repr;
             fields
           in
-          Belt.List.reduceReverse fields (Js.Dict.empty ()) f
+          Belt.List.reduce fields (Js.Dict.empty ()) f
         in
         let repr = obj Js.Dict.(
           let dict = empty () in

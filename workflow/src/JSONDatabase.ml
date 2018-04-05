@@ -317,15 +317,16 @@ let execute ?value ~db query =
     let resolveRef value =
       match parseRefOpt value with
       | Some ref ->
-        (* TODO: we can implement an internal efficient codepath which skips
-         * type checking and direct query execution *)
-        let q = Query.Syntax.(
-          void
-          |> nav ref.refEntityName
-          |> locate (string ref.refEntityId)
-        ) in
-        let%bind q = Core.QueryTyper.typeQuery ~univ:db.univ q in
-        aux ~value:db.value q
+        let resolved =
+          let open! Option.Syntax in
+          let%bind coll = Value.get ~name:ref.refEntityName db.value in
+          let%bind value = Value.get ~name:ref.refEntityId coll in
+          return value
+        in
+        begin match resolved with
+        | Some value -> return value
+        | None -> error {j|unable to resolve ref $ref.refEntityName@ref.refEntityId|j}
+        end
       | None -> return value
     in
     match Value.classify value with
