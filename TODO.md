@@ -1,7 +1,14 @@
 # TODO
 
 - [x] Expose metadata via query API
-- [ ] Redesign JSONDatabase to model relations via references
+
+- [ ] In-memory JSONDatabase redesign
+  - [x] Use multiple normalized stores per entity at the root and model
+        relations as links
+  - [ ] Back & circular references
+
+- [ ] Create/Edit support for databases
+
 - [ ] Add more combinators
   - [ ] Chain/Bind
   - [ ] Filter
@@ -9,7 +16,6 @@
   - [ ] Boolean ops
   - [ ] Numeric ops
   - [ ] String concat
-- [ ] Create/Edit support
 - [ ] Add conditionals to workflow language
 - [ ] Choice eliminators
 - [ ] Add locations to lexer/parser
