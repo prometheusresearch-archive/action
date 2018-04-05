@@ -9,7 +9,7 @@ install:
   - travis_retry npm install -g yarn
   - travis_retry make bootstrap
 script:
-  - travis_wait make ci
+  - travis_wait make test
 cache:
   # default timeout is 180 but it takes longer sometimes
   timeout: 360
