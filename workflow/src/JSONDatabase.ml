@@ -94,11 +94,11 @@ let formatValue ~ctyp value =
 
   and format ~ctyp value =
     match ctyp, Value.classify value with
-    | (Card.One, Type.Entity {entityFields; _}), Value.Object value
-    | (Card.Opt, Type.Entity {entityFields; _}), Value.Object value ->
-      filterOutRefsAndRecurse ~fields:entityFields value
-    | (Card.Many, Type.Entity {entityFields; _}), Value.Array items ->
-      recurseIntoArrayWith ~recurse:filterOutRefsAndRecurse ~fields:entityFields items
+    | (Card.One, (Type.Entity {entityFields; _} as typ)), Value.Object value
+    | (Card.Opt, (Type.Entity {entityFields; _} as typ)), Value.Object value ->
+      filterOutRefsAndRecurse ~fields:(entityFields typ) value
+    | (Card.Many, (Type.Entity {entityFields; _} as typ)), Value.Array items ->
+      recurseIntoArrayWith ~recurse:filterOutRefsAndRecurse ~fields:(entityFields typ) items
 
     | (Card.One, Type.Record fields), Value.Object obj
     | (Card.Opt, Type.Record fields), Value.Object obj ->
@@ -317,6 +317,8 @@ let execute ?value ~db query =
     let resolveRef value =
       match parseRefOpt value with
       | Some ref ->
+        (* TODO: we can implement an internal efficient codepath which skips
+         * type checking and direct query execution *)
         let q = Query.Syntax.(
           void
           |> nav ref.refEntityName
