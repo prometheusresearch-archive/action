@@ -2,10 +2,11 @@
 
 - [x] Expose metadata via query API
 
-- [x] In-memory JSONDatabase redesign
+- [ ] In-memory JSONDatabase redesign
   - [x] Use multiple normalized stores per entity at the root and model
         relations as links
   - [x] Back & circular references
+  - [ ] Converter from PostgreSQL to JSONDatabase JSON format
 
 - [ ] Create/Edit support for databases
 
