@@ -99,28 +99,32 @@ let barChartScreen =
 
 let univ =
 
-  let regionNationCustomer = Type.Syntax.(entity "customer" [
+  let customer = Type.Syntax.(entity "customer" [
     hasOne "name" string;
     hasOne "comment" string;
     hasOne "phone" string;
     hasOne "acctbal" string;
   ]) in
 
-  let regionNation = Type.Syntax.(entity "nation" [
+  let nation = Type.Syntax.(entity "nation" [
     hasOne "name" string;
     hasOne "comment" string;
-    hasMany "customer" regionNationCustomer;
+    hasMany "customer" customer;
   ]) in
 
   let region = Type.Syntax.(entity "region" [
     hasOne "name" string;
     hasOne "comment" string;
-    hasMany "nation" regionNation;
+    hasMany "nation" nation;
   ]) in
 
   Universe.(
     empty
+
     |> hasMany "region" region
+    |> hasMany "nation" nation
+    |> hasMany "customer" customer
+
     |> hasScreen "pick" pickScreen
     |> hasScreen "view" viewScreen
     |> hasScreen "barChart" barChartScreen

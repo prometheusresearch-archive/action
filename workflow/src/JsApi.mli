@@ -25,7 +25,7 @@ val next : state -> state array
 (** Query against the current state *)
 val query : state -> string -> Core.Value.t
 
-val db : Core.JSONDatabase.t
+val db : JSONDatabase.t
 val univ : Core.Universe.t
 
 val showQuery : Core.TypedQuery.t -> string
