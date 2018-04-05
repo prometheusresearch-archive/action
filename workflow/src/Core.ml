@@ -89,7 +89,16 @@ module Option = struct
 
 end
 
-module StringMap = Belt.Map.String
+module StringMap = struct
+  include Belt.Map.String
+
+  let mergeSimple a b = reduce b a set
+end
+
+module MutStringMap = struct
+  include Belt.MutableMap.String
+end
+
 
 (**
  * Query cardinality.
@@ -368,7 +377,7 @@ module Type = struct
 
   and entity = {
     entityName : string;
-    entityFields : field list;
+    entityFields : t -> field list;
   }
 
   and field = {
@@ -412,15 +421,29 @@ module Type = struct
     {j|$card $typ|j}
 
   let ctyp =
-    Card.One,
-    Record [
+    let t =
+      Card.One,
+      Record [
+        {
+          fieldName = "card";
+          fieldCtyp = Card.One, Value String;
+          fieldArgs = StringMap.empty;
+        };
+        {
+          fieldName = "type";
+          fieldCtyp = Card.One, Value Abstract;
+          fieldArgs = StringMap.empty;
+        };
+      ]
+    in
+    Card.One, Record [
       {
-        fieldName = "card";
-        fieldCtyp = Card.One, Value String;
+        fieldName = "type";
+        fieldCtyp = t;
         fieldArgs = StringMap.empty;
       };
       {
-        fieldName = "type";
+        fieldName = "registry";
         fieldCtyp = Card.One, Value Abstract;
         fieldArgs = StringMap.empty;
       };
@@ -735,7 +758,7 @@ end = struct
     | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
     | Type.Screen { screenOut = _, typ; _ } ->
       extractField ~univ fieldName typ
-    | Type.Entity {entityName = _; entityFields} -> findInFieldList entityFields
+    | Type.Entity {entityName = _; entityFields} -> findInFieldList (entityFields typ)
     | Type.Record fields -> findInFieldList fields
     | Type.Value _ ->
       error {j|cannot extract field "$fieldName" from value|j}
@@ -1096,63 +1119,114 @@ module Value = struct
     | Some v -> v
     | None -> null
 
-  let rec ofCard card =
-    match card with
-    | Card.One -> string "one"
-    | Card.Opt -> string "opt"
-    | Card.Many -> string "many"
+  let ofCtyp ctyp =
 
-  and ofTyp typ =
-    let simpleType name =
-      obj Js.Dict.(
-        let dict = empty () in
-        set dict "type" (string name);
-        dict
-      )
+    let registry = MutStringMap.make () in
+
+    let rec addEntityRepr entityName entityFields =
+
+      let add () =
+
+        let rec repr = lazy (
+          MutStringMap.set registry entityName repr;
+
+          let fields =
+            let f fields {Type. fieldName; fieldCtyp} =
+              let fieldRepr = ctypRepr fieldCtyp in
+              Js.Dict.set fields fieldName fieldRepr;
+              fields
+            in
+            Belt.List.reduceReverse entityFields (Js.Dict.empty ()) f
+          in
+
+          obj Js.Dict.(
+            let dict = empty () in
+            set dict "name" (string entityName);
+            set dict "fields" (obj fields);
+            dict
+          )
+        ) in
+        let _ = Lazy.force repr in ()
+      in
+
+      match MutStringMap.get registry entityName with
+      | None -> add ()
+      | Some _ -> ()
+
+    and cardRepr card =
+      match card with
+      | Card.One -> string "one"
+      | Card.Opt -> string "opt"
+      | Card.Many -> string "many"
+
+    and typRepr typ =
+      let simpleType name =
+        obj Js.Dict.(
+          let dict = empty () in
+          set dict "type" (string name);
+          dict
+        )
+      in
+      match typ with
+      | Type.Void -> simpleType "void"
+      | Type.Screen _ -> simpleType "screen"
+      | Type.Entity { Type. entityName; entityFields } ->
+        addEntityRepr entityName (entityFields typ);
+        obj Js.Dict.(
+          let dict = empty () in
+          set dict "type" (string "entity");
+          set dict "name" (string entityName);
+          dict
+        )
+
+      | Type.Record fields ->
+        let fields =
+          let f fields {Type. fieldName;fieldCtyp} =
+            let repr = ctypRepr fieldCtyp in
+            Js.Dict.set fields fieldName repr;
+            fields
+          in
+          Belt.List.reduceReverse fields (Js.Dict.empty ()) f
+        in
+        let repr = obj Js.Dict.(
+          let dict = empty () in
+          set dict "type" (string "record");
+          set dict "fields" (obj fields);
+          dict
+        ) in
+        repr
+      | Type.Value Type.String -> simpleType "string"
+      | Type.Value Type.Number -> simpleType "number"
+      | Type.Value Type.Bool -> simpleType "bool"
+      | Type.Value Type.Null -> simpleType "null"
+      | Type.Value Type.Abstract -> simpleType "abstract"
+
+    and ctypRepr (card, typ) =
+      let typRepr = typRepr typ in
+      let cardRepr = cardRepr card in
+      let ctypRepr = obj Js.Dict.(
+        empty ()
+        |> (fun o -> set o "card" cardRepr; o)
+        |> (fun o -> set o "type" typRepr; o)
+      ) in
+      ctypRepr
+
     in
-    match typ with
-    | Type.Void -> simpleType "void"
-    | Type.Screen _ -> simpleType "screen"
-    | Type.Entity { Type. entityName; entityFields } ->
-      let fields =
-        let f dict {Type. fieldName;fieldCtyp} =
-          Js.Dict.set dict fieldName (ofCtyp fieldCtyp);
-          dict
-        in
-        Belt.List.reduceReverse entityFields (Js.Dict.empty ()) f
-      in
-      obj Js.Dict.(
-        let dict = empty () in
-        set dict "type" (string "entity");
-        set dict "name" (string entityName);
-        set dict "fields" (obj fields);
-        dict
-      )
-    | Type.Record fields ->
-      let fields =
-        let f dict {Type. fieldName;fieldCtyp} =
-          Js.Dict.set dict fieldName (ofCtyp fieldCtyp);
-          dict
-        in
-        Belt.List.reduceReverse fields (Js.Dict.empty ()) f
-      in
-      obj Js.Dict.(
-        let dict = empty () in
-        set dict "type" (string "record");
-        set dict "fields" (obj fields);
-        dict
-      )
-    | Type.Value Type.String -> simpleType "string"
-    | Type.Value Type.Number -> simpleType "number"
-    | Type.Value Type.Bool -> simpleType "bool"
-    | Type.Value Type.Null -> simpleType "null"
-    | Type.Value Type.Abstract -> simpleType "abstract"
 
-  and ofCtyp (card, typ) = obj Js.Dict.(
-    empty ()
-    |> (fun obj -> set obj "card" (ofCard card); obj)
-    |> (fun obj -> set obj "type" (ofTyp typ); obj)
-  )
+    let repr = ctypRepr ctyp in
+
+    let registry =
+      let f dict k v =
+        Js.Dict.set dict k (Lazy.force v); dict
+      in
+      MutStringMap.reduce registry (Js.Dict.empty ()) f
+    in
+
+    obj Js.Dict.(
+      empty ()
+      |> (fun o -> set o "type" repr; o)
+      |> (fun o -> set o "registry" (obj registry); o)
+    )
 
   type tagged =
     | Object of t Js.Dict.t

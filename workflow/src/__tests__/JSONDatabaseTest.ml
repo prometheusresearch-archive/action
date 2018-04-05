@@ -5,23 +5,25 @@ open! Expect.Operators
 module Q = Core.Query.Syntax
 
 let univ =
-  let nation = Core.Type.Syntax.(
-    entity "nation" [
+  let rec nation = lazy Core.Type.Syntax.(
+    entity "nation" (fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
-    ]
-  ) in
-  let region = Core.Type.Syntax.(
-    entity "region" [
+      hasOne "region" (Lazy.force region);
+    ])
+  )
+  and region = lazy Core.Type.Syntax.(
+    entity "region" (fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
-      hasMany "nation" nation;
-    ]
-  ) in
+      hasMany "nation" (Lazy.force nation);
+    ])
+  )
+  in
   Core.Universe.(
     empty
-    |> hasMany "region" region
-    |> hasMany "nation" nation
+    |> hasMany "region" (Lazy.force region)
+    |> hasMany "nation" (Lazy.force nation)
   )
 
 let db = JSONDatabase.ofStringExn ~univ {|
@@ -45,9 +47,21 @@ let db = JSONDatabase.ofStringExn ~univ {|
     },
 
     "nation": {
-      "US": {"id": "US", "name": "United States of America"},
-      "CHINA": {"id": "CHINA", "name": "China"},
-      "RUSSIA": {"id": "RUSSIA", "name": "Russia"}
+      "US": {
+        "id": "US",
+        "name": "United States of America",
+        "region": {"$ref": {"entity": "region", "id": "AMERICA"}}
+      },
+      "CHINA": {
+        "id": "CHINA",
+        "name": "China",
+        "region": {"$ref": {"entity": "region", "id": "ASIA"}}
+      },
+      "RUSSIA": {
+        "id": "RUSSIA",
+        "name": "Russia",
+        "region": {"$ref": {"entity": "region", "id": "ASIA"}}
+      }
     }
   }
 |}
@@ -323,6 +337,31 @@ let () =
             ]
           }
         }
+      |})
+    end;
+
+    test "region.nation.region" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> nav "nation"
+        |> nav "region"
+      ) in
+      runQueryAndExpect q (valueOfStringExn {|
+        [
+          {
+            "id": "AMERICA",
+            "name": "America"
+          },
+          {
+            "id": "ASIA",
+            "name": "Asia"
+          },
+          {
+            "id": "ASIA",
+            "name": "Asia"
+          }
+        ]
       |})
     end;
 

@@ -498,7 +498,13 @@
           }
         }
       ],
-      "id": "ALGERIA"
+      "id": "ALGERIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AFRICA"
+        }
+      }
     },
     "ETHIOPIA": {
       "name": "ETHIOPIA",
@@ -769,7 +775,13 @@
           }
         }
       ],
-      "id": "ETHIOPIA"
+      "id": "ETHIOPIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AFRICA"
+        }
+      }
     },
     "KENYA": {
       "name": "KENYA",
@@ -1004,7 +1016,13 @@
           }
         }
       ],
-      "id": "KENYA"
+      "id": "KENYA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AFRICA"
+        }
+      }
     },
     "MOROCCO": {
       "name": "MOROCCO",
@@ -1377,7 +1395,13 @@
           }
         }
       ],
-      "id": "MOROCCO"
+      "id": "MOROCCO",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AFRICA"
+        }
+      }
     },
     "MOZAMBIQUE": {
       "name": "MOZAMBIQUE",
@@ -1678,7 +1702,13 @@
           }
         }
       ],
-      "id": "MOZAMBIQUE"
+      "id": "MOZAMBIQUE",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AFRICA"
+        }
+      }
     },
     "ARGENTINA": {
       "name": "ARGENTINA",
@@ -1985,7 +2015,13 @@
           }
         }
       ],
-      "id": "ARGENTINA"
+      "id": "ARGENTINA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AMERICA"
+        }
+      }
     },
     "BRAZIL": {
       "name": "BRAZIL",
@@ -2370,7 +2406,13 @@
           }
         }
       ],
-      "id": "BRAZIL"
+      "id": "BRAZIL",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AMERICA"
+        }
+      }
     },
     "CANADA": {
       "name": "CANADA",
@@ -2665,7 +2707,13 @@
           }
         }
       ],
-      "id": "CANADA"
+      "id": "CANADA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AMERICA"
+        }
+      }
     },
     "PERU": {
       "name": "PERU",
@@ -2912,7 +2960,13 @@
           }
         }
       ],
-      "id": "PERU"
+      "id": "PERU",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AMERICA"
+        }
+      }
     },
     "UNITED STATES": {
       "name": "UNITED STATES",
@@ -3105,7 +3159,13 @@
           }
         }
       ],
-      "id": "UNITED STATES"
+      "id": "UNITED STATES",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "AMERICA"
+        }
+      }
     },
     "CHINA": {
       "name": "CHINA",
@@ -3382,7 +3442,13 @@
           }
         }
       ],
-      "id": "CHINA"
+      "id": "CHINA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "ASIA"
+        }
+      }
     },
     "INDIA": {
       "name": "INDIA",
@@ -3701,7 +3767,13 @@
           }
         }
       ],
-      "id": "INDIA"
+      "id": "INDIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "ASIA"
+        }
+      }
     },
     "INDONESIA": {
       "name": "INDONESIA",
@@ -4044,7 +4116,13 @@
           }
         }
       ],
-      "id": "INDONESIA"
+      "id": "INDONESIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "ASIA"
+        }
+      }
     },
     "JAPAN": {
       "name": "JAPAN",
@@ -4369,7 +4447,13 @@
           }
         }
       ],
-      "id": "JAPAN"
+      "id": "JAPAN",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "ASIA"
+        }
+      }
     },
     "VIETNAM": {
       "name": "VIETNAM",
@@ -4658,7 +4742,13 @@
           }
         }
       ],
-      "id": "VIETNAM"
+      "id": "VIETNAM",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "ASIA"
+        }
+      }
     },
     "FRANCE": {
       "name": "FRANCE",
@@ -4857,7 +4947,13 @@
           }
         }
       ],
-      "id": "FRANCE"
+      "id": "FRANCE",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "EUROPE"
+        }
+      }
     },
     "GERMANY": {
       "name": "GERMANY",
@@ -5110,7 +5206,13 @@
           }
         }
       ],
-      "id": "GERMANY"
+      "id": "GERMANY",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "EUROPE"
+        }
+      }
     },
     "ROMANIA": {
       "name": "ROMANIA",
@@ -5453,7 +5555,13 @@
           }
         }
       ],
-      "id": "ROMANIA"
+      "id": "ROMANIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "EUROPE"
+        }
+      }
     },
     "RUSSIA": {
       "name": "RUSSIA",
@@ -5754,7 +5862,13 @@
           }
         }
       ],
-      "id": "RUSSIA"
+      "id": "RUSSIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "EUROPE"
+        }
+      }
     },
     "UNITED KINGDOM": {
       "name": "UNITED KINGDOM",
@@ -6013,7 +6127,13 @@
           }
         }
       ],
-      "id": "UNITED KINGDOM"
+      "id": "UNITED KINGDOM",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "EUROPE"
+        }
+      }
     },
     "EGYPT": {
       "name": "EGYPT",
@@ -6356,7 +6476,13 @@
           }
         }
       ],
-      "id": "EGYPT"
+      "id": "EGYPT",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "MIDDLE EAST"
+        }
+      }
     },
     "IRAN": {
       "name": "IRAN",
@@ -6705,7 +6831,13 @@
           }
         }
       ],
-      "id": "IRAN"
+      "id": "IRAN",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "MIDDLE EAST"
+        }
+      }
     },
     "IRAQ": {
       "name": "IRAQ",
@@ -6970,7 +7102,13 @@
           }
         }
       ],
-      "id": "IRAQ"
+      "id": "IRAQ",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "MIDDLE EAST"
+        }
+      }
     },
     "JORDAN": {
       "name": "JORDAN",
@@ -7241,7 +7379,13 @@
           }
         }
       ],
-      "id": "JORDAN"
+      "id": "JORDAN",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "MIDDLE EAST"
+        }
+      }
     },
     "SAUDI ARABIA": {
       "name": "SAUDI ARABIA",
@@ -7560,7 +7704,13 @@
           }
         }
       ],
-      "id": "SAUDI ARABIA"
+      "id": "SAUDI ARABIA",
+      "region": {
+        "$ref": {
+          "entity": "region",
+          "id": "MIDDLE EAST"
+        }
+      }
     }
   },
   "customer": {

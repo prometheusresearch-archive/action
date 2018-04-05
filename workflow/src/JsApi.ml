@@ -99,31 +99,37 @@ let barChartScreen =
 
 let univ =
 
-  let customer = Type.Syntax.(entity "customer" [
+  let rec customer = lazy Type.Syntax.(entity "customer" (fun _ -> [
+    hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
     hasOne "phone" string;
     hasOne "acctbal" string;
-  ]) in
+  ]))
 
-  let nation = Type.Syntax.(entity "nation" [
+  and nation = lazy Type.Syntax.(entity "nation" (fun _ -> [
+    hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
-    hasMany "customer" customer;
-  ]) in
+    hasMany "customer" (Lazy.force customer);
+    hasOne "region" (Lazy.force region);
+  ]))
 
-  let region = Type.Syntax.(entity "region" [
+  and region = lazy Type.Syntax.(entity "region" (fun _ -> [
+    hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
-    hasMany "nation" nation;
-  ]) in
+    hasMany "nation" (Lazy.force nation);
+  ]))
+
+  in
 
   Universe.(
     empty
 
-    |> hasMany "region" region
-    |> hasMany "nation" nation
-    |> hasMany "customer" customer
+    |> hasMany "region" (Lazy.force region)
+    |> hasMany "nation" (Lazy.force nation)
+    |> hasMany "customer" (Lazy.force customer)
 
     |> hasScreen "pick" pickScreen
     |> hasScreen "view" viewScreen
