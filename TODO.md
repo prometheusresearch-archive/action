@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Expose metadata via query API
+- [x] Expose metadata via query API
 - [ ] Redesign JSONDatabase to model relations via references
 - [ ] Add more combinators
   - [ ] Chain/Bind
