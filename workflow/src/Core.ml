@@ -72,6 +72,17 @@ module Option = struct
 
   end
 
+  module Syntax = struct
+    let return v = Some v
+
+    module Let_syntax = struct
+      let bind v f = match v with
+      | Some v -> f v
+      | None -> None
+    end
+  end
+
+
   let alt a b = match a with
   | Some a -> Some a
   | None -> b
@@ -1166,6 +1177,16 @@ module Value = struct
     else if UI.test v
     then UI (Obj.magic v)
     else Object (Obj.magic v)
+
+  let decodeObj v =
+    match classify v with
+    | Object obj -> Some obj
+    | _ -> None
+
+  let decodeString v =
+    match classify v with
+    | String v -> Some v
+    | _ -> None
 
   let get ~name value =
     match classify value with
