@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/prometheusresearch/action.svg?branch=master)](https://travis-ci.org/prometheusresearch/action)
 
-Langauge for composable data-driven workflows.
+Language for composable data-driven workflows.
 
 Action is an experimental language based on [Query Combinators][] paper which
 defines a notion of UI values and workflows over them.
