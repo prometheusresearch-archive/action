@@ -5,7 +5,7 @@
 import * as React from 'react';
 import {View, Text, TouchableHighlight} from 'react-native-web';
 import * as W from 'workflow';
-import type {State, Args} from 'workflow';
+import type {State, Args, Meta} from 'workflow';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
@@ -16,20 +16,20 @@ type P = {
 };
 
 export function Pick(props: P) {
-  const {title, data, type} = W.query(
+  const {title, data, metadata: meta} = W.query(
     props.state,
     `
       {
         title: title,
         data: dataForUI,
-        type: dataForUI:meta.type,
+        metadata: dataForUI:meta,
       }
     `,
   );
   const onSelect = id => {
     props.onPick(id);
   };
-  const fields = fieldsFromType(type);
+  const fields = fieldsFromMeta(meta);
   return (
     <View>
       <ScreenTitle>{title}</ScreenTitle>
@@ -46,12 +46,16 @@ export function Pick(props: P) {
   );
 }
 
-function fieldsFromType(type) {
+function fieldsFromMeta(meta: Meta) {
+  const {type: {type}, registry} = meta;
   switch (type.type) {
     case 'entity': {
       const fields = [];
-      for (const key in type.fields) {
-        fields.push(key);
+      for (const name in registry[type.name].fields) {
+        const fieldType = registry[type.name].fields[name].type;
+        if (fieldType.type !== 'entity') {
+          fields.push(name);
+        }
       }
       return fields;
     }

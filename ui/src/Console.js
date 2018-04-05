@@ -34,11 +34,7 @@ const initialState = {
 export class Console extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
-    this.state = this.getStateFromQuery(outdent`
-      render(region:pick(title: "Regions")) {
-        render(value:view)
-      }
-    `);
+    this.state = this.getStateFromQuery(outdent``);
   }
 
   getStateFromQuery = (value: string) => {
