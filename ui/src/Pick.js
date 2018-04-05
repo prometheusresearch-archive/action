@@ -16,13 +16,14 @@ type P = {
 };
 
 export function Pick(props: P) {
-  const {title, data, metadata: meta} = W.query(
+  const {id, title, data, metadata: meta} = W.query(
     props.state,
     `
       {
         title: title,
         data: dataForUI,
         metadata: dataForUI:meta,
+        id: value.id,
       }
     `,
   );
@@ -35,12 +36,7 @@ export function Pick(props: P) {
       <ScreenTitle>{title}</ScreenTitle>
       <View>{props.toolbar}</View>
       <View style={{padding: 5}}>
-        <Table
-          selectedId={props.args.id}
-          data={data}
-          onSelect={onSelect}
-          fields={fields}
-        />
+        <Table selectedId={id} data={data} onSelect={onSelect} fields={fields} />
       </View>
     </View>
   );
