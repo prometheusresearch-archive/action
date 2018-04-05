@@ -18,12 +18,10 @@ build:
 	@esy $(NODE_MODULE_BIN)/bsb -make-world
 
 watch:
-	echo $(PROJECT_DIR)
-	echo $(NODE_MODULE_BIN)
-	esy $(NODE_MODULE_BIN)/bsb -make-world -w
+	@esy $(NODE_MODULE_BIN)/bsb -make-world -w
 
 test: build
-	@$(NODE_MODULE_BIN)/jest
+	@$(NODE_MODULE_BIN)/jest --runInBand
 
 test-watch:
 	@$(NODE_MODULE_BIN)/jest --watch
