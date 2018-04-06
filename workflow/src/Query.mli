@@ -74,8 +74,6 @@ module Untyped : sig
 
   val showArgs : args -> string
 
-  val unsafeLookupArg : name:Common.StringMap.key -> 'a Common.StringMap.t -> 'a
-
   val updateArgs : update:args -> args -> t Common.StringMap.t
 
   module Syntax : sig
@@ -122,7 +120,12 @@ module Type : sig
 
   and screen = { screenName : string; screenOut : ctyp; }
 
-  and value = String | Number | Bool | Null | Abstract
+  and value =
+    | String
+    | Number
+    | Bool
+    | Null
+    | Abstract
 
   and entity = { entityName : string; entityFields : t -> field list; }
 
@@ -141,41 +144,44 @@ module Type : sig
   val ctyp : Card.t * t
 
   module Syntax : sig
-      module Arg : sig
-          module ArgSyntax : sig
-              type t = { name : string; value : arg; }
-              val make : string -> arg -> t
-              val toMap : t Belt.List.t -> arg Common.StringMap.t
-              val ofMap : arg Common.StringMap.t -> t list
-            end
-          type arg = ArgSyntax.t
-          val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
-        end
-
-      val entity : string -> (t -> field list) -> t
-      val has :
-        ?card:Card.t ->
-        ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
-      val hasOne : ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
-      val hasOpt : ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
-      val hasMany : ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
-      val one : 'a -> Card.t * 'a
-      val opt : 'a -> Card.t * 'a
-      val many : 'a -> Card.t * 'a
-      module Value : sig val string : t val number : t val bool : t end
-      val string : t
-      val number : t
-      val bool : t
-      module ArgSyntax = Arg.ArgSyntax
+    module Arg : sig
+      module ArgSyntax : sig
+        type t = { name : string; value : arg; }
+        val make : string -> arg -> t
+        val toMap : t Belt.List.t -> arg Common.StringMap.t
+        val ofMap : arg Common.StringMap.t -> t list
+      end
       type arg = ArgSyntax.t
       val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
-
-      module Card : sig
-        val one : t -> ctyp
-        val opt : t -> ctyp
-        val many : t -> ctyp
-      end
     end
+
+    val entity : string -> (t -> field list) -> t
+    val has :
+      ?card:Card.t ->
+      ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
+    val hasOne : ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
+    val hasOpt : ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
+    val hasMany : ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
+    val one : 'a -> Card.t * 'a
+    val opt : 'a -> Card.t * 'a
+    val many : 'a -> Card.t * 'a
+    module Value : sig val string : t val number : t val bool : t end
+    val string : t
+    val number : t
+    val bool : t
+    module ArgSyntax = Arg.ArgSyntax
+    type arg = ArgSyntax.t
+    val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
+
+    module Card : sig
+
+      val one : t -> ctyp
+
+      val opt : t -> ctyp
+
+      val many : t -> ctyp
+    end
+  end
 end
 
 module Typed : sig
@@ -217,16 +223,15 @@ module Typed : sig
 
   module Context : sig
     type t = context
-    val void : 'a Common.StringMap.t * (Card.t * Type.t)
-    val bindings : 'a * 'b -> 'a
-    val addBindings :
-      bindings:'a Common.StringMap.t -> 'a Common.StringMap.t * 'b -> 'a Common.StringMap.t * 'b
-    val inspect :
-      binding Common.StringMap.t * Type.ctyp ->
-      < ctyp : string; scope : string Js.Dict.t > Js.t
+
+    val void : t
+
+    val bindings : t -> scope
+
+    val addBindings : bindings:scope -> t -> t
   end
 
-  val void : ('a Common.StringMap.t * (Card.t * Type.t)) * syntax
+  val void : t
 
   val ctyp : t -> Type.ctyp
 
