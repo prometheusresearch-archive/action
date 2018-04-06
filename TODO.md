@@ -11,12 +11,12 @@
 - [ ] Create/Edit support for databases
 
 - [ ] Add more combinators
-  - [ ] Chain/Bind
+  - [ ] Compare operators (=, !=, <, >, <=, >=)
+  - [ ] Logical operators (&&, ||, !)
   - [ ] Filter
   - [ ] String interpolation
-  - [ ] Boolean ops
-  - [ ] Numeric ops
-  - [ ] String concat
+  - [ ] Numeric ops (+, -, *, /, mod?, div?)
+  - [ ] String ops / interpolation
 - [ ] Add conditionals to workflow language
 - [ ] Choice eliminators
 - [ ] Add locations to lexer/parser
