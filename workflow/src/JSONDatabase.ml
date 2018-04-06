@@ -8,10 +8,19 @@ module Query = Core.Query
 module TypedQuery = Core.TypedQuery
 module ConstExpr = Core.ConstExpr
 
+let liftResult = function
+  | Result.Ok v -> Run.return v
+  | Result.Error err -> Run.error (`DatabaseError err)
+
+let executionError err = Run.error (`DatabaseError err)
+
 type t = {
   value : Value.t;
   univ : Universe.t;
 }
+
+type error = [ `DatabaseError of string ]
+type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
 type entityRef = {
   refEntityName : string;
@@ -49,7 +58,7 @@ let parseRefOpt value =
  *)
 let formatValue ~ctyp value =
 
-  let open Result.Syntax in
+  let open Run.Syntax in
 
   let rec filterOutRefsAndRecurse ~fields input =
     let%bind obj =
@@ -65,7 +74,7 @@ let formatValue ~ctyp value =
           | None -> return output
           end
       in
-      Result.List.foldLeft ~f ~init:(Js.Dict.empty ()) fields
+      Run.List.foldLeft ~f ~init:(Js.Dict.empty ()) fields
     in
     return (Value.obj obj)
 
@@ -79,7 +88,7 @@ let formatValue ~ctyp value =
           return output
         | None -> return output
       in
-      Result.List.foldLeft ~f ~init:(Js.Dict.empty ()) fields
+      Run.List.foldLeft ~f ~init:(Js.Dict.empty ()) fields
     in
     return (Value.obj obj)
 
@@ -89,7 +98,7 @@ let formatValue ~ctyp value =
       | Value.Object obj -> recurse ~fields obj
       | _ -> return value
     in
-    let%bind items = Result.Array.map ~f items in
+    let%bind items = Run.Array.map ~f items in
     return (Value.array items)
 
   and format ~ctyp value =
@@ -111,7 +120,7 @@ let formatValue ~ctyp value =
   format ~ctyp value
 
 let execute ?value ~db query =
-  let open Result.Syntax in
+  let open Run.Syntax in
 
   let isRoot value = value == db.value in
 
@@ -125,10 +134,10 @@ let execute ?value ~db query =
       | None ->
         let msg = {j|no such key "$name"|j} in
         Js.log3 "ERROR:" msg [%bs.obj { data = value; key = name; }];
-        error msg
+        executionError msg
       end
     | Value.Null -> return Value.null
-    | _ -> error "cannot traverse this"
+    | _ -> executionError "cannot traverse this"
 
   and navigateFromRoot name value =
     let%bind value = navigate name value in
@@ -136,7 +145,7 @@ let execute ?value ~db query =
     | Value.Object value ->
       let value = Js.Dict.values value in
       return (Value.array value)
-    | _ -> error "invalid db structure: expected an entity collection"
+    | _ -> executionError "invalid db structure: expected an entity collection"
 
   and aux ~(value : Value.t) ((_bindings, (_card, typ)), syn) =
 
@@ -144,7 +153,7 @@ let execute ?value ~db query =
     | Type.Void, TypedQuery.Void ->
       return db.value
     | _, TypedQuery.Void ->
-      error "invalid type for void"
+      executionError "invalid type for void"
 
     | _, TypedQuery.Here ->
       return value
@@ -164,7 +173,7 @@ let execute ?value ~db query =
     | Type.Value Type.Null, TypedQuery.Const (ConstExpr.Null) ->
       return (Value.null)
     | _, TypedQuery.Const _ ->
-      error "invalid type for const"
+      executionError "invalid type for const"
 
     | Type.Value Type.Number, TypedQuery.Count query ->
       let%bind value = aux ~value query in
@@ -174,7 +183,7 @@ let execute ?value ~db query =
       | _ -> return (Value.number 1.)
       end
     | _, TypedQuery.Count _ ->
-      error "invalid type for count"
+      executionError "invalid type for count"
 
     | _, TypedQuery.First query ->
       let%bind value = aux ~value query in
@@ -193,7 +202,7 @@ let execute ?value ~db query =
         | Value.Null -> return Value.null
         | _ ->
           let univ = univ db in
-          let%bind screen = Universe.lookupScreenResult screenName univ in
+          let%bind screen = liftResult (Universe.lookupScreenResult screenName univ) in
           let ui =
             Value.UI.make
               ~univ
@@ -217,7 +226,7 @@ let execute ?value ~db query =
       | _ -> make value
       end
     | _, TypedQuery.Screen _ ->
-      error "invalid type for screen"
+      executionError "invalid type for screen"
 
     | _, TypedQuery.Navigate (query, { navName; }) ->
       let%bind value = aux ~value query in
@@ -228,11 +237,11 @@ let execute ?value ~db query =
       | true, Value.Object _ ->
         navigateFromRoot navName value
       | true, _ ->
-        error "invalid db structure: expected an object as the root"
+        executionError "invalid db structure: expected an object as the root"
 
       | _, Value.Object _ -> navigate navName value
       | _, Value.Array items  ->
-        let%bind items = Result.Array.map ~f:(navigate navName) items in
+        let%bind items = Run.Array.map ~f:(navigate navName) items in
         let items =
           let f res item =
             match Value.classify item with
@@ -244,26 +253,23 @@ let execute ?value ~db query =
       | _, Value.Null ->
         return Value.null
       | _, Value.UI ui ->
-        let%bind outQuery = Value.UI.outQuery ui in
+        let%bind outQuery = liftResult (Value.UI.outQuery ui) in
         let queryValue = Value.UI.value ui in
         let%bind value = aux ~value:queryValue outQuery in
         navigate navName value
-      | _ -> error {|Cannot navigate away from this value|}
+      | _ -> executionError {|Cannot navigate away from this value|}
       end
 
     | Type.Record _, TypedQuery.Select (query, selection) ->
       let selectFrom value =
         let%bind _, dataset =
-          let build state { TypedQuery. alias; query; } =
-            match state with
-            | Result.Ok (idx, dataset) ->
-              let%bind selectionValue = aux ~value query in
-              let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
-              Js.Dict.set dataset selectionAlias selectionValue;
-              return (idx + 1, dataset)
-            | Result.Error err -> error err
+          let build (idx, dataset) { TypedQuery. alias; query; } =
+            let%bind selectionValue = aux ~value query in
+            let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
+            Js.Dict.set dataset selectionAlias selectionValue;
+            return (idx + 1, dataset)
           in
-          Belt.List.reduce selection (Result.Ok (0, Js.Dict.empty ())) build
+          Run.List.foldLeft ~f:build ~init:(0, Js.Dict.empty ()) selection
         in
         return (Value.obj dataset)
       in
@@ -271,21 +277,21 @@ let execute ?value ~db query =
       begin match Value.classify value with
       | Value.Object _ -> selectFrom value
       | Value.UI ui ->
-        let%bind outQuery = Value.UI.outQuery ui in
+        let%bind outQuery = liftResult (Value.UI.outQuery ui) in
         let queryValue = Value.UI.value ui in
         let%bind value = aux ~value:queryValue outQuery in
         selectFrom value
       | Value.Array items ->
-        let%bind items = Result.Array.map ~f:selectFrom items in
+        let%bind items = Run.Array.map ~f:selectFrom items in
         return (Value.array items)
       | Value.Null ->
         return Value.null
       | _ ->
         Js.log3 "ERROR" "cannot select from this value" value;
-        error "cannot select from here"
+        executionError "cannot select from here"
       end
     | _, TypedQuery.Select _ ->
-      error "invalid type for select"
+      executionError "invalid type for select"
 
     | _, TypedQuery.Locate (parent, id) ->
       let%bind parent = aux ~value parent in
@@ -302,7 +308,7 @@ let execute ?value ~db query =
         return (Value.ofOption (Js.Array.find f items))
       | _ ->
         Js.log3 "ERROR:" "expected array but got" (Js.typeof parent);
-        error {j|expected array|j}
+        executionError {j|expected array|j}
       end
 
     | _, TypedQuery.Meta ((_,ctyp),_) ->
@@ -325,7 +331,7 @@ let execute ?value ~db query =
         | Value.Null, Value.Null ->
           return Value.null
         | _ ->
-          error "'<' type mismatch ..."
+          executionError "'<' type mismatch ..."
       end
 
   and expandRef value =
@@ -340,14 +346,14 @@ let execute ?value ~db query =
         in
         begin match resolved with
         | Some value -> return value
-        | None -> error {j|unable to resolve ref $ref.refEntityName@ref.refEntityId|j}
+        | None -> executionError {j|unable to resolve ref $ref.refEntityName@ref.refEntityId|j}
         end
       | None -> return value
     in
     match Value.classify value with
     | Value.Object _ -> resolveRef value
     | Value.Array items ->
-      let%bind items = Result.Array.map ~f:resolveRef items in
+      let%bind items = Run.Array.map ~f:resolveRef items in
       return (Value.array items)
     | _ -> return value
   in

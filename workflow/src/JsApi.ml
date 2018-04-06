@@ -7,7 +7,16 @@ module Q = Core.Query.Syntax
 module T = Core.Type.Syntax
 module S = Core.Screen.Syntax
 
-module WorkflowInterpreter = WorkflowInterpreter(JSONDatabase)
+module WorkflowInterpreter = RunWorkflow.Make(JSONDatabase)
+
+let runToResult v = match Run.toResult v with
+  | Result.Ok v -> Result.Ok v
+  | Result.Error (`DatabaseError err) ->
+    let msg = {j|DatabaseError: $err|j} in
+    Result.Error msg
+  | Result.Error (`RunWorkflowError err) ->
+    let msg = {j|WorkflowError: $err|j} in
+    Result.Error msg
 
 module JsResult = struct
   type 'v t
@@ -34,7 +43,7 @@ let unwrapResult v =
   | Result.Error err -> Js.Exn.raiseError err
 
 let id state =
-  state |> WorkflowInterpreter.uiQuery |> unwrapResult |> TypedQuery.show
+  state |> WorkflowInterpreter.uiQuery |> runToResult |> unwrapResult |> TypedQuery.show
 
 let pickScreen =
 
@@ -151,12 +160,12 @@ let breadcrumbs state =
   state |> WorkflowInterpreter.breadcrumbs |> Array.of_list
 
 let next state =
-  match WorkflowInterpreter.next state with
+  match runToResult (WorkflowInterpreter.next state) with
   | Result.Ok next -> Array.of_list next
   | Result.Error err -> Js.Exn.raiseError err
 
 let render state =
-  toJS (WorkflowInterpreter.render state)
+  toJS (runToResult (WorkflowInterpreter.render state))
 
 let pickValue id state =
   let id = match Js.Json.classify id with
@@ -169,16 +178,16 @@ let pickValue id state =
     let open Result.Syntax in
     let args = StringMap.(empty |> fun m -> set m "id" id) in
     Js.log2 "pickValue" (Query.showArgs args);
-    let%bind state = WorkflowInterpreter.setArgs ~args state in
-    let%bind state = WorkflowInterpreter.step state in
-    WorkflowInterpreter.render state
+    let%bind state = runToResult (WorkflowInterpreter.setArgs ~args state) in
+    let%bind state = runToResult (WorkflowInterpreter.step state) in
+    runToResult (WorkflowInterpreter.render state)
   )
 
 let executeQuery q =
   let res =
     let open Result.Syntax in
     let%bind q = q in
-    let%bind data = JSONDatabase.execute ~db q in
+    let%bind data = runToResult (JSONDatabase.execute ~db q) in
     return data
   in match res with
   | Result.Ok data -> data
@@ -204,7 +213,7 @@ let query state q =
   executeQuery (
     let open Result.Syntax in
     let%bind q = parseQuery q in
-    let%bind base = WorkflowInterpreter.uiQuery state in
+    let%bind base = runToResult (WorkflowInterpreter.uiQuery state) in
     let%bind q = QueryTyper.growQuery ~univ ~base q in
     Js.log3 "QUERY" (WorkflowInterpreter.show state) (TypedQuery.show q);
     return q
@@ -224,7 +233,7 @@ let parse s =
     let makeWorkflow w =
       let state =
         let%bind w = WorkflowTyper.typeWorkflow ~univ w in
-        WorkflowInterpreter.boot ~db w
+        runToResult (WorkflowInterpreter.boot ~db w)
       in
       return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
     in
@@ -239,7 +248,7 @@ let parse s =
         makeWorkflow w
       | Core.ParseResult.Query q ->
         let%bind tq = QueryTyper.typeQuery ~univ q in
-        let%bind value = JSONDatabase.execute ~db tq in
+        let%bind value = runToResult (JSONDatabase.execute ~db tq) in
         match Value.classify value with
         | Value.UI _ -> makeUi q
         | _ -> makeData value

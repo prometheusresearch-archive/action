@@ -9,6 +9,11 @@ module Q = Query.Syntax
 let univ = JsApi.univ
 let db = JsApi.db
 
+let runToResult v = match Run.toResult v with
+  | Result.Ok v -> Result.Ok v
+  | Result.Error (`DatabaseError err) -> Result.Error err
+  | Result.Error (`RunWorkflowError err) -> Result.Error err
+
 let runResult result = match result with
   | Result.Ok () -> ()
   | Result.Error err ->
@@ -23,7 +28,7 @@ let expectQueryOk query =
   let result =
     let open Result.Syntax in
     let%bind query = QueryTyper.typeQuery ~univ query in
-    let%bind _result = JSONDatabase.execute ~db query in
+    let%bind _result = runToResult (JSONDatabase.execute ~db query) in
     return ()
   in
   expectOk result
@@ -36,11 +41,9 @@ let runQueryAndExpect q v =
   unwrapAssertionResult (
     let open Core.Result.Syntax in
     let%bind q = Core.QueryTyper.typeQuery ~univ q in
-    let%bind r = JSONDatabase.execute ~db q in
+    let%bind r = runToResult (JSONDatabase.execute ~db q) in
     return (expect(r) |> toEqual(v))
   )
-
-
 
 let typeWorkflow w =
   runResult (Result.ignore (WorkflowTyper.typeWorkflow ~univ w))
