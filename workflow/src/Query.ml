@@ -185,9 +185,6 @@ module Untyped = struct
       let right = show right in
       {j|$left < $right|j}
 
-  let unsafeLookupArg ~name args =
-    StringMap.getExn args name
-
   let updateArgs ~(update : args) (args : args) =
     let merge _name a u = match a, u with
     | Some a, None -> Some a
@@ -509,20 +506,6 @@ module Typed = struct
         StringMap.merge currBindings bindings f
       in
       nextBindings, ctyp
-
-    let inspect (scope, ctyp) =
-      let scope =
-        let f dict k v =
-          let v = match v with
-          | TypedBinding q -> show q
-          | Binding q -> Untyped.show q
-          in
-          Js.Dict.set dict k v;
-          dict
-        in
-        StringMap.reduce scope (Js.Dict.empty ()) f
-      in
-      [%bs.obj {scope; ctyp = Type.showCt ctyp}]
 
   end
 
