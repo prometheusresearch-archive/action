@@ -275,11 +275,11 @@ module Type = struct
     | Record of field list
     | Value of value
 
-  and ct = Card.t * t
+  and ctyp = Card.t * t
 
   and screen = {
     screenName : string;
-    screenOut : ct;
+    screenOut : ctyp;
   }
 
   and value =
@@ -297,11 +297,11 @@ module Type = struct
   and field = {
     fieldName : string;
     fieldArgs : args;
-    fieldCtyp : ct;
+    fieldCtyp : ctyp;
   }
 
   and arg = {
-    argCtyp : ct;
+    argCtyp : ctyp;
     argDefault : Untyped.t option;
   }
 
@@ -421,7 +421,7 @@ module Typed = struct
 
   type t = context * syntax
 
-  and context = scope * Type.ct
+  and context = scope * Type.ctyp
 
   and scope = binding StringMap.t
 
