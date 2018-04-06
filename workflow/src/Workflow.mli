@@ -1,5 +1,3 @@
-open Core
-
 module Untyped : sig
 
   type t =

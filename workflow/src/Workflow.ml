@@ -3,10 +3,7 @@ open Core
 (**
  * Monadic structure on top queries which represent transition between screens.
  *)
-module Syntax (Q : sig
-  type t
-  val show : t -> string
-end) = struct
+module Syntax (Q : sig type t end) = struct
 
   type q = Q.t
   type t =
@@ -14,15 +11,6 @@ end) = struct
     | Render of q
     (** Define how to transition from one screen to another screen *)
     | Next of (t * t list)
-
-  let rec show v =
-    match v with
-    | Render q ->
-        let q = Q.show q in {j|render($q)|j}
-    | Next (w, next) ->
-      let w = show w
-      and next = next |> List.map show |> String.concat ", "
-      in {j|$w { $next }|j}
 
 end
 
@@ -39,9 +27,6 @@ module Typed = struct
   include Syntax(struct
 
     type t = Query.t
-
-    let show w =
-      Query.show w
 
   end)
 end
