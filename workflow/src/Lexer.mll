@@ -34,6 +34,7 @@ rule read = parse
   | "first"    { FIRST }
   | "meta"     { META }
   | "render"   { RENDER }
+  | "null"     { NULL }
   | "true"     { BOOL true }
   | "false"    { BOOL false }
   | '{'        { LEFT_BRACE }

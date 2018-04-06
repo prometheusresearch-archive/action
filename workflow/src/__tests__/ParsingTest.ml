@@ -61,5 +61,6 @@ let () =
 
     |};
     expectParseOk "1 < 2";
+    expectParseOk "null";
 
   end;
