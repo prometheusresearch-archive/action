@@ -19,6 +19,7 @@
 %token <string> STRING
 %token <float> NUMBER
 %token <bool> BOOL
+%token LT
 %token EOF
 
 %{
@@ -79,6 +80,7 @@ query:
   | v = BOOL { S.bool v }
   | NULL { S.null }
   | name = NAME { S.name name }
+  | left = query; LT; right = query { S.lessThan left right }
 
 nav:
   | name = ID { {name; args = []} }

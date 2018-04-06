@@ -43,6 +43,7 @@ rule read = parse
   | ':'        { COLON }
   | '.'        { DOT }
   | ','        { COMMA }
+  | '<'        { LT }
   | id         { ID (Lexing.lexeme lexbuf) }
   | name       { NAME (Lexing.lexeme lexbuf) }
   | float      { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }

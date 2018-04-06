@@ -192,6 +192,7 @@ module Query = struct
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
+    | LessThan of (t * t)
 
   and args = t StringMap.t
 
@@ -271,6 +272,10 @@ module Query = struct
       let parent = show parent in
       let args = showArgs args in
       {j|$parent:where$args|j}
+    | LessThan (left, right) ->
+      let left = show left in
+      let right = show right in
+      {j|$left < $right|j}
 
   let unsafeLookupArg ~name args =
     StringMap.getExn args name
@@ -339,6 +344,9 @@ module Query = struct
 
     let grow next parent =
       (), Grow (parent, next)
+
+    let lessThan left right =
+      (), LessThan (left, right)
 
     let arg = Arg.make
     let define = Arg.make
@@ -527,6 +535,7 @@ module TypedQuery = struct
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
+    | LessThan of (t * t)
 
   and nav = { navName : string; }
 
@@ -564,6 +573,8 @@ module TypedQuery = struct
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
     | _, Meta parent -> (), Query.Meta (stripTypes parent)
     | _, Grow (parent, next) -> (), Query.Grow (stripTypes parent, stripTypes next)
+    | _, LessThan (left, right) ->
+      (), Query.LessThan (stripTypes left, stripTypes right)
 
   let show q =
     Query.show (stripTypes q)
@@ -609,6 +620,19 @@ module TypedQuery = struct
 
   let void = Context.void, Void
 
+
+  let ctyp (q : t) =
+    let ctx, _ = q in
+    let _, ctyp = ctx in
+    ctyp
+
+  let card (q : t) =
+    let card, _ = ctyp q in
+    card
+
+  let typ (q : t) =
+    let _, typ = ctyp q in
+    typ
 end
 
 module Screen = struct
@@ -884,7 +908,7 @@ end = struct
         )
       | Query.Const (ConstExpr.Null) ->
         return (
-          (scope, (Card.One, Type.Value Type.Null)),
+          (scope, (Card.Opt, Type.Value Type.Null)),
           TypedQuery.Const (ConstExpr.Null)
         )
       | Query.Count parent ->
@@ -974,6 +998,35 @@ end = struct
         in
         let typ = Type.Record fields in
         return ((parentScope, (parentCard, typ)), TypedQuery.Select (parent, selection))
+
+      | Query.LessThan (left, right) ->
+        let%bind left = aux ~here ~ctx left in
+        let%bind right = aux ~here ~ctx right in
+        let syn = TypedQuery.LessThan (left, right) in
+        let%bind card =
+          match TypedQuery.card left, TypedQuery.card right with
+          | Card.One, Card.One -> return Card.One
+          | Card.Opt, Card.One
+          | Card.One, Card.Opt
+          | Card.Opt, Card.Opt -> return Card.Opt
+          | _ ->
+            error "'<' cardinality mismatch: expected one / opt"
+        in
+        let%bind () =
+          match TypedQuery.typ left, TypedQuery.typ right with
+          | Type.Value Type.Number, Type.Value Type.Number
+          | Type.Value Type.Number, Type.Value Type.Null
+          | Type.Value Type.Null, Type.Value Type.Number
+          | Type.Value Type.Null, Type.Value Type.Null ->
+            return ()
+          | _ ->
+            error "'<' type mismatch: numbers expected"
+        in
+        (* TODO:
+         * Handler for Card.Many < Card.One etc
+         * *)
+        return ((scope, (card, Type.Value Type.Bool)), syn)
+
 
     in aux ~here ~ctx query
 

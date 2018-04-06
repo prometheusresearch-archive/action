@@ -23,11 +23,24 @@ let expectQueryOk query =
   let result =
     let open Result.Syntax in
     let%bind query = QueryTyper.typeQuery ~univ query in
-    let (_scope, (_card, _typ)), _syn = query in
     let%bind _result = JSONDatabase.execute ~db query in
     return ()
   in
   expectOk result
+
+let unwrapAssertionResult = function
+  | Core.Result.Ok assertion -> assertion
+  | Core.Result.Error err -> fail err
+
+let runQueryAndExpect q v =
+  unwrapAssertionResult (
+    let open Core.Result.Syntax in
+    let%bind q = Core.QueryTyper.typeQuery ~univ q in
+    let%bind r = JSONDatabase.execute ~db q in
+    return (expect(r) |> toEqual(v))
+  )
+
+
 
 let typeWorkflow w =
   runResult (Result.ignore (WorkflowTyper.typeWorkflow ~univ w))
@@ -203,4 +216,38 @@ let () =
         |> nav "registry"
       );
     end;
+  end;
+
+  describe "< / lessThan" begin fun () ->
+    test "1 < 2 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan (number 1.) (number 2.)
+      ) (Core.Value.bool true);
+    end;
+
+    test "2 < 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan (number 2.) (number 1.)
+      ) (Core.Value.bool false);
+    end;
+
+    test "1 < null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan (number 1.) null
+      ) Core.Value.null;
+    end;
+
+    test "null < 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan null (number 1.)
+      ) Core.Value.null;
+    end;
+
+    test "null < null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan null null
+      ) Core.Value.null;
+    end;
+
+
   end;

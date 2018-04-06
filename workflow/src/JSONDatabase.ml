@@ -313,6 +313,21 @@ let execute ?value ~db query =
       let%bind value = aux ~value next in
       return value
 
+    | _, TypedQuery.LessThan (left, right) ->
+      let%bind left = aux ~value left in
+      let%bind right = aux ~value right in
+      begin
+        match Value.classify left, Value.classify right with
+        | Value.Number left, Value.Number right ->
+          return (Value.bool (left < right))
+        | Value.Null, Value.Number _
+        | Value.Number _, Value.Null
+        | Value.Null, Value.Null ->
+          return Value.null
+        | _ ->
+          error "'<' type mismatch ..."
+      end
+
   and expandRef value =
     let resolveRef value =
       match parseRefOpt value with

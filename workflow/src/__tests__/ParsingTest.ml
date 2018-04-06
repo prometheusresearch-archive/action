@@ -59,5 +59,7 @@ let () =
         render(site:view)
       }
 
-    |}
+    |};
+    expectParseOk "1 < 2";
+
   end;
