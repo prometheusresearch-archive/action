@@ -5,8 +5,8 @@
 import * as React from 'react';
 import * as ReactNative from 'react-native-web';
 import MediaQuery from 'react-responsive';
-import * as W from 'workflow';
-import type {Result, RenderableState, State} from 'workflow';
+import * as W from 'core';
+import type {Result, RenderableState, State} from 'core';
 import {Pick} from './Pick.js';
 import {View} from './View.js';
 import {BarChart} from './BarChart.js';

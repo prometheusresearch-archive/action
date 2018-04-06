@@ -19,7 +19,7 @@
     "react-native-web": "^0.4.0",
     "react-responsive": "^4.1.0",
     "react-textarea-autosize": "^6.0.0",
-    "workflow": "link:../workflow"
+    "core": "link:../core"
   },
   "homepage": "https://prometheusresearch.github.io/action",
   "scripts": {
