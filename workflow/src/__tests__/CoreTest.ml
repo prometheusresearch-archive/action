@@ -13,6 +13,7 @@ let runToResult v = match Run.toResult v with
   | Result.Ok v -> Result.Ok v
   | Result.Error (`DatabaseError err) -> Result.Error err
   | Result.Error (`RunWorkflowError err) -> Result.Error err
+  | Result.Error (`WorkflowTypeError err) -> Result.Error err
 
 let runResult result = match result with
   | Result.Ok () -> ()
@@ -46,7 +47,7 @@ let runQueryAndExpect q v =
   )
 
 let typeWorkflow w =
-  runResult (Result.ignore (WorkflowTyper.typeWorkflow ~univ w))
+  runToResult (Workflow.Typer.typeWorkflow ~univ w)
 
 let () =
 

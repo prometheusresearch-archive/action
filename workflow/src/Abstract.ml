@@ -50,7 +50,7 @@ module type RUN_WORKFLOW = functor (DB : DATABASE) -> sig
   (**
    * Produce an initial state for the given database and workflow description.
    *)
-  val boot : db : DB.t -> TypedWorkflow.t -> ((t * Value.UI.t option), 'err) comp
+  val boot : db : DB.t -> Workflow.Typed.t -> ((t * Value.UI.t option), 'err) comp
 
   (**
    * Render workflow state and return a new state and a UI screen to render.

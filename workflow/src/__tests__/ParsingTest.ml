@@ -10,9 +10,9 @@ let () =
       try
         let res = Parser.start Lexer.read filebuf in
         match res with
-        | Core.ParseResult.Query _ ->
+        | ParserResult.Query _ ->
           pass
-        | Core.ParseResult.Workflow _ ->
+        | ParserResult.Workflow _ ->
           pass
       with
       | Lexer.Error msg ->
