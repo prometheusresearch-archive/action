@@ -73,11 +73,12 @@ let db = JSONDatabase.ofStringExn ~univ {|
 let unwrapAssertionResult v = match Run.toResult v with
   | Common.Result.Ok assertion -> assertion
   | Common.Result.Error (`DatabaseError err) -> fail err
+  | Common.Result.Error (`QueryTypeError err) -> fail err
 
 let runQueryAndExpect q v =
   unwrapAssertionResult (
     let open Run.Syntax in
-    let%bind q = liftResult (Core.QueryTyper.typeQuery ~univ q) in
+    let%bind q = Core.QueryTyper.typeQuery ~univ q in
     let%bind r = JSONDatabase.execute ~db q in
     return (expect(r) |> toEqual(v))
   )

@@ -33,7 +33,7 @@ end
 
 module Typer = struct
 
-  type error = [ `WorkflowTypeError of string ]
+  type error = [ `WorkflowTypeError of string | `QueryTypeError of string ]
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
   let workflowTypeError err = Run.error (`WorkflowTypeError err)
@@ -47,7 +47,7 @@ module Typer = struct
     let rec aux ~parent w =
       match w with
       | Untyped.Render q ->
-        let%bind tq = liftResult (QueryTyper.growQuery ~univ ~base:parent q) in
+        let%bind tq = QueryTyper.growQuery ~univ ~base:parent q in
         begin match tq with
         | _, Query.Typed.Screen _ ->
           return (Typed.Render q, tq)

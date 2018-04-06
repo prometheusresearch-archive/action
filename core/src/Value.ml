@@ -36,8 +36,8 @@ module UI : sig
   val args : t -> Query.Untyped.args
   val setArgs : args : Query.Untyped.args -> t -> t
   val parentQuery : t -> Query.Typed.t
-  val outQuery : t -> (Query.Typed.t, string) Result.t
-  val screenQuery : t -> (Query.Typed.t, string) Result.t
+  val outQuery : t -> (Query.Typed.t, [> QueryTyper.error ]) QueryTyper.comp
+  val screenQuery : t -> (Query.Typed.t, [> QueryTyper.error ]) QueryTyper.comp
   val value : t -> value
   val typ : t -> Type.t
 
@@ -74,7 +74,7 @@ end = struct
   let parentQuery ui = ui##parentQuery
 
   let screenQuery (ui : t) =
-    let open Result.Syntax in
+    let open Run.Syntax in
     let univ = ui##univ in
     let baseQuery = ui##parentQuery in
     let screenName = ui##name in
@@ -84,7 +84,7 @@ end = struct
     return screenQuery
 
   let outQuery ui =
-    let open Result.Syntax in
+    let open Run.Syntax in
     let univ = ui##univ in
     let baseQuery = ui##parentQuery in
     let screen = ui##screen in

@@ -24,7 +24,8 @@ end
 
 module Typer : sig
 
-  type error = [ `WorkflowTypeError of string ]
+  type error = [ `WorkflowTypeError of string | `QueryTypeError of string ]
+
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
   val typeWorkflow : univ : Universe.t -> Untyped.t -> (Typed.t, 'err) comp

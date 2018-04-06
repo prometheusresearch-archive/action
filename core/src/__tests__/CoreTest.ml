@@ -14,6 +14,7 @@ let runToResult v = match Run.toResult v with
   | Result.Error (`DatabaseError err) -> Result.Error err
   | Result.Error (`RunWorkflowError err) -> Result.Error err
   | Result.Error (`WorkflowTypeError err) -> Result.Error err
+  | Result.Error (`QueryTypeError err) -> Result.Error err
 
 let runResult result = match result with
   | Result.Ok () -> ()
@@ -27,24 +28,24 @@ let expectOk = function
 
 let expectQueryOk query =
   let result =
-    let open Result.Syntax in
+    let open Run.Syntax in
     let%bind query = QueryTyper.typeQuery ~univ query in
-    let%bind _result = runToResult (JSONDatabase.execute ~db query) in
+    let%bind _result = JSONDatabase.execute ~db query in
     return ()
   in
-  expectOk result
+  expectOk (runToResult result)
 
 let unwrapAssertionResult = function
   | Result.Ok assertion -> assertion
   | Result.Error err -> fail err
 
 let runQueryAndExpect q v =
-  unwrapAssertionResult (
-    let open Result.Syntax in
+  unwrapAssertionResult (runToResult (
+    let open Run.Syntax in
     let%bind q = Core.QueryTyper.typeQuery ~univ q in
-    let%bind r = runToResult (JSONDatabase.execute ~db q) in
+    let%bind r = JSONDatabase.execute ~db q in
     return (expect(r) |> toEqual(v))
-  )
+  ))
 
 let typeWorkflow w =
   runToResult (Workflow.Typer.typeWorkflow ~univ w)

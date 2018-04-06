@@ -19,4 +19,5 @@ val hasScreen : string -> Screen.t -> t -> t
 val fields : t -> Query.Type.field list
 
 val lookupScreen : string -> t -> Screen.t option
+
 val lookupScreenResult : string -> t -> (Screen.t, string) Common.Result.t

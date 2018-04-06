@@ -15,7 +15,7 @@ type t = {
   univ : Universe.t;
 }
 
-type error = [ `DatabaseError of string ]
+type error = [ `DatabaseError of string | `QueryTypeError of string ]
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
 type entityRef = {
@@ -249,7 +249,7 @@ let execute ?value ~db query =
       | _, Value.Null ->
         return Value.null
       | _, Value.UI ui ->
-        let%bind outQuery = liftResult (Value.UI.outQuery ui) in
+        let%bind outQuery = Value.UI.outQuery ui in
         let queryValue = Value.UI.value ui in
         let%bind value = aux ~value:queryValue outQuery in
         navigate navName value
@@ -273,7 +273,7 @@ let execute ?value ~db query =
       begin match Value.classify value with
       | Value.Object _ -> selectFrom value
       | Value.UI ui ->
-        let%bind outQuery = liftResult (Value.UI.outQuery ui) in
+        let%bind outQuery = Value.UI.outQuery ui in
         let queryValue = Value.UI.value ui in
         let%bind value = aux ~value:queryValue outQuery in
         selectFrom value
