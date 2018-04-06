@@ -112,23 +112,23 @@ end
 
 module Type : sig
   type t =
-      Void
+    | Void
     | Screen of screen
     | Entity of entity
     | Record of field list
     | Value of value
 
-  and ct = Card.t * t
+  and ctyp = Card.t * t
 
-  and screen = { screenName : string; screenOut : ct; }
+  and screen = { screenName : string; screenOut : ctyp; }
 
   and value = String | Number | Bool | Null | Abstract
 
   and entity = { entityName : string; entityFields : t -> field list; }
 
-  and field = { fieldName : string; fieldArgs : args; fieldCtyp : ct; }
+  and field = { fieldName : string; fieldArgs : args; fieldCtyp : ctyp; }
 
-  and arg = { argCtyp : ct; argDefault : Untyped.t option; }
+  and arg = { argCtyp : ctyp; argDefault : Untyped.t option; }
 
   and args = arg Common.StringMap.t
 
@@ -136,7 +136,7 @@ module Type : sig
 
   val showValue : value -> string
 
-  val showCt : ct -> string
+  val showCt : ctyp -> string
 
   val ctyp : Card.t * t
 
@@ -149,7 +149,7 @@ module Type : sig
               val ofMap : arg Common.StringMap.t -> t list
             end
           type arg = ArgSyntax.t
-          val arg : ?default:Untyped.t -> string -> ct -> ArgSyntax.t
+          val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
         end
 
       val entity : string -> (t -> field list) -> t
@@ -168,12 +168,12 @@ module Type : sig
       val bool : t
       module ArgSyntax = Arg.ArgSyntax
       type arg = ArgSyntax.t
-      val arg : ?default:Untyped.t -> string -> ct -> ArgSyntax.t
+      val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
 
       module Card : sig
-        val one : t -> ct
-        val opt : t -> ct
-        val many : t -> ct
+        val one : t -> ctyp
+        val opt : t -> ctyp
+        val many : t -> ctyp
       end
     end
 end
@@ -181,7 +181,7 @@ end
 module Typed : sig
   type t = context * syntax
 
-  and context = scope * Type.ct
+  and context = scope * Type.ctyp
 
   and scope = binding Common.StringMap.t
 
@@ -222,13 +222,13 @@ module Typed : sig
     val addBindings :
       bindings:'a Common.StringMap.t -> 'a Common.StringMap.t * 'b -> 'a Common.StringMap.t * 'b
     val inspect :
-      binding Common.StringMap.t * Type.ct ->
+      binding Common.StringMap.t * Type.ctyp ->
       < ctyp : string; scope : string Js.Dict.t > Js.t
   end
 
   val void : ('a Common.StringMap.t * (Card.t * Type.t)) * syntax
 
-  val ctyp : t -> Type.ct
+  val ctyp : t -> Type.ctyp
 
   val card : t -> Card.t
 
