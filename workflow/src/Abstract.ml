@@ -2,8 +2,6 @@
  * This module contains abstract interface declarations for the action.
  *)
 
-open Core
-
 (**
  * Database
  *)
@@ -29,7 +27,7 @@ module type DATABASE = sig
   val execute :
     ?value : Value.t
     -> db : t
-    -> TypedQuery.t
+    -> Query.Typed.t
     -> (Value.t, 'err) comp
 
 end
@@ -57,13 +55,13 @@ module type RUN_WORKFLOW = functor (DB : DATABASE) -> sig
    *)
   val render : t -> ((t * Value.UI.t option), 'err) comp
 
-  val dataQuery : t -> (TypedQuery.t, 'err) comp
+  val dataQuery : t -> (Query.Typed.t, 'err) comp
 
-  val titleQuery : t -> (TypedQuery.t, 'err) comp
+  val titleQuery : t -> (Query.Typed.t, 'err) comp
 
-  val uiQuery : t -> (TypedQuery.t, 'err) comp
+  val uiQuery : t -> (Query.Typed.t, 'err) comp
 
-  val setArgs : args : Query.args -> t -> (t, 'err) comp
+  val setArgs : args : Query.Untyped.args -> t -> (t, 'err) comp
 
   val step : t -> (t, 'err) comp
 

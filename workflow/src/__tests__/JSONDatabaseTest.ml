@@ -2,21 +2,21 @@ open! Jest
 open! Expect
 open! Expect.Operators
 
-module Q = Core.Query.Syntax
+module Q = Query.Untyped.Syntax
 
 let liftResult = function
   | Js.Result.Ok v -> Run.return v
   | Js.Result.Error err -> Run.error (`DatabaseError err)
 
 let univ =
-  let rec nation = lazy Core.Type.Syntax.(
+  let rec nation = lazy Query.Type.Syntax.(
     entity "nation" (fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
       hasOne "region" (Lazy.force region);
     ])
   )
-  and region = lazy Core.Type.Syntax.(
+  and region = lazy Query.Type.Syntax.(
     entity "region" (fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
@@ -71,8 +71,8 @@ let db = JSONDatabase.ofStringExn ~univ {|
 |}
 
 let unwrapAssertionResult v = match Run.toResult v with
-  | Core.Result.Ok assertion -> assertion
-  | Core.Result.Error (`DatabaseError err) -> fail err
+  | Common.Result.Ok assertion -> assertion
+  | Common.Result.Error (`DatabaseError err) -> fail err
 
 let runQueryAndExpect q v =
   unwrapAssertionResult (
@@ -82,7 +82,7 @@ let runQueryAndExpect q v =
     return (expect(r) |> toEqual(v))
   )
 
-let valueOfStringExn s = s |> Js.Json.parseExn |> Core.Value.ofJson
+let valueOfStringExn s = s |> Js.Json.parseExn |> Value.ofJson
 
 let () =
 

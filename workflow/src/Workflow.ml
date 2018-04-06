@@ -1,4 +1,4 @@
-open Core
+module Result = Common.Result
 
 (**
  * Monadic structure on top queries which represent transition between screens.
@@ -15,7 +15,7 @@ module Syntax (Q : sig type t end) = struct
 end
 
 module Untyped = struct
-  include Syntax(Query)
+  include Syntax(Query.Untyped)
 
   module Syntax = struct
     let render q = Render q
@@ -26,7 +26,7 @@ end
 module Typed = struct
   include Syntax(struct
 
-    type t = Query.t
+    type t = Query.Untyped.t
 
   end)
 end
@@ -49,10 +49,10 @@ module Typer = struct
       | Untyped.Render q ->
         let%bind tq = liftResult (QueryTyper.growQuery ~univ ~base:parent q) in
         begin match tq with
-        | _, TypedQuery.Screen _ ->
+        | _, Query.Typed.Screen _ ->
           return (Typed.Render q, tq)
         | q ->
-          let q = TypedQuery.show q in
+          let q = Query.Typed.show q in
           let msg = {j|workflow can only be defined on screen syntax but got $q|j} in
           workflowTypeError msg
         end
@@ -67,7 +67,7 @@ module Typer = struct
         in
         return (Typed.Next (first, List.rev next), parent)
     in
-    let%bind tw, _ = aux ~parent:TypedQuery.void w in
+    let%bind tw, _ = aux ~parent:Query.Typed.void w in
     return tw
 
 end

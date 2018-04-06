@@ -1,4 +1,4 @@
-open Core
+module Result = Common.Result
 
 module Make (Db : Abstract.DATABASE) = struct
 
@@ -6,11 +6,11 @@ module Make (Db : Abstract.DATABASE) = struct
 
   and frame = {
     db : Db.t;
-    query : TypedQuery.t;
+    query : Query.Typed.t;
     workflow : Workflow.Typed.t;
     position: position;
     prev: t option;
-    args : Query.args;
+    args : Query.Untyped.args;
   }
 
   and position =
@@ -42,7 +42,7 @@ module Make (Db : Abstract.DATABASE) = struct
 
   let rec show (frame, _ as state) =
     let query = match Run.toResult (uiQuery state) with
-    | Result.Ok query -> TypedQuery.show query
+    | Result.Ok query -> Query.Typed.show query
     | Result.Error _ -> "EMPTY"
     in
     match frame.prev with
@@ -52,8 +52,8 @@ module Make (Db : Abstract.DATABASE) = struct
   let make
     ?prev
     ?ui
-    ?(args=StringMap.empty)
-    ?(query=TypedQuery.void)
+    ?(args=Common.StringMap.empty)
+    ?(query=Query.Typed.void)
     ~position
     ~db
     workflow
@@ -129,7 +129,7 @@ module Make (Db : Abstract.DATABASE) = struct
           findRender state
         in
         let%bind next = Run.List.map ~f next in
-        return (Option.List.filterNone next)
+        return (Common.Option.List.filterNone next)
     in
 
     let%bind q = uiQuery currentState in
@@ -160,15 +160,15 @@ module Make (Db : Abstract.DATABASE) = struct
   let setArgs ~args (frame, ui) =
     let open Run.Syntax in
     let%bind frame = match frame.workflow with
-    | Workflow.Typed.Render (ctyp, Query.Screen (p, c)) ->
+    | Workflow.Typed.Render (ctyp, Query.Untyped.Screen (p, c)) ->
       let univ = Db.univ frame.db in
       let%bind screen = liftResult (Universe.lookupScreenResult c.screenName univ) in
       let%bind args = liftResult (QueryTyper.checkArgsPartial ~argTyps:screen.args args) in
       let c = {
-        c with Query.
-        screenArgs = Query.updateArgs ~update:args c.screenArgs
+        c with Query.Untyped.
+        screenArgs = Query.Untyped.updateArgs ~update:args c.screenArgs
       } in
-      let workflow = Workflow.Typed.Render (ctyp, Query.Screen (p, c)) in
+      let workflow = Workflow.Typed.Render (ctyp, Query.Untyped.Screen (p, c)) in
       return { frame with args; workflow; }
     | _ -> runWorkflowError {j|Arguments can only be updated at the workflow node with a rendered screen|j}
     in
