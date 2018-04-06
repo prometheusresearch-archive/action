@@ -1160,11 +1160,15 @@ module Value = struct
   let null : t = Obj.magic (Js.null)
   external string : string -> t = "%identity"
   external number : float -> t = "%identity"
-  external bool : bool -> t = "%identity"
+  external jsBool : Js.boolean -> t = "%identity"
   external ui : UI.t -> t = "%identity"
   external array : t array -> t = "%identity"
   external obj : t Js.Dict.t -> t = "%identity"
   external ofJson : Js.Json.t -> t = "%identity"
+
+  let bool = function
+    | true -> jsBool Js.true_
+    | false -> jsBool Js.false_
 
   let ofOption = function
     | Some v -> v
@@ -1293,8 +1297,10 @@ module Value = struct
     then String (Obj.magic v)
     else if Js.typeof v = "number"
     then Number (Obj.magic v)
-    else if Js.typeof v = "boolean"
-    then Bool (Obj.magic v)
+    else if Obj.magic v == Js.true_
+    then Bool true
+    else if Obj.magic v == Js.false_
+    then Bool false
     else if Obj.magic v == Js.null
     then Null
     else if Js.Array.isArray (Obj.magic v)
