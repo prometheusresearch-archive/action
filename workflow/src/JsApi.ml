@@ -17,6 +17,9 @@ let runToResult v = match Run.toResult v with
   | Result.Error (`RunWorkflowError err) ->
     let msg = {j|WorkflowError: $err|j} in
     Result.Error msg
+  | Result.Error (`WorkflowTypeError err) ->
+    let msg = {j|WorkflowTypeError: $err|j} in
+    Result.Error msg
 
 module JsResult = struct
   type 'v t
@@ -198,9 +201,9 @@ let parseQuery q =
   let filebuf = Lexing.from_string q in
   try
     match Parser.start Lexer.read filebuf with
-    | Core.ParseResult.Workflow _ ->
+    | ParserResult.Workflow _ ->
       error "expected query"
-    | Core.ParseResult.Query q ->
+    | ParserResult.Query q ->
       return q
   with
   | Lexer.Error msg ->
@@ -223,30 +226,33 @@ let parse s =
   let module N = Js.Nullable in
   let makeError err = [%bs.obj {error = N.return err; ui = N.null; data = N.null;}] in
   let r =
-    let open Result.Syntax in
     let makeData data =
-      return [%bs.obj {error = N.null; ui = N.null; data = N.return data;}]
+      Result.Syntax.return [%bs.obj {error = N.null; ui = N.null; data = N.return data;}]
     in
     let makeError err =
-      return (makeError err)
+      Result.Syntax.return (makeError err)
     in
     let makeWorkflow w =
       let state =
-        let%bind w = WorkflowTyper.typeWorkflow ~univ w in
-        runToResult (WorkflowInterpreter.boot ~db w)
+        runToResult (
+          let open! Run.Syntax in
+          let%bind w = Workflow.Typer.typeWorkflow ~univ w in
+          WorkflowInterpreter.boot ~db w
+        )
       in
-      return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
+      Result.Syntax.return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
     in
     let makeUi ui =
-      let w = UntypedWorkflow.Syntax.render ui in
+      let w = Workflow.Untyped.Syntax.render ui in
       makeWorkflow w
     in
+    let open Result.Syntax in
     let filebuf = Lexing.from_string s in
     try
       match Parser.start Lexer.read filebuf with
-      | Core.ParseResult.Workflow w ->
+      | ParserResult.Workflow w ->
         makeWorkflow w
-      | Core.ParseResult.Query q ->
+      | ParserResult.Query q ->
         let%bind tq = QueryTyper.typeQuery ~univ q in
         let%bind value = runToResult (JSONDatabase.execute ~db tq) in
         match Value.classify value with

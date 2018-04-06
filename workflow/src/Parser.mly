@@ -25,7 +25,7 @@
 %{
 
   module S = Core.Query.Syntax
-  module W = Core.UntypedWorkflow.Syntax
+  module W = Workflow.Untyped.Syntax
   module StringMap = Belt.Map.String
 
   type nav = {
@@ -36,7 +36,7 @@
 %}
 
 %start start
-%type <Core.ParseResult.t> start
+%type <ParserResult.t> start
 
 %%
 
@@ -44,8 +44,8 @@ start:
   | p = program EOF { p }
 
 program:
-  | q = query { Core.ParseResult.Query q }
-  | w = workflow { Core.ParseResult.Workflow w }
+  | q = query { ParserResult.Query q }
+  | w = workflow { ParserResult.Workflow w }
 
 workflow:
   | RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render q }

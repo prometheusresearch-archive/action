@@ -7,7 +7,7 @@ module Make (Db : Abstract.DATABASE) = struct
   and frame = {
     db : Db.t;
     query : TypedQuery.t;
-    workflow : TypedWorkflow.t;
+    workflow : Workflow.Typed.t;
     position: position;
     prev: t option;
     args : Query.args;
@@ -30,7 +30,7 @@ module Make (Db : Abstract.DATABASE) = struct
   let uiQuery (frame, _) =
     let open Run.Syntax in
     match frame.workflow with
-    | TypedWorkflow.Render q ->
+    | Workflow.Typed.Render q ->
       let%bind q = liftResult (QueryTyper.growQuery ~univ:(Db.univ frame.db) ~base:frame.query q) in
       return q
     | _ -> runWorkflowError "no query"
@@ -73,10 +73,10 @@ module Make (Db : Abstract.DATABASE) = struct
     let rec aux (frame, _ as state) =
       let {workflow; db; query; _} = frame in
       match workflow with
-      | TypedWorkflow.Next (first, _next) ->
+      | Workflow.Typed.Next (first, _next) ->
         let state = make ?prev:frame.prev ~position:(First state) ~query ~db first in
         aux state
-      | TypedWorkflow.Render _ ->
+      | Workflow.Typed.Render _ ->
         let%bind q = uiQuery state in
         let%bind ui = Db.execute ~db:frame.db q in
         begin match Value.classify ui with
@@ -119,11 +119,11 @@ module Make (Db : Abstract.DATABASE) = struct
     let rec aux query (frame, _ as state) =
       let {workflow; position; db;} = frame in
       match workflow, position with
-      | TypedWorkflow.Render _, First parent -> aux query parent
-      | TypedWorkflow.Render _, Next _  -> return []
-      | TypedWorkflow.Render _, Root -> return []
-      | TypedWorkflow.Next (_first, []), First parent -> aux query parent
-      | TypedWorkflow.Next (_first, next), _ ->
+      | Workflow.Typed.Render _, First parent -> aux query parent
+      | Workflow.Typed.Render _, Next _  -> return []
+      | Workflow.Typed.Render _, Root -> return []
+      | Workflow.Typed.Next (_first, []), First parent -> aux query parent
+      | Workflow.Typed.Next (_first, next), _ ->
         let f w =
           let state = make ~prev:currentState ~query ~position:(Next state) ~db w in
           findRender state
@@ -160,7 +160,7 @@ module Make (Db : Abstract.DATABASE) = struct
   let setArgs ~args (frame, ui) =
     let open Run.Syntax in
     let%bind frame = match frame.workflow with
-    | TypedWorkflow.Render (ctyp, Query.Screen (p, c)) ->
+    | Workflow.Typed.Render (ctyp, Query.Screen (p, c)) ->
       let univ = Db.univ frame.db in
       let%bind screen = liftResult (Universe.lookupScreenResult c.screenName univ) in
       let%bind args = liftResult (QueryTyper.checkArgsPartial ~argTyps:screen.args args) in
@@ -168,7 +168,7 @@ module Make (Db : Abstract.DATABASE) = struct
         c with Query.
         screenArgs = Query.updateArgs ~update:args c.screenArgs
       } in
-      let workflow = TypedWorkflow.Render (ctyp, Query.Screen (p, c)) in
+      let workflow = Workflow.Typed.Render (ctyp, Query.Screen (p, c)) in
       return { frame with args; workflow; }
     | _ -> runWorkflowError {j|Arguments can only be updated at the workflow node with a rendered screen|j}
     in
