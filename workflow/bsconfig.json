@@ -1,5 +1,5 @@
 {
-  "name": "Workflow",
+  "name": "core",
   "namespace": true,
   "sources": [
     {
