@@ -38,10 +38,10 @@ make serve
 If you work only on core portion of action:
 
 ```
-cd workflow
+cd core
 make watch
 esy vim ./src/
 ```
 
-If you work on both you need both `make serve` and `make watch-workflow`
+If you work on both you need both `make serve` and `make watch-core`
 running.
