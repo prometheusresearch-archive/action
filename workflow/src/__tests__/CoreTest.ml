@@ -1,6 +1,6 @@
-open Jest
-open Expect
-open Expect.Operators
+open! Jest
+open! Expect
+open! Expect.Operators
 
 open Core
 
