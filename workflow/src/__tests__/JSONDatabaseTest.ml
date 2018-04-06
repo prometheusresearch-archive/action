@@ -4,6 +4,10 @@ open! Expect.Operators
 
 module Q = Core.Query.Syntax
 
+let liftResult = function
+  | Js.Result.Ok v -> Run.return v
+  | Js.Result.Error err -> Run.error (`DatabaseError err)
+
 let univ =
   let rec nation = lazy Core.Type.Syntax.(
     entity "nation" (fun _ -> [
@@ -66,14 +70,14 @@ let db = JSONDatabase.ofStringExn ~univ {|
   }
 |}
 
-let unwrapAssertionResult = function
+let unwrapAssertionResult v = match Run.toResult v with
   | Core.Result.Ok assertion -> assertion
-  | Core.Result.Error err -> fail err
+  | Core.Result.Error (`DatabaseError err) -> fail err
 
 let runQueryAndExpect q v =
   unwrapAssertionResult (
-    let open Core.Result.Syntax in
-    let%bind q = Core.QueryTyper.typeQuery ~univ q in
+    let open Run.Syntax in
+    let%bind q = liftResult (Core.QueryTyper.typeQuery ~univ q) in
     let%bind r = JSONDatabase.execute ~db q in
     return (expect(r) |> toEqual(v))
   )
