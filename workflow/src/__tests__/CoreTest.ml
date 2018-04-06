@@ -2,9 +2,9 @@ open! Jest
 open! Expect
 open! Expect.Operators
 
-open Core
+module Result = Common.Result
 
-module Q = Query.Syntax
+module Q = Query.Untyped.Syntax
 
 let univ = JsApi.univ
 let db = JsApi.db
@@ -35,12 +35,12 @@ let expectQueryOk query =
   expectOk result
 
 let unwrapAssertionResult = function
-  | Core.Result.Ok assertion -> assertion
-  | Core.Result.Error err -> fail err
+  | Result.Ok assertion -> assertion
+  | Result.Error err -> fail err
 
 let runQueryAndExpect q v =
   unwrapAssertionResult (
-    let open Core.Result.Syntax in
+    let open Result.Syntax in
     let%bind q = Core.QueryTyper.typeQuery ~univ q in
     let%bind r = runToResult (JSONDatabase.execute ~db q) in
     return (expect(r) |> toEqual(v))
@@ -226,31 +226,31 @@ let () =
     test "1 < 2 -> true" begin fun () ->
       runQueryAndExpect Q.(
         lessThan (number 1.) (number 2.)
-      ) (Core.Value.bool true);
+      ) (Value.bool true);
     end;
 
     test "2 < 1 -> false" begin fun () ->
       runQueryAndExpect Q.(
         lessThan (number 2.) (number 1.)
-      ) (Core.Value.bool false);
+      ) (Value.bool false);
     end;
 
     test "1 < null -> null" begin fun () ->
       runQueryAndExpect Q.(
         lessThan (number 1.) null
-      ) Core.Value.null;
+      ) Value.null;
     end;
 
     test "null < 1 -> null" begin fun () ->
       runQueryAndExpect Q.(
         lessThan null (number 1.)
-      ) Core.Value.null;
+      ) Value.null;
     end;
 
     test "null < null -> null" begin fun () ->
       runQueryAndExpect Q.(
         lessThan null null
-      ) Core.Value.null;
+      ) Value.null;
     end;
 
 

@@ -1,12 +1,8 @@
-module Result = Core.Result
-module Option = Core.Option
-module Value = Core.Value
-module Universe = Core.Universe
-module Card = Core.Card
-module Type = Core.Type
-module Query = Core.Query
-module TypedQuery = Core.TypedQuery
-module ConstExpr = Core.ConstExpr
+module Result = Common.Result
+module Option = Common.Option
+module Card = Query.Card
+module Type = Query.Type
+module Const = Query.Const
 
 let liftResult = function
   | Result.Ok v -> Run.return v
@@ -40,7 +36,7 @@ let ofStringExn ~univ value =
   {univ; value}
 
 let parseRefOpt value =
-  let open Core.Option.Syntax in
+  let open Common.Option.Syntax in
   match Value.classify value with
   | Value.Object dict ->
     let%bind ref = Js.Dict.get dict "$ref" in
@@ -150,42 +146,42 @@ let execute ?value ~db query =
   and aux ~(value : Value.t) ((_bindings, (_card, typ)), syn) =
 
     match typ, syn with
-    | Type.Void, TypedQuery.Void ->
+    | Type.Void, Query.Typed.Void ->
       return db.value
-    | _, TypedQuery.Void ->
+    | _, Query.Typed.Void ->
       executionError "invalid type for void"
 
-    | _, TypedQuery.Here ->
+    | _, Query.Typed.Here ->
       return value
 
-    | _, TypedQuery.Name (_name, query) ->
+    | _, Query.Typed.Name (_name, query) ->
       aux ~value query
 
-    | _, TypedQuery.Where (parent, _bindings) ->
+    | _, Query.Typed.Where (parent, _bindings) ->
       aux ~value parent
 
-    | Type.Value Type.String, TypedQuery.Const (ConstExpr.String v) ->
+    | Type.Value Type.String, Query.Typed.Const (Const.String v) ->
       return (Value.string v)
-    | Type.Value Type.Number, TypedQuery.Const (ConstExpr.Number v) ->
+    | Type.Value Type.Number, Query.Typed.Const (Const.Number v) ->
       return (Value.number v)
-    | Type.Value Type.Bool, TypedQuery.Const (ConstExpr.Bool v) ->
+    | Type.Value Type.Bool, Query.Typed.Const (Const.Bool v) ->
       return (Value.bool v)
-    | Type.Value Type.Null, TypedQuery.Const (ConstExpr.Null) ->
+    | Type.Value Type.Null, Query.Typed.Const (Const.Null) ->
       return (Value.null)
-    | _, TypedQuery.Const _ ->
+    | _, Query.Typed.Const _ ->
       executionError "invalid type for const"
 
-    | Type.Value Type.Number, TypedQuery.Count query ->
+    | Type.Value Type.Number, Query.Typed.Count query ->
       let%bind value = aux ~value query in
       begin match Value.classify value with
       | Value.Null -> return (Value.number 0.)
       | Value.Array items -> return (Value.number (float_of_int (Array.length items)))
       | _ -> return (Value.number 1.)
       end
-    | _, TypedQuery.Count _ ->
+    | _, Query.Typed.Count _ ->
       executionError "invalid type for count"
 
-    | _, TypedQuery.First query ->
+    | _, Query.Typed.First query ->
       let%bind value = aux ~value query in
       begin match Value.classify value with
       | Value.Array items ->
@@ -195,7 +191,7 @@ let execute ?value ~db query =
       | _ -> return value
       end
 
-    | Type.Screen _ as typ, TypedQuery.Screen (query, { screenName; screenArgs; }) ->
+    | Type.Screen _ as typ, Query.Typed.Screen (query, { screenName; screenArgs; }) ->
 
       let make value =
         match Value.classify value with
@@ -225,10 +221,10 @@ let execute ?value ~db query =
       | Value.Null -> return Value.null
       | _ -> make value
       end
-    | _, TypedQuery.Screen _ ->
+    | _, Query.Typed.Screen _ ->
       executionError "invalid type for screen"
 
-    | _, TypedQuery.Navigate (query, { navName; }) ->
+    | _, Query.Typed.Navigate (query, { navName; }) ->
       let%bind value = aux ~value query in
       let%bind value = expandRef value in
 
@@ -260,10 +256,10 @@ let execute ?value ~db query =
       | _ -> executionError {|Cannot navigate away from this value|}
       end
 
-    | Type.Record _, TypedQuery.Select (query, selection) ->
+    | Type.Record _, Query.Typed.Select (query, selection) ->
       let selectFrom value =
         let%bind _, dataset =
-          let build (idx, dataset) { TypedQuery. alias; query; } =
+          let build (idx, dataset) { Query.Typed. alias; query; } =
             let%bind selectionValue = aux ~value query in
             let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
             Js.Dict.set dataset selectionAlias selectionValue;
@@ -290,10 +286,10 @@ let execute ?value ~db query =
         Js.log3 "ERROR" "cannot select from this value" value;
         executionError "cannot select from here"
       end
-    | _, TypedQuery.Select _ ->
+    | _, Query.Typed.Select _ ->
       executionError "invalid type for select"
 
-    | _, TypedQuery.Locate (parent, id) ->
+    | _, Query.Typed.Locate (parent, id) ->
       let%bind parent = aux ~value parent in
       begin match Value.classify parent with
       | Value.Null ->
@@ -311,15 +307,15 @@ let execute ?value ~db query =
         executionError {j|expected array|j}
       end
 
-    | _, TypedQuery.Meta ((_,ctyp),_) ->
+    | _, Query.Typed.Meta ((_,ctyp),_) ->
       return (Value.ofCtyp ctyp)
 
-    | _, TypedQuery.Grow (parent, next) ->
+    | _, Query.Typed.Grow (parent, next) ->
       let%bind value = aux ~value parent in
       let%bind value = aux ~value next in
       return value
 
-    | _, TypedQuery.LessThan (left, right) ->
+    | _, Query.Typed.LessThan (left, right) ->
       let%bind left = aux ~value left in
       let%bind right = aux ~value right in
       begin

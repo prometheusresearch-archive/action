@@ -1,11 +1,11 @@
 (**
  * JS API
  *)
-open Core
 
-module Q = Core.Query.Syntax
-module T = Core.Type.Syntax
-module S = Core.Screen.Syntax
+module Q = Query.Untyped.Syntax
+module T = Query.Type.Syntax
+module S = Screen.Syntax
+module Result = Common.Result
 
 module WorkflowInterpreter = RunWorkflow.Make(JSONDatabase)
 
@@ -36,9 +36,9 @@ end
 type ui = Value.UI.t
 type state = WorkflowInterpreter.t
 type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
-type query = TypedQuery.t
+type query = Query.Typed.t
 
-let showQuery = TypedQuery.show
+let showQuery = Query.Typed.show
 
 let unwrapResult v =
   match v with
@@ -46,12 +46,12 @@ let unwrapResult v =
   | Result.Error err -> Js.Exn.raiseError err
 
 let id state =
-  state |> WorkflowInterpreter.uiQuery |> runToResult |> unwrapResult |> TypedQuery.show
+  state |> WorkflowInterpreter.uiQuery |> runToResult |> unwrapResult |> Query.Typed.show
 
 let pickScreen =
 
   Screen.Syntax.(screen
-    ~inputCard:Card.Many
+    ~inputCard:Query.Card.Many
     ~args:[
       arg "id" ~default:Q.null (one number);
       arg "title" ~default:(Q.string "Pick") (one string);
@@ -79,7 +79,7 @@ let pickScreen =
 
 let viewScreen =
   Screen.Syntax.(screen
-    ~inputCard:Card.One
+    ~inputCard:Query.Card.One
     ~args:[
       arg "title" ~default:(Q.string "View") (one string);
     ]
@@ -95,7 +95,7 @@ let viewScreen =
 
 let barChartScreen =
   Screen.Syntax.(screen
-    ~inputCard:Card.Many
+    ~inputCard:Query.Card.Many
     ~args:[
       arg "title" ~default:(Q.string "View") (one string);
     ]
@@ -111,7 +111,7 @@ let barChartScreen =
 
 let univ =
 
-  let rec customer = lazy Type.Syntax.(entity "customer" (fun _ -> [
+  let rec customer = lazy Query.Type.Syntax.(entity "customer" (fun _ -> [
     hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
@@ -119,7 +119,7 @@ let univ =
     hasOne "acctbal" string;
   ]))
 
-  and nation = lazy Type.Syntax.(entity "nation" (fun _ -> [
+  and nation = lazy Query.Type.Syntax.(entity "nation" (fun _ -> [
     hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
@@ -127,7 +127,7 @@ let univ =
     hasOne "region" (Lazy.force region);
   ]))
 
-  and region = lazy Type.Syntax.(entity "region" (fun _ -> [
+  and region = lazy Query.Type.Syntax.(entity "region" (fun _ -> [
     hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
@@ -179,8 +179,8 @@ let pickValue id state =
   Js.log2 "pickValue.id" id;
   toJS (
     let open Result.Syntax in
-    let args = StringMap.(empty |> fun m -> set m "id" id) in
-    Js.log2 "pickValue" (Query.showArgs args);
+    let args = Common.StringMap.(empty |> fun m -> set m "id" id) in
+    Js.log2 "pickValue" (Query.Untyped.showArgs args);
     let%bind state = runToResult (WorkflowInterpreter.setArgs ~args state) in
     let%bind state = runToResult (WorkflowInterpreter.step state) in
     runToResult (WorkflowInterpreter.render state)
@@ -218,7 +218,7 @@ let query state q =
     let%bind q = parseQuery q in
     let%bind base = runToResult (WorkflowInterpreter.uiQuery state) in
     let%bind q = QueryTyper.growQuery ~univ ~base q in
-    Js.log3 "QUERY" (WorkflowInterpreter.show state) (TypedQuery.show q);
+    Js.log3 "QUERY" (WorkflowInterpreter.show state) (Query.Typed.show q);
     return q
   )
 
