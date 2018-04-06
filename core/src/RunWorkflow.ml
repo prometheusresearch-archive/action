@@ -18,7 +18,11 @@ module Make (Db : Abstract.DATABASE) = struct
     | First of t
     | Next of t
 
-  type error = [ `RunWorkflowError of string | `DatabaseError of string ]
+  type error = [
+    `RunWorkflowError of string
+  | `DatabaseError of string
+  | `QueryTypeError of string
+  ]
   type ('v, 'err) comp = ('v,  [> error ] as 'err) Run.t
 
   let runWorkflowError err = Run.error (`RunWorkflowError err)
@@ -31,7 +35,7 @@ module Make (Db : Abstract.DATABASE) = struct
     let open Run.Syntax in
     match frame.workflow with
     | Workflow.Typed.Render q ->
-      let%bind q = liftResult (QueryTyper.growQuery ~univ:(Db.univ frame.db) ~base:frame.query q) in
+      let%bind q = QueryTyper.growQuery ~univ:(Db.univ frame.db) ~base:frame.query q in
       return q
     | _ -> runWorkflowError "no query"
 
@@ -147,14 +151,14 @@ module Make (Db : Abstract.DATABASE) = struct
     let open Run.Syntax in
     let univ = Db.univ frame.db in
     let%bind q = uiQuery state in
-    let%bind q = liftResult (QueryTyper.nav ~univ "data" q) in
+    let%bind q = QueryTyper.nav ~univ "data" q in
     return q
 
   let titleQuery (frame, _ as state) =
     let open Run.Syntax in
     let univ = Db.univ frame.db in
     let%bind q = uiQuery state in
-    let%bind q = liftResult (QueryTyper.nav ~univ "title" q) in
+    let%bind q = QueryTyper.nav ~univ "title" q in
     return q
 
   let setArgs ~args (frame, ui) =
@@ -163,7 +167,7 @@ module Make (Db : Abstract.DATABASE) = struct
     | Workflow.Typed.Render (ctyp, Query.Untyped.Screen (p, c)) ->
       let univ = Db.univ frame.db in
       let%bind screen = liftResult (Universe.lookupScreenResult c.screenName univ) in
-      let%bind args = liftResult (QueryTyper.checkArgsPartial ~argTyps:screen.args args) in
+      let%bind args = QueryTyper.checkArgsPartial ~argTyps:screen.args args in
       let c = {
         c with Query.Untyped.
         screenArgs = Query.Untyped.updateArgs ~update:args c.screenArgs

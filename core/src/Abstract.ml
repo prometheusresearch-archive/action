@@ -8,7 +8,9 @@
 module type DATABASE = sig
 
   type t
-  type error = [ `DatabaseError of string ]
+
+  type error = [ `DatabaseError of string | `QueryTypeError of string ]
+
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
   (**
@@ -42,7 +44,12 @@ module type RUN_WORKFLOW = functor (DB : DATABASE) -> sig
    *)
   type t
 
-  type error = [ `RunWorkflowError of string | `DatabaseError of string ]
+  type error = [
+    `RunWorkflowError of string
+  | `DatabaseError of string
+  | `QueryTypeError of string
+  ]
+
   type ('v, 'err) comp = ('v,  [> error ] as 'err) Run.t
 
   (**

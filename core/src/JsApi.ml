@@ -20,6 +20,12 @@ let runToResult v = match Run.toResult v with
   | Result.Error (`WorkflowTypeError err) ->
     let msg = {j|WorkflowTypeError: $err|j} in
     Result.Error msg
+  | Result.Error (`QueryTypeError err) ->
+    let msg = {j|QueryTypeError: $err|j} in
+    Result.Error msg
+  | Result.Error (`ParseError err) ->
+    let msg = {j|ParseError: $err|j} in
+    Result.Error msg
 
 module JsResult = struct
   type 'v t
@@ -188,35 +194,35 @@ let pickValue id state =
 
 let executeQuery q =
   let res =
-    let open Result.Syntax in
+    let open Run.Syntax in
     let%bind q = q in
-    let%bind data = runToResult (JSONDatabase.execute ~db q) in
+    let%bind data = JSONDatabase.execute ~db q in
     return data
-  in match res with
+  in match runToResult res with
   | Result.Ok data -> data
   | Result.Error err -> Js.Exn.raiseError err
 
 let parseQuery q =
-  let open Result.Syntax in
+  let open Run.Syntax in
   let filebuf = Lexing.from_string q in
   try
     match Parser.start Lexer.read filebuf with
     | ParserResult.Workflow _ ->
-      error "expected query"
+      error (`ParseError "expected query")
     | ParserResult.Query q ->
       return q
   with
   | Lexer.Error msg ->
-    error msg
+    error (`ParseError msg)
   | Parser.Error ->
-    error "Syntax Error"
+    error (`ParseError "syntax error")
 
 
 let query state q =
   executeQuery (
-    let open Result.Syntax in
+    let open Run.Syntax in
     let%bind q = parseQuery q in
-    let%bind base = runToResult (WorkflowInterpreter.uiQuery state) in
+    let%bind base = WorkflowInterpreter.uiQuery state in
     let%bind q = QueryTyper.growQuery ~univ ~base q in
     Js.log3 "QUERY" (WorkflowInterpreter.show state) (Query.Typed.show q);
     return q
@@ -227,26 +233,26 @@ let parse s =
   let makeError err = [%bs.obj {error = N.return err; ui = N.null; data = N.null;}] in
   let r =
     let makeData data =
-      Result.Syntax.return [%bs.obj {error = N.null; ui = N.null; data = N.return data;}]
+      Run.return [%bs.obj {error = N.null; ui = N.null; data = N.return data;}]
     in
     let makeError err =
-      Result.Syntax.return (makeError err)
+      Run.return (makeError err)
     in
     let makeWorkflow w =
       let state =
         runToResult (
-          let open! Run.Syntax in
+          let open Run.Syntax in
           let%bind w = Workflow.Typer.typeWorkflow ~univ w in
           WorkflowInterpreter.boot ~db w
         )
       in
-      Result.Syntax.return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
+      Run.return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
     in
     let makeUi ui =
       let w = Workflow.Untyped.Syntax.render ui in
       makeWorkflow w
     in
-    let open Result.Syntax in
+    let open Run.Syntax in
     let filebuf = Lexing.from_string s in
     try
       match Parser.start Lexer.read filebuf with
@@ -254,7 +260,7 @@ let parse s =
         makeWorkflow w
       | ParserResult.Query q ->
         let%bind tq = QueryTyper.typeQuery ~univ q in
-        let%bind value = runToResult (JSONDatabase.execute ~db tq) in
+        let%bind value = JSONDatabase.execute ~db tq in
         match Value.classify value with
         | Value.UI _ -> makeUi q
         | _ -> makeData value
@@ -263,7 +269,7 @@ let parse s =
       makeError msg
     | Parser.Error ->
       makeError "Syntax Error"
-  in match r with
+  in match runToResult r with
   | Result.Ok r -> r
   | Result.Error err -> makeError err
 

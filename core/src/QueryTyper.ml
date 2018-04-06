@@ -3,14 +3,24 @@ module StringMap = Common.StringMap
 module Result = Common.Result
 module Option = Common.Option
 
+type error = [ `QueryTypeError of string ]
+type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
+
+let queryTypeError err =
+  Run.error (`QueryTypeError err)
+
+let liftResult = function
+  | Result.Ok v -> Run.return v
+  | Result.Error err -> queryTypeError err
+
 let rec extractField ~univ fieldName (typ : Type.t) =
-  let open Result.Syntax in
+  let open Run.Syntax in
   let findInFieldList fields =
     match Belt.List.getBy fields (fun field -> field.Type.fieldName = fieldName) with
     | None ->
       let typ = Type.show typ in
-      error {j|no such field "$fieldName" on $typ|j}
-    | Some field -> Ok field
+      queryTypeError {j|no such field "$fieldName" on $typ|j}
+    | Some field -> return field
   in
   match typ with
   | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
@@ -19,10 +29,10 @@ let rec extractField ~univ fieldName (typ : Type.t) =
   | Type.Entity {entityName = _; entityFields} -> findInFieldList (entityFields typ)
   | Type.Record fields -> findInFieldList fields
   | Type.Value _ ->
-    error {j|cannot extract field "$fieldName" from value|j}
+    queryTypeError {j|cannot extract field "$fieldName" from value|j}
 
 let nav ~univ name parent =
-  let open Result.Syntax in
+  let open Run.Syntax in
   let navigation = { Query.Typed. navName = name; } in
   let (scope, (parentCard, parentTyp)), _parentSyn = parent in
   let%bind field = extractField ~univ name parentTyp in
@@ -35,13 +45,13 @@ let rec checkArgsImpl
   ~argTyps
   args
   =
-  let open Result.Syntax in
+  let open Run.Syntax in
   (** Type check all passed args first *)
   let%bind args =
     let f args name query =
       let%bind args = args in
       match StringMap.get argTyps name with
-      | None -> error {j|unknown arg "$name"|j}
+      | None -> queryTypeError {j|unknown arg "$name"|j}
       | Some _ ->
         let args = StringMap.set args name query in
         return args
@@ -56,7 +66,7 @@ let rec checkArgsImpl
         match StringMap.get args name with
         | None ->
           begin match argDefault with
-          | None -> error {j|missing required arg "$name"|j}
+          | None -> queryTypeError {j|missing required arg "$name"|j}
           | Some query ->
             let args = StringMap.set args name query in
             return args
@@ -70,7 +80,7 @@ let rec checkArgsImpl
 and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
   let rec aux ~here ~ctx ((), query) =
     let scope, ctyp = ctx in
-    let open Result.Syntax in
+    let open Run.Syntax in
     match query with
     | Query.Untyped.Void ->
       return ((scope, (Query.Card.One, Type.Void)), Query.Typed.Void)
@@ -86,7 +96,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
         let%bind id = aux ~here ~ctx id in
         return ((bindings, (Query.Card.Opt, typ)), Query.Typed.Locate (parent, id))
       | _ ->
-        error {j|locate can only be applied to queries with cardinality many|j}
+        queryTypeError {j|locate can only be applied to queries with cardinality many|j}
       end
 
     | Query.Untyped.Meta parent ->
@@ -112,7 +122,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
         in
         return (nextCtx, Query.Typed.Name (name, query))
       | None ->
-        error {j|referencing unknown binding "$name"|j}
+        queryTypeError {j|referencing unknown binding "$name"|j}
       end
 
     | Query.Untyped.Where (parent, bindings) ->
@@ -161,7 +171,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
       )
     | Query.Untyped.Screen (parent, { screenName; screenArgs; }) ->
       let%bind (parentCtx, _) as parent = aux ~here ~ctx parent in
-      let%bind screen = Universe.lookupScreenResult screenName univ in
+      let%bind screen = liftResult (Universe.lookupScreenResult screenName univ) in
 
       let%bind screenArgs = checkArgsImpl
         ~updateWithDefaultValues:true
@@ -174,7 +184,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
       | Query.Card.Opt, Query.Card.Many
       | Query.Card.Many, Query.Card.One
       | Query.Card.Many, Query.Card.Opt ->
-        error {j|screen "$screenName" cannot be constructed due to cardinality mismatch|j}
+        queryTypeError {j|screen "$screenName" cannot be constructed due to cardinality mismatch|j}
       | Query.Card.One, Query.Card.Opt
       | Query.Card.One, Query.Card.One
       | Query.Card.Opt, Query.Card.Opt
@@ -214,23 +224,19 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
       let%bind parent = aux ~here ~ctx parent in
       let parentCtx, _parentSyn = parent in
       let parentScope, (parentCard, _parentTyp) = parentCtx in
-      let checkField fields { Query.Untyped. alias; query } =
-        match fields with
-        | Result.Ok (fields, selection, index) ->
-          let%bind query = aux ~here:None ~ctx:parentCtx query in
-          let (_fieldScope, (fieldCard, fieldTyp)), _fieldSyn = query in
-          let fieldName = Option.getWithDefault (string_of_int index) alias in
-          let fieldCard = Query.Card.merge parentCard fieldCard in
-          let fieldCtyp = fieldCard, fieldTyp in
-          let field = { Type. fieldCtyp; fieldName; fieldArgs = StringMap.empty } in
-          let selectionField = { Query.Typed. alias; query; } in
-          Result.Ok (field::fields, selectionField::selection, index + 1)
-        | Result.Error err ->
-          error err
+      let checkField (fields, selection, index) { Query.Untyped. alias; query } =
+        let%bind query = aux ~here:None ~ctx:parentCtx query in
+        let (_fieldScope, (fieldCard, fieldTyp)), _fieldSyn = query in
+        let fieldName = Option.getWithDefault (string_of_int index) alias in
+        let fieldCard = Query.Card.merge parentCard fieldCard in
+        let fieldCtyp = fieldCard, fieldTyp in
+        let field = { Type. fieldCtyp; fieldName; fieldArgs = StringMap.empty } in
+        let selectionField = { Query.Typed. alias; query; } in
+        return (field::fields, selectionField::selection, index + 1)
       in
       let%bind (fields, selection, _) =
-        let init = Result.Ok ([], [], 0) in
-        Belt.List.reduce selection init checkField
+        let init = ([], [], 0) in
+        Run.List.foldLeft ~f:checkField ~init selection
       in
       let typ = Type.Record fields in
       return ((parentScope, (parentCard, typ)), Query.Typed.Select (parent, selection))
@@ -246,7 +252,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
         | Query.Card.One, Query.Card.Opt
         | Query.Card.Opt, Query.Card.Opt -> return Query.Card.Opt
         | _ ->
-          error "'<' cardinality mismatch: expected one / opt"
+          queryTypeError "'<' cardinality mismatch: expected one / opt"
       in
       let%bind () =
         match Query.Typed.typ left, Query.Typed.typ right with
@@ -256,7 +262,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
         | Type.Value Type.Null, Type.Value Type.Null ->
           return ()
         | _ ->
-          error "'<' type mismatch: numbers expected"
+          queryTypeError "'<' type mismatch: numbers expected"
       in
       (* TODO:
         * Handler for Query.Card.Many < Query.Card.One etc
@@ -277,5 +283,8 @@ let growQuery ?bindings ~univ ~base query =
   in
   typeQueryImpl ~here:base ~ctx ~univ query
 
-let checkArgs = checkArgsImpl ~updateWithDefaultValues:true
-let checkArgsPartial = checkArgsImpl ~updateWithDefaultValues:false
+let checkArgs ~argTyps args =
+  checkArgsImpl ~updateWithDefaultValues:true ~argTyps args
+
+let checkArgsPartial ~argTyps args =
+  checkArgsImpl ~updateWithDefaultValues:false ~argTyps args
