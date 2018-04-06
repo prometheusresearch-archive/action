@@ -4,8 +4,8 @@
 
 import * as React from 'react';
 import * as ReactNative from 'react-native-web';
-import * as W from 'workflow';
-import type {State} from 'workflow';
+import * as W from 'core';
+import type {State} from 'core';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {

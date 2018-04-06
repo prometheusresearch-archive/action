@@ -4,7 +4,7 @@
 
 import * as React from 'react';
 import {View, ScrollView, Text} from 'react-native-web';
-import * as W from 'workflow';
+import * as W from 'core';
 import {type ScreenConfig, Header} from './Header.js';
 import {Console} from './Console.js';
 import {Workflow} from './Workflow';

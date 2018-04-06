@@ -10,8 +10,8 @@ import {withScreenSize} from '@vx/responsive';
 import {Text} from '@vx/text';
 import {PatternLines} from '@vx/pattern';
 import {AxisBottom} from '@vx/axis';
-import type {State} from 'workflow';
-import * as W from 'workflow';
+import type {State} from 'core';
+import * as W from 'core';
 import {ScreenTitle} from './ScreenTitle.js';
 import {View} from 'react-native-web';
 

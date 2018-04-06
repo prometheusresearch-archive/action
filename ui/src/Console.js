@@ -7,7 +7,7 @@ import outdent from 'outdent/lib/index';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import {type BreadcrumbItem} from './Header.js';
 import Textarea from 'react-textarea-autosize';
-import * as W from 'workflow';
+import * as W from 'core';
 import {Workflow} from './Workflow.js';
 
 type P = {
