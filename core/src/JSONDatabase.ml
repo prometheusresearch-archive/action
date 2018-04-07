@@ -315,13 +315,21 @@ let execute ?value ~db query =
       let%bind value = aux ~value next in
       return value
 
-    | _, Query.Typed.LessThan (left, right) ->
+    | _, Query.Typed.Compare {Query.Typed. op; left; right;} ->
       let%bind left = aux ~value left in
       let%bind right = aux ~value right in
+      let exec = function
+        | Query.Operator.Equal -> (=)
+        | Query.Operator.NotEqual -> (<>)
+        | Query.Operator.LessThan -> (<)
+        | Query.Operator.LessThanOrEqual -> (<=)
+        | Query.Operator.GreaterThan -> (>)
+        | Query.Operator.GreaterThanOrEqual -> (>=)
+      in
       begin
         match Value.classify left, Value.classify right with
         | Value.Number left, Value.Number right ->
-          return (Value.bool (left < right))
+          return (Value.bool ((exec op) left right))
         | Value.Null, Value.Number _
         | Value.Number _, Value.Null
         | Value.Null, Value.Null ->

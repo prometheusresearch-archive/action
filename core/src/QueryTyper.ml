@@ -241,10 +241,10 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
       let typ = Type.Record fields in
       return ((parentScope, (parentCard, typ)), Query.Typed.Select (parent, selection))
 
-    | Query.Untyped.LessThan (left, right) ->
+    | Query.Untyped.Compare {Query.Untyped. op; left; right; } ->
       let%bind left = aux ~here ~ctx left in
       let%bind right = aux ~here ~ctx right in
-      let syn = Query.Typed.LessThan (left, right) in
+      let syn = Query.Typed.Compare { op; left; right } in
       let%bind card =
         match Query.Typed.card left, Query.Typed.card right with
         | Query.Card.One, Query.Card.One -> return Query.Card.One

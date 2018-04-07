@@ -35,6 +35,20 @@ module Const : sig
     | Null
 end
 
+module Operator : sig
+
+  type t =
+    | Equal
+    | NotEqual
+    | LessThan
+    | LessThanOrEqual
+    | GreaterThan
+    | GreaterThanOrEqual
+
+  val show : t -> string
+
+end
+
 (**
  * Untyped query syntax.
  *)
@@ -58,7 +72,9 @@ module Untyped : sig
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
-    | LessThan of (t * t)
+    | Compare of binary
+
+  and binary = { op : Operator.t; left : t; right : t}
 
   and args = t Common.StringMap.t
 
@@ -207,7 +223,9 @@ module Typed : sig
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
-    | LessThan of (t * t)
+    | Compare of binary
+
+  and binary = { op : Operator.t; left : t; right : t}
 
   and nav = { navName : string; }
 

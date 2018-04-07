@@ -72,6 +72,27 @@ module Const = struct
 
 end
 
+module Operator = struct
+
+  type t =
+    | Equal
+    | NotEqual
+    | LessThan
+    | LessThanOrEqual
+    | GreaterThan
+    | GreaterThanOrEqual
+
+  let show = function
+    | Equal -> "="
+    | NotEqual -> "!="
+    | LessThan -> "<"
+    | LessThanOrEqual -> "<="
+    | GreaterThan -> ">"
+    | GreaterThanOrEqual -> ">="
+
+
+end
+
 (**
  * This defines a query syntax parametrized by the payload.
  *
@@ -100,7 +121,9 @@ module Untyped = struct
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
-    | LessThan of (t * t)
+    | Compare of binary
+
+  and binary = { op : Operator.t; left : t; right : t}
 
   and args = t StringMap.t
 
@@ -180,10 +203,11 @@ module Untyped = struct
       let parent = show parent in
       let args = showArgs args in
       {j|$parent:where$args|j}
-    | LessThan (left, right) ->
+    | Compare { op; left; right } ->
+      let op = Operator.show op in
       let left = show left in
       let right = show right in
-      {j|$left < $right|j}
+      {j|$left $op $right|j}
 
   let updateArgs ~(update : args) (args : args) =
     let merge _name a u = match a, u with
@@ -251,7 +275,7 @@ module Untyped = struct
       (), Grow (parent, next)
 
     let lessThan left right =
-      (), LessThan (left, right)
+      (), Compare {op = Operator.LessThan; left; right}
 
     let arg = Arg.make
     let define = Arg.make
@@ -440,7 +464,9 @@ module Typed = struct
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
-    | LessThan of (t * t)
+    | Compare of binary
+
+  and binary = { op : Operator.t; left : t; right : t}
 
   and nav = { navName : string; }
 
@@ -478,8 +504,8 @@ module Typed = struct
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
     | _, Meta parent -> (), Untyped.Meta (stripTypes parent)
     | _, Grow (parent, next) -> (), Untyped.Grow (stripTypes parent, stripTypes next)
-    | _, LessThan (left, right) ->
-      (), Untyped.LessThan (stripTypes left, stripTypes right)
+    | _, Compare { op; left; right } ->
+      (), Untyped.Compare {op; left = stripTypes left; right = stripTypes right }
 
   let show q =
     Untyped.show (stripTypes q)
