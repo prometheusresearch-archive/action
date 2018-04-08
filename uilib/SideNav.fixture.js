@@ -6,24 +6,38 @@ import * as React from 'react';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import * as cfg from './config.js';
 import {Badge} from './Badge.js';
-import {SideNav, SideNavButton} from './SideNav.js';
+import {SideNav, SideNavButton, SideNavDivider} from './SideNav.js';
+import {MdHome, MdPeople} from 'react-icons/lib/md';
+import {createShowcaseList, StateContainer} from './FixtureUtil.js';
 
-import {createShowcaseList} from './FixtureUtil.js';
+const itemsSingle = [
+  {render: props => <SideNavButton {...props} label="Home" />, id: 'home'},
+];
 
-const renderNavOne = () => [{element: <SideNavButton label="Home" />, id: 'home'}];
-
-const renderNavMultiple = () => [
-  {element: <SideNavButton label="Home" />, id: 'home'},
-  {element: <SideNavButton label="Tutorial" />, id: 'tutorial'},
-  {element: <SideNavButton label="Documentation" />, id: 'documentation'},
-  {element: <SideNavButton label="About" />, id: 'about'},
+const itemsMultiple = [
+  {
+    render: props => <SideNavButton {...props} label="Home" />,
+    id: 'home',
+  },
+  {
+    render: props => <SideNavButton {...props} label="Tutorial" />,
+    id: 'tutorial',
+  },
+  {
+    render: props => <SideNavButton {...props} label="Documentation" />,
+    id: 'documentation',
+  },
+  {
+    render: props => <SideNavButton {...props} label="About" />,
+    id: 'about',
+  },
 ];
 
 const oneElement = {
   title: 'One Element',
   element: (
     <View style={{width: 300, padding: cfg.padding.size6}}>
-      <SideNav renderNav={renderNavOne} />
+      <SideNav items={itemsSingle} />
     </View>
   ),
 };
@@ -32,27 +46,65 @@ const multipleElements = {
   title: 'Multiple Elements',
   element: (
     <View style={{width: 300, padding: cfg.padding.size6}}>
-      <SideNav renderNav={renderNavMultiple} />
+      <SideNav items={itemsMultiple} />
     </View>
   ),
 };
 
 const withActive = {
-  title: 'Multiple Elements',
+  title: 'With Active',
   element: (
     <View style={{width: 300, padding: cfg.padding.size6}}>
-      <SideNav renderNav={renderNavMultiple} active="tutorial" />
+      <SideNav items={itemsMultiple} active="tutorial" />
     </View>
   ),
 };
 
-const renderNavWithBadges = ({outlineColor}) => [
-  {element: <SideNavButton outlineColor={outlineColor} label="Home" />, id: 'home'},
+const itemsWithIcon = [
   {
-    element: (
+    render: props => <SideNavButton {...props} icon={<MdHome />} label="Home" />,
+    id: 'home',
+  },
+  {
+    render: props => <SideNavButton {...props} label="Tutorial" />,
+    id: 'tutorial',
+  },
+  {
+    render: props => <SideNavButton {...props} label="Documentation" />,
+    id: 'documentation',
+  },
+  {
+    render: props => <SideNavButton {...props} label="About" />,
+    id: 'about',
+  },
+];
+
+const withIcon = {
+  title: 'With Icon',
+  element: (
+    <View style={{width: 300, padding: cfg.padding.size6}}>
+      <SideNav items={itemsWithIcon} active="tutorial" />
+    </View>
+  ),
+};
+
+const itemsWithBadge = [
+  {
+    render: props => (
       <SideNavButton
-        outlineColor={outlineColor}
+        {...props}
+        icon={<MdHome color={props.outlineColor} />}
+        label="Home"
+      />
+    ),
+    id: 'home',
+  },
+  {
+    render: props => (
+      <SideNavButton
+        {...props}
         label="Individuals"
+        icon={<MdPeople color={props.outlineColor} />}
         badge={
           <Badge backgroundColor={cfg.color.redLight} textColor={cfg.color.white}>
             42
@@ -63,16 +115,16 @@ const renderNavWithBadges = ({outlineColor}) => [
     id: 'individuals',
   },
   {
-    element: <SideNavButton outlineColor={outlineColor} label="Tutorial" />,
+    render: props => <SideNavButton {...props} label="Tutorial" />,
     id: 'tutorial',
   },
   {
-    element: (
+    render: props => (
       <SideNavButton
-        outlineColor={outlineColor}
+        {...props}
         label="Documentation"
         badge={
-          <Badge backgroundColor={outlineColor} textColor={cfg.color.white}>
+          <Badge backgroundColor={props.outlineColor} textColor={cfg.color.white}>
             NEW
           </Badge>
         }
@@ -81,7 +133,7 @@ const renderNavWithBadges = ({outlineColor}) => [
     id: 'documentation',
   },
   {
-    element: <SideNavButton outlineColor={outlineColor} label="About" />,
+    render: props => <SideNavButton {...props} label="About" />,
     id: 'about',
   },
 ];
@@ -90,7 +142,81 @@ const withBadges = {
   title: 'With Badges',
   element: (
     <View style={{width: 300, padding: cfg.padding.size6}}>
-      <SideNav renderNav={renderNavWithBadges} active="individuals" />
+      <SideNav items={itemsWithBadge} active="individuals" />
+    </View>
+  ),
+};
+
+const itemsWithDivider = [
+  {
+    render: props => (
+      <SideNavButton
+        {...props}
+        icon={<MdHome color={props.outlineColor} />}
+        label="Home"
+      />
+    ),
+    id: 'home',
+  },
+  {
+    render: props => (
+      <SideNavButton
+        {...props}
+        label="Individuals"
+        icon={<MdPeople color={props.outlineColor} />}
+        badge={
+          <Badge backgroundColor={cfg.color.redLight} textColor={cfg.color.white}>
+            42
+          </Badge>
+        }
+      />
+    ),
+    id: 'individuals',
+  },
+  {
+    render: props => <SideNavButton {...props} label="Tutorial" />,
+    id: 'tutorial',
+  },
+  {node: <SideNavDivider />},
+  {
+    render: props => (
+      <SideNavButton
+        {...props}
+        label="Documentation"
+        badge={
+          <Badge backgroundColor={props.outlineColor} textColor={cfg.color.white}>
+            NEW
+          </Badge>
+        }
+      />
+    ),
+    id: 'documentation',
+  },
+  {
+    render: props => <SideNavButton {...props} label="About" />,
+    id: 'about',
+  },
+];
+
+const withDivider = {
+  title: 'With Divider',
+  element: (
+    <View style={{width: 300, padding: cfg.padding.size6}}>
+      <SideNav items={itemsWithDivider} active="individuals" />
+    </View>
+  ),
+};
+
+const onWhiteBg = {
+  title: 'On white background',
+  element: (
+    <View
+      style={{
+        width: 300,
+        padding: cfg.padding.size6,
+        backgroundColor: cfg.color.white,
+      }}>
+      <SideNav items={itemsWithBadge} active="individuals" />
     </View>
   ),
 };
@@ -105,7 +231,7 @@ const withCustomColor = {
       }}>
       <SideNav
         outlineColor={cfg.color.indigo}
-        renderNav={renderNavWithBadges}
+        items={itemsWithBadge}
         active="individuals"
       />
     </View>
@@ -123,25 +249,61 @@ const withCustomColorBg = {
       }}>
       <SideNav
         outlineColor={cfg.color.indigo}
-        renderNav={renderNavWithBadges}
+        items={itemsWithBadge}
         active="individuals"
       />
     </View>
   ),
 };
 
+const withStateManagement = {
+  title: 'With state management',
+  element: (
+    <View
+      style={{
+        width: 300,
+        padding: cfg.padding.size6,
+        backgroundColor: cfg.color.pinkLightest,
+      }}>
+      <StateContainer initialState={{active: 'home'}}>
+        {({state, onState}) => (
+          <SideNav
+            outlineColor={cfg.color.indigo}
+            items={itemsWithBadge}
+            active={state.active}
+            onActive={ev => onState({active: ev.id})}
+          />
+        )}
+      </StateContainer>
+    </View>
+  ),
+};
+
 const ShowcaseList = createShowcaseList(SideNav);
 
-export default {
-  component: ShowcaseList,
-  props: {
-    rows: [
-      oneElement,
-      multipleElements,
-      withActive,
-      withBadges,
-      withCustomColor,
-      withCustomColorBg,
-    ],
+export default [
+  {
+    name: 'Default',
+    component: ShowcaseList,
+    props: {
+      rows: [
+        oneElement,
+        multipleElements,
+        withActive,
+        withIcon,
+        withBadges,
+        withDivider,
+        onWhiteBg,
+        withCustomColor,
+        withCustomColorBg,
+      ],
+    },
   },
-};
+  {
+    name: 'With State management',
+    component: ShowcaseList,
+    props: {
+      rows: [withStateManagement],
+    },
+  },
+];

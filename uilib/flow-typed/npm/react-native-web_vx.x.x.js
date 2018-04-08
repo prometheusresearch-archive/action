@@ -23,4 +23,5 @@ declare module 'react-native-web' {
   declare export var Button: ComponentType<any>;
   declare export var Text: ComponentType<any>;
   declare export var StyleSheet: any;
+  declare export function processColor(string, number): string;
 }

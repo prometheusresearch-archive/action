@@ -79,3 +79,21 @@ export function createShowcaseMatrix(Component: React.ComponentType<*>) {
   ShowcaseMatrix.displayName = getComponentDisplayName(Component);
   return ShowcaseMatrix;
 }
+
+type StateContainerProps<S> = {
+  initialState: S,
+  children: ({state: S, onState: S => void}) => React.Node,
+};
+
+export class StateContainer<S> extends React.Component<StateContainerProps<S>, S> {
+  constructor(props: StateContainerProps<S>) {
+    super(props);
+    this.state = props.initialState;
+  }
+
+  onState = (state: $Shape<S>) => this.setState(state);
+
+  render() {
+    return this.props.children({state: this.state, onState: this.onState});
+  }
+}
