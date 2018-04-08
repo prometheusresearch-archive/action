@@ -3,177 +3,82 @@
  */
 
 import * as React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native-web';
-import type {FixtureList} from './FixtureUtil.js';
+import {TouchableOpacity} from 'react-native-web';
+import {MdExitToApp} from 'react-icons/lib/md';
+
+import {Nav, NavButton} from './Nav.js';
 import {OutlineButton} from './OutlineButton.js';
-import {Breadcrumb} from './Breadcrumb.js';
 import * as cfg from './config.js';
-import {
-  MdHome,
-  MdExitToApp,
-  MdHelpOutline,
-  MdKeyboardArrowRight,
-} from 'react-icons/lib/md';
+import {type FixtureList, createShowcaseList} from './FixtureUtil.js';
 
-const borderWidth = cfg.borderWidth.size2;
+const displayName = Nav.displayName || Nav.name;
+const ShowcaseList = createShowcaseList(displayName);
 
-function NavTitle({title, textColor}) {
-  return (
-    <View>
-      <TouchableOpacity>
-        <Text
-          style={{
-            color: textColor,
-            fontSize: cfg.fontSize.xLarge,
-            fontWeight: cfg.fontWeight.extrabold,
-          }}>
-          {title}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+const renderNav = ({outlineColor: textColor}) => [
+  <NavButton textColor={textColor} title="Home" />,
+  <NavButton textColor={textColor} title="Documentation" />,
+  <NavButton textColor={textColor} title="Publications" />,
+  <OutlineButton strokeColor={textColor} label="Try Action" />,
+];
 
-function NavElement({children}) {
-  return (
-    <View
-      style={{
-        justifyContent: 'center',
-        paddingHorizontal: cfg.padding.size2,
-      }}>
-      {children}
-    </View>
-  );
-}
+const renderNavExtra = ({outlineColor: textColor}) => [
+  <TouchableOpacity>
+    <MdExitToApp />
+  </TouchableOpacity>,
+];
 
-function NavButton({title, textColor}) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}>
-      <TouchableOpacity>
-        <Text style={{color: textColor, fontWeight: cfg.fontWeight.bold}}>{title}</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+const noNav = {
+  title: 'No Nav',
+  element: <Nav breadcrumb={[]} />,
+};
 
-function Nav(props) {
-  const borderColor = props.outlineColor;
-  const textColor = props.outlineColor;
-  return (
-    <View style={{padding: cfg.padding.size4}}>
-      <View
-        style={{
-          borderWidth,
-          borderColor,
-          borderRadius: cfg.borderRadius.small,
-        }}>
-        <View
-          style={{
-            padding: cfg.padding.size4,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}>
-          <NavTitle title="Action" textColor={textColor} />
-          <View
-            style={{flex: 1, flexDirection: 'row', paddingHorizontal: cfg.padding.size8}}>
-            <NavElement>
-              <NavButton textColor={textColor} title="Home" />
-            </NavElement>
-            <NavElement>
-              <NavButton textColor={textColor} title="Documentation" />
-            </NavElement>
-            <NavElement>
-              <NavButton textColor={textColor} title="Publications" />
-            </NavElement>
-            <NavElement>
-              <NavButton textColor={textColor} title="About" />
-            </NavElement>
-            <NavElement>
-              <OutlineButton strokeColor={textColor} label="Try Action" />
-            </NavElement>
-          </View>
-          <View
-            style={{
-              flexDirection: 'row',
-            }}>
-            <TouchableOpacity style={{paddingHorizontal: cfg.padding.size2}}>
-              <MdExitToApp color={textColor} size={cfg.fontSize.large} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        {props.breadcrumb &&
-          props.breadcrumb.length > 0 && (
-            <View
-              style={{
-                borderTopWidth: cfg.borderWidth.default,
-                borderTopColor: borderColor,
-              }}>
-              <Breadcrumb items={props.breadcrumb} textColor={textColor} />
-            </View>
-          )}
-      </View>
-    </View>
-  );
-}
+const withNav = {
+  title: 'With Nav',
+  element: <Nav breadcrumb={[]} renderNav={renderNav} />,
+};
 
-Nav.defaultProps = {outlineColor: cfg.color.black};
+const withNavExtra = {
+  title: 'With Nav',
+  element: <Nav breadcrumb={[]} renderNav={renderNav} renderNavExtra={renderNavExtra} />,
+};
 
-function NavOnNonTransparentBackground() {
-  return (
-    <View style={{height: '100vh', backgroundColor: cfg.color.pinkLightest}}>
-      <Nav
-        outlineColor={cfg.color.indigoDark}
-        breadcrumb={[
-          {title: 'Documentation'},
-          {title: 'API References'},
-          {title: 'Combinators'},
-        ]}
-      />
-    </View>
-  );
-}
-NavOnNonTransparentBackground.displayName = 'Nav';
+const withBreadcrumb = {
+  title: 'With Breadcrumb',
+  element: (
+    <Nav
+      renderNav={renderNav}
+      breadcrumb={[
+        {title: 'Documentation'},
+        {title: 'API References'},
+        {title: 'Combinators'},
+      ]}
+    />
+  ),
+};
+
+const customOutlineColor = {
+  title: 'Custom Outline Color',
+  element: (
+    <Nav
+      renderNav={renderNav}
+      outlineColor={cfg.color.indigo}
+      breadcrumb={[
+        {title: 'Documentation'},
+        {title: 'API References'},
+        {title: 'Combinators'},
+      ]}
+    />
+  ),
+};
 
 const fixtures: FixtureList = [
   {
-    name: 'Default',
-    component: Nav,
+    component: ShowcaseList,
     props: {
-      breadcrumb: [],
+      rows: [noNav, withNav, withNavExtra, withBreadcrumb, customOutlineColor],
     },
   },
-  {
-    name: 'With Breadcrumb',
-    component: Nav,
-    props: {
-      breadcrumb: [
-        {title: 'Documentation'},
-        {title: 'API References'},
-        {title: 'Combinators'},
-      ],
-    },
-  },
-  {
-    name: 'Custom Outline Color',
-    component: Nav,
-    props: {
-      outlineColor: cfg.color.indigo,
-      breadcrumb: [
-        {title: 'Documentation'},
-        {title: 'API References'},
-        {title: 'Combinators'},
-      ],
-    },
-  },
-  {
-    name: 'Custom Outline Color (on non-transparent background)',
-    component: NavOnNonTransparentBackground,
-    props: {},
-  },
+  ,
 ];
 
 export default fixtures;

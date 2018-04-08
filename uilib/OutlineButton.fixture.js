@@ -25,13 +25,17 @@ const fixtures: FixtureList = [
         {
           title: 'Custom stroke color',
           columns: sizes.map(size => (
-            <OutlineButton size={size} label="Press Me" strokeColor={cfg.color.blue} />
+            <OutlineButton size={size} label="Press Me" strokeColor={cfg.color.indigo} />
           )),
         },
         {
           title: 'Custom fill color',
           columns: sizes.map(size => (
-            <OutlineButton size={size} label="Press Me" fillColor={cfg.color.blue} />
+            <OutlineButton
+              size={size}
+              label="Press Me"
+              fillColor={cfg.color.pinkLightest}
+            />
           )),
         },
         {
@@ -40,8 +44,8 @@ const fixtures: FixtureList = [
             <OutlineButton
               size={size}
               label="Press Me"
-              strokeColor={cfg.color.blueDarker}
-              fillColor={cfg.color.red}
+              strokeColor={cfg.color.indigo}
+              fillColor={cfg.color.pinkLightest}
             />
           )),
         },

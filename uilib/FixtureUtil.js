@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import {View, Text} from 'react-native-web';
+import {ScrollView, View, Text} from 'react-native-web';
 import * as cfg from './config.js';
 
 type _Fixture<P> = {
@@ -41,7 +41,7 @@ export function createShowcaseList(
         <View style={{paddingVertical: cfg.padding.size2}}>{row.element}</View>
       </View>
     ));
-    return <View style={{padding: cfg.padding.size4}}>{rowsRendered}</View>;
+    return <ScrollView style={{padding: cfg.padding.size4}}>{rowsRendered}</ScrollView>;
   }
   ShowcaseList.displayName = displayName;
   return ShowcaseList;
@@ -69,7 +69,7 @@ export function createShowcaseMatrix(displayName: string) {
       </View>
     ));
 
-    return <View style={{padding: cfg.padding.size4}}>{casesRendered}</View>;
+    return <ScrollView style={{padding: cfg.padding.size4}}>{casesRendered}</ScrollView>;
   }
   ShowcaseMatrix.displayName = displayName;
   return ShowcaseMatrix;
