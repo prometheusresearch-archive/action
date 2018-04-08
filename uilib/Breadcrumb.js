@@ -33,8 +33,9 @@ type P = {
 };
 
 export function Breadcrumb({items, textColor}: P) {
-  let itemsRendered = items.map(item => (
+  let itemsRendered = items.map((item, idx) => (
     <View
+      key={idx}
       style={{
         flexDirection: 'row',
         alignItems: 'flex-end',

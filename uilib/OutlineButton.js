@@ -9,7 +9,7 @@ import * as cfg from './config.js';
 type P = {
   label: string,
   size: 'small' | 'medium' | 'large',
-  strokeColor?: string,
+  outlineColor?: string,
   fillColor?: string,
 };
 
@@ -55,7 +55,7 @@ const style = StyleSheet.create({
   },
 });
 
-export function OutlineButton({label, size, strokeColor, fillColor}: P) {
+export function OutlineButton({label, size, outlineColor, fillColor}: P) {
   return (
     <TouchableOpacity
       activeOpacity={0.4}
@@ -64,7 +64,7 @@ export function OutlineButton({label, size, strokeColor, fillColor}: P) {
         size === 'small' && style.viewSizeSmall,
         size === 'medium' && style.viewSizeMedium,
         size === 'large' && style.viewSizeLarge,
-        strokeColor != null && {borderColor: strokeColor},
+        outlineColor != null && {borderColor: outlineColor},
         fillColor != null && {backgroundColor: fillColor},
       ]}>
       <Text
@@ -73,7 +73,7 @@ export function OutlineButton({label, size, strokeColor, fillColor}: P) {
           size === 'small' && style.textSizeSmall,
           size === 'medium' && style.textSizeMedium,
           size === 'large' && style.textSizeLarge,
-          strokeColor != null && {color: strokeColor},
+          outlineColor != null && {color: outlineColor},
         ]}>
         {label}
       </Text>
