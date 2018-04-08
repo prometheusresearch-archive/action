@@ -5,7 +5,7 @@
 import * as cfg from './config.js';
 import * as React from 'react';
 import {View, Text} from 'react-native-web';
-import type {FixtureList} from './fixture.js';
+import type {FixtureList} from './FixtureUtil.js';
 
 function FillColorCard({color, id}) {
   return (

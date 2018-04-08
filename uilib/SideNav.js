@@ -3,29 +3,56 @@
  */
 
 import * as React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native-web';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  TouchableHighlight,
+  processColor,
+} from 'react-native-web';
 import * as cfg from './config.js';
+
+const emptyFunction = () => {};
 
 type NavItem = {
   id: string,
-  element: React.Node,
+  render: (props: {
+    key: string,
+    outlineColor: string,
+    active: boolean,
+    onPress: () => void,
+  }) => React.Node,
 };
+
+type ReactNodeItem = {node: React.Node};
 
 type P = {
-  renderNav: (props: {outlineColor: string}) => Array<NavItem>,
+  items: Array<NavItem | ReactNodeItem>,
   outlineColor: string,
   active?: string,
+  onActive?: ({id: string}) => void,
 };
 
-export function SideNav({renderNav, active, outlineColor}: P) {
-  const nav = renderNav({outlineColor});
+export function SideNav({items, active, onActive, outlineColor}: P) {
   return (
     <View>
-      {nav.map(item => (
-        <SideNavElement outlineColor={outlineColor} active={active === item.id}>
-          {item.element}
-        </SideNavElement>
-      ))}
+      {items.map(item => {
+        if (
+          typeof item === 'object' &&
+          typeof item.render === 'function' &&
+          typeof item.id === 'string'
+        ) {
+          return item.render({
+            key: item.id,
+            outlineColor,
+            active: active === item.id,
+            onPress:
+              onActive != null ? onActive.bind(null, {id: item.id}) : emptyFunction,
+          });
+        } else {
+          return item.node;
+        }
+      })}
     </View>
   );
 }
@@ -34,34 +61,61 @@ SideNav.defaultProps = {
   outlineColor: cfg.color.black,
 };
 
-function SideNavElement({children, active, outlineColor = cfg.color.black}) {
-  const style = {
-    paddingHorizontal: cfg.padding.size4,
-    borderLeftColor: active ? outlineColor : cfg.color.transparent,
-    borderLeftWidth: cfg.borderWidth.size2,
-  };
-  return <View style={style}>{children}</View>;
-}
-
-type SideNavProps = {
+type SideNavButtonProps = {
   label: string,
   badge?: React.Node,
+  icon?: React.Node,
   outlineColor: string,
+  onPress: () => void,
+  active: boolean,
 };
 
-export function SideNavButton({label, badge, outlineColor}: SideNavProps) {
+export function SideNavButton({
+  active,
+  label,
+  badge,
+  icon,
+  outlineColor,
+  onPress,
+}: SideNavButtonProps) {
   const textStyle = {
     color: outlineColor,
-    fontWeight: cfg.fontWeight.semibold,
+    // fontWeight: cfg.fontWeight.semibold,
+    fontSize: active ? cfg.fontSize.base : cfg.fontSize.small,
+    fontWeight: active ? cfg.fontWeight.black : cfg.fontWeight.normal,
+  };
+  const viewStyle = {
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: cfg.borderRadius.default,
+    paddingVertical: cfg.padding.size2,
+    paddingHorizontal: cfg.padding.size4,
+  };
+  const iconWrapperStyle = {
+    width: 30,
   };
   return (
     <View>
-      <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center'}}>
-        <View style={{padding: cfg.padding.size2, flexGrow: 1}}>
-          <Text style={textStyle}>{label}</Text>
+      <TouchableHighlight
+        disabled={active}
+        onPress={onPress}
+        underlayColor={processColor(outlineColor, 0.1)}
+        delayPressOut={0}
+        style={{
+          borderRadius: cfg.borderRadius.default,
+          // backgroundColor: active
+          //   ? processColor(outlineColor, 0.25)
+          //   : cfg.color.transparent,
+        }}>
+        <View style={viewStyle}>
+          <View style={iconWrapperStyle}>{icon}</View>
+          <View style={{flexGrow: 1}}>
+            <Text style={textStyle}>{label}</Text>
+          </View>
+          {badge != null && <View>{badge}</View>}
         </View>
-        {badge != null && <View>{badge}</View>}
-      </TouchableOpacity>
+      </TouchableHighlight>
     </View>
   );
 }
@@ -69,3 +123,10 @@ export function SideNavButton({label, badge, outlineColor}: SideNavProps) {
 SideNavButton.defaultProps = {
   outlineColor: cfg.color.black,
 };
+
+export function SideNavDivider() {
+  let style = {
+    height: cfg.height.size6,
+  };
+  return <View style={style} />;
+}
