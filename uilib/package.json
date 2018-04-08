@@ -1,0 +1,41 @@
+{
+  "name": "uilib",
+  "version": "0.0.1",
+  "description": "A set of reusable UI components",
+  "main": "index.js",
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prometheusresearch/action.git"
+  },
+  "keywords": [
+    "ui",
+    "react"
+  ],
+  "author": "Andrey Popp <8mayday@gmail.com> (http://andreypopp.com/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/prometheusresearch/action/issues"
+  },
+  "homepage": "https://github.com/prometheusresearch/action#readme",
+  "dependencies": {
+    "react-native-web": "^0.5.4"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.4",
+    "babel-preset-env": "^1.6.1",
+    "babel-preset-react": "^6.24.1",
+    "flow-bin": "^0.69.0",
+    "flow-typed": "^2.4.0",
+    "html-webpack-plugin": "^3.2.0",
+    "prettier": "^1.11.1",
+    "react": "^16.3.1",
+    "react-cosmos": "4.0.0-beta.8",
+    "react-dom": "^16.3.1",
+    "react-icons": "^2.2.7",
+    "webpack": "4.x.x"
+  }
+}
