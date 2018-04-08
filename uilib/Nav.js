@@ -41,35 +41,54 @@ function NavElement({children}) {
 
 type NavButtonProps = {
   title: string,
-  textColor: string,
+  active: boolean,
+  outlineColor?: string,
+  onPress: () => void,
 };
 
-export function NavButton({title, textColor}: NavButtonProps) {
+export function NavButton({title, active, outlineColor, onPress}: NavButtonProps) {
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
       }}>
-      <TouchableOpacity>
-        <Text style={{color: textColor, fontWeight: cfg.fontWeight.bold}}>{title}</Text>
+      <TouchableOpacity onPress={onPress}>
+        <Text
+          style={{
+            color: outlineColor,
+            fontSize: active ? cfg.fontSize.base : cfg.fontSize.small,
+            fontWeight: active ? cfg.fontWeight.black : cfg.fontWeight.semibold,
+          }}>
+          {title}
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
+type NavItem = {
+  id: string,
+  render: ({
+    outlineColor: string,
+    id: string,
+    active: boolean,
+    onPress: () => void,
+  }) => React.Node,
+};
+
 type P = {
   outlineColor: string,
   breadcrumb: Array<BreadcrumbItem>,
-  renderNav?: (props: {outlineColor: string}) => Array<React.Node>,
-  renderNavExtra?: (props: {outlineColor: string}) => Array<React.Node>,
+  items?: Array<NavItem>,
+  itemsExtra?: Array<NavItem>,
+  active?: string,
+  onActive: ({id: string}) => void,
 };
 
-export function Nav({outlineColor, renderNav, renderNavExtra, breadcrumb}: P) {
+export function Nav({outlineColor, items, itemsExtra, breadcrumb, active, onActive}: P) {
   const borderColor = outlineColor;
   const textColor = outlineColor;
-  const nav = renderNav != null ? renderNav({outlineColor}) : [];
-  const navExtra = renderNavExtra != null ? renderNavExtra({outlineColor}) : [];
   return (
     <View style={{padding: cfg.padding.size4}}>
       <View
@@ -87,10 +106,30 @@ export function Nav({outlineColor, renderNav, renderNavExtra, breadcrumb}: P) {
           <NavTitle title="Action" textColor={textColor} />
           <View
             style={{flex: 1, flexDirection: 'row', paddingHorizontal: cfg.padding.size8}}>
-            {nav.map(element => <NavElement>{element}</NavElement>)}
+            {items != null &&
+              items.map(item => (
+                <NavElement key={item.id}>
+                  {item.render({
+                    id: item.id,
+                    active: active != null && item.id === active,
+                    outlineColor,
+                    onPress: onActive.bind(null, {id: item.id}),
+                  })}
+                </NavElement>
+              ))}
           </View>
           <View style={{flexDirection: 'row'}}>
-            {navExtra.map(element => <NavElement>{element}</NavElement>)}
+            {itemsExtra != null &&
+              itemsExtra.map(item => (
+                <NavElement key={item.id}>
+                  {item.render({
+                    id: item.id,
+                    active: active != null && item.id === active,
+                    outlineColor,
+                    onPress: onActive.bind(null, {id: item.id}),
+                  })}
+                </NavElement>
+              ))}
           </View>
         </View>
         {breadcrumb &&
@@ -108,4 +147,7 @@ export function Nav({outlineColor, renderNav, renderNavExtra, breadcrumb}: P) {
   );
 }
 
-Nav.defaultProps = {outlineColor: cfg.color.black};
+Nav.defaultProps = {
+  outlineColor: cfg.color.black,
+  onActive: _ev => {},
+};

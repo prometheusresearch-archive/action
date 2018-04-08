@@ -177,7 +177,7 @@ const itemsWithDivider = [
     render: props => <SideNavButton {...props} label="Tutorial" />,
     id: 'tutorial',
   },
-  {node: <SideNavDivider />},
+  {node: <SideNavDivider key="divider" />},
   {
     render: props => (
       <SideNavButton
@@ -256,8 +256,8 @@ const withCustomColorBg = {
   ),
 };
 
-const withStateManagement = {
-  title: 'With state management',
+const stateful = {
+  title: 'Stateful',
   element: (
     <View
       style={{
@@ -283,7 +283,7 @@ const ShowcaseList = createShowcaseList(SideNav);
 
 export default [
   {
-    name: 'Default',
+    name: 'Showcase',
     component: ShowcaseList,
     props: {
       rows: [
@@ -300,10 +300,10 @@ export default [
     },
   },
   {
-    name: 'With State management',
+    name: 'Stateful',
     component: ShowcaseList,
     props: {
-      rows: [withStateManagement],
+      rows: [stateful],
     },
   },
 ];

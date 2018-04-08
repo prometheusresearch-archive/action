@@ -9,21 +9,25 @@ import {MdExitToApp} from 'react-icons/lib/md';
 import {Nav, NavButton} from './Nav.js';
 import {OutlineButton} from './OutlineButton.js';
 import * as cfg from './config.js';
-import {type FixtureList, createShowcaseList} from './FixtureUtil.js';
+import {type FixtureList, createShowcaseList, StateContainer} from './FixtureUtil.js';
 
 const ShowcaseList = createShowcaseList(Nav);
 
-const renderNav = ({outlineColor: textColor}) => [
-  <NavButton textColor={textColor} title="Home" />,
-  <NavButton textColor={textColor} title="Documentation" />,
-  <NavButton textColor={textColor} title="Publications" />,
-  <OutlineButton strokeColor={textColor} label="Try Action" />,
+const items = [
+  {id: 'home', render: props => <NavButton {...props} title="Home" />},
+  {id: 'documentation', render: props => <NavButton {...props} title="Documentation" />},
+  {id: 'publications', render: props => <NavButton {...props} title="Publications" />},
 ];
 
-const renderNavExtra = ({outlineColor: textColor}) => [
-  <TouchableOpacity>
-    <MdExitToApp />
-  </TouchableOpacity>,
+const itemsExtra = [
+  {
+    id: 'exit',
+    render: props => (
+      <TouchableOpacity {...props}>
+        <MdExitToApp />
+      </TouchableOpacity>
+    ),
+  },
 ];
 
 const noNav = {
@@ -33,19 +37,19 @@ const noNav = {
 
 const withNav = {
   title: 'With Nav',
-  element: <Nav breadcrumb={[]} renderNav={renderNav} />,
+  element: <Nav breadcrumb={[]} items={items} />,
 };
 
 const withNavExtra = {
   title: 'With Nav',
-  element: <Nav breadcrumb={[]} renderNav={renderNav} renderNavExtra={renderNavExtra} />,
+  element: <Nav breadcrumb={[]} items={items} itemsExtra={itemsExtra} />,
 };
 
 const withBreadcrumb = {
   title: 'With Breadcrumb',
   element: (
     <Nav
-      renderNav={renderNav}
+      items={items}
       breadcrumb={[
         {title: 'Documentation'},
         {title: 'API References'},
@@ -55,12 +59,47 @@ const withBreadcrumb = {
   ),
 };
 
+const withActive = {
+  title: 'On background',
+  element: (
+    <View style={{backgroundColor: cfg.color.white}}>
+      <Nav
+        items={items}
+        active="documentation"
+        breadcrumb={[
+          {title: 'Documentation'},
+          {title: 'API References'},
+          {title: 'Combinators'},
+        ]}
+      />
+    </View>
+  ),
+};
+
+const onBg = {
+  title: 'On background',
+  element: (
+    <View style={{backgroundColor: cfg.color.white}}>
+      <Nav
+        items={items}
+        active="documentation"
+        breadcrumb={[
+          {title: 'Documentation'},
+          {title: 'API References'},
+          {title: 'Combinators'},
+        ]}
+      />
+    </View>
+  ),
+};
+
 const customOutlineColor = {
   title: 'Custom Outline Color',
   element: (
     <Nav
-      renderNav={renderNav}
+      items={items}
       outlineColor={cfg.color.indigo}
+      active="documentation"
       breadcrumb={[
         {title: 'Documentation'},
         {title: 'API References'},
@@ -75,8 +114,9 @@ const customOutlineColorOnBg = {
   element: (
     <View style={{backgroundColor: cfg.color.pinkLightest}}>
       <Nav
-        renderNav={renderNav}
+        items={items}
         outlineColor={cfg.color.indigo}
+        active="documentation"
         breadcrumb={[
           {title: 'Documentation'},
           {title: 'API References'},
@@ -87,8 +127,32 @@ const customOutlineColorOnBg = {
   ),
 };
 
+const stateful = {
+  title: 'Stateful',
+  element: (
+    <View style={{backgroundColor: cfg.color.pinkLightest}}>
+      <StateContainer initialState={{active: 'home'}}>
+        {({state, onState}) => (
+          <Nav
+            items={items}
+            outlineColor={cfg.color.indigo}
+            active={state.active}
+            onActive={ev => onState({active: ev.id})}
+            breadcrumb={[
+              {title: 'Documentation'},
+              {title: 'API References'},
+              {title: 'Combinators'},
+            ]}
+          />
+        )}
+      </StateContainer>
+    </View>
+  ),
+};
+
 const fixtures: FixtureList = [
   {
+    name: 'Showcase',
     component: ShowcaseList,
     props: {
       rows: [
@@ -96,12 +160,20 @@ const fixtures: FixtureList = [
         withNav,
         withNavExtra,
         withBreadcrumb,
+        withActive,
+        onBg,
         customOutlineColor,
         customOutlineColorOnBg,
       ],
     },
   },
-  ,
+  {
+    name: 'Stateful',
+    component: ShowcaseList,
+    props: {
+      rows: [stateful],
+    },
+  },
 ];
 
 export default fixtures;

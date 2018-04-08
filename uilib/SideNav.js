@@ -50,6 +50,7 @@ export function SideNav({items, active, onActive, outlineColor}: P) {
               onActive != null ? onActive.bind(null, {id: item.id}) : emptyFunction,
           });
         } else {
+          // $FlowFixMe: ...
           return item.node;
         }
       })}
@@ -98,7 +99,7 @@ export function SideNavButton({
   return (
     <View>
       <TouchableHighlight
-        disabled={active}
+        disabled={Boolean(active)}
         onPress={onPress}
         underlayColor={processColor(outlineColor, 0.1)}
         delayPressOut={0}
