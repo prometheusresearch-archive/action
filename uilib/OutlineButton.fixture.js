@@ -8,8 +8,7 @@ import {type FixtureList, createShowcaseMatrix} from './FixtureUtil.js';
 import {OutlineButton} from './OutlineButton.js';
 import * as cfg from './config.js';
 
-const displayName = OutlineButton.displayName || OutlineButton.name;
-const ShowcaseMatrix = createShowcaseMatrix(displayName);
+const ShowcaseMatrix = createShowcaseMatrix(OutlineButton);
 
 const sizes = ['large', 'medium', 'small'];
 

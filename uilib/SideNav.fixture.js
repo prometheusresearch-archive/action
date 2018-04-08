@@ -5,82 +5,10 @@
 import * as React from 'react';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import * as cfg from './config.js';
+import {Badge} from './Badge.js';
+import {SideNav, SideNavButton} from './SideNav.js';
 
 import {createShowcaseList} from './FixtureUtil.js';
-
-function SideNav({renderNav, active, outlineColor}) {
-  const nav = renderNav({outlineColor});
-  return (
-    <View>
-      {nav.map(item => (
-        <SideNavElement outlineColor={outlineColor} active={active === item.id}>
-          {item.element}
-        </SideNavElement>
-      ))}
-    </View>
-  );
-}
-SideNav.defaultProps = {
-  outlineColor: cfg.color.black,
-};
-
-function SideNavElement({children, active, outlineColor = cfg.color.black}) {
-  const style = {
-    paddingHorizontal: cfg.padding.size4,
-    borderLeftColor: active ? outlineColor : cfg.color.transparent,
-    borderLeftWidth: cfg.borderWidth.size2,
-  };
-  return <View style={style}>{children}</View>;
-}
-
-type SideNavProps = {
-  label: string,
-  badge?: React.Node,
-};
-
-function SideNavButton({label, badge, outlineColor}: SideNavProps) {
-  const textStyle = {
-    color: outlineColor,
-    fontWeight: cfg.fontWeight.semibold,
-  };
-  return (
-    <View>
-      <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center'}}>
-        <View style={{padding: cfg.padding.size2, flexGrow: 1}}>
-          <Text style={textStyle}>{label}</Text>
-        </View>
-        {badge != null && <View>{badge}</View>}
-      </TouchableOpacity>
-    </View>
-  );
-}
-SideNavButton.defaultProps = {
-  outlineColor: cfg.color.black,
-};
-
-function Badge({children, backgroundColor, textColor}) {
-  return (
-    <View
-      style={{
-        backgroundColor,
-        padding: cfg.padding.size1,
-        borderRadius: cfg.borderRadius.default,
-      }}>
-      <Text
-        style={{
-          color: textColor,
-          fontSize: cfg.fontSize.xSmall,
-          fontWeight: cfg.fontWeight.semibold,
-        }}>
-        {children}
-      </Text>
-    </View>
-  );
-}
-Badge.defaultProps = {
-  backgroundColor: cfg.color.black,
-  textColor: cfg.color.white,
-};
 
 const renderNavOne = () => [{element: <SideNavButton label="Home" />, id: 'home'}];
 
@@ -93,18 +21,26 @@ const renderNavMultiple = () => [
 
 const oneElement = {
   title: 'One Element',
-  element: <SideNav renderNav={renderNavOne} />,
+  element: (
+    <View style={{width: 300, padding: cfg.padding.size6}}>
+      <SideNav renderNav={renderNavOne} />
+    </View>
+  ),
 };
 
 const multipleElements = {
   title: 'Multiple Elements',
-  element: <SideNav renderNav={renderNavMultiple} />,
+  element: (
+    <View style={{width: 300, padding: cfg.padding.size6}}>
+      <SideNav renderNav={renderNavMultiple} />
+    </View>
+  ),
 };
 
 const withActive = {
   title: 'Multiple Elements',
   element: (
-    <View style={{width: 300}}>
+    <View style={{width: 300, padding: cfg.padding.size6}}>
       <SideNav renderNav={renderNavMultiple} active="tutorial" />
     </View>
   ),
@@ -144,13 +80,16 @@ const renderNavWithBadges = ({outlineColor}) => [
     ),
     id: 'documentation',
   },
-  {element: <SideNavButton outlineColor={outlineColor} label="About" />, id: 'about'},
+  {
+    element: <SideNavButton outlineColor={outlineColor} label="About" />,
+    id: 'about',
+  },
 ];
 
 const withBadges = {
   title: 'With Badges',
   element: (
-    <View style={{width: 300}}>
+    <View style={{width: 300, padding: cfg.padding.size6}}>
       <SideNav renderNav={renderNavWithBadges} active="individuals" />
     </View>
   ),
@@ -158,6 +97,23 @@ const withBadges = {
 
 const withCustomColor = {
   title: 'With Custom Color',
+  element: (
+    <View
+      style={{
+        width: 300,
+        padding: cfg.padding.size6,
+      }}>
+      <SideNav
+        outlineColor={cfg.color.indigo}
+        renderNav={renderNavWithBadges}
+        active="individuals"
+      />
+    </View>
+  ),
+};
+
+const withCustomColorBg = {
+  title: 'With Custom Color (on background)',
   element: (
     <View
       style={{
@@ -174,12 +130,18 @@ const withCustomColor = {
   ),
 };
 
-const displayName = SideNav.displayName || SideNav.name;
-const ShowcaseList = createShowcaseList(displayName);
+const ShowcaseList = createShowcaseList(SideNav);
 
 export default {
   component: ShowcaseList,
   props: {
-    rows: [oneElement, multipleElements, withActive, withBadges, withCustomColor],
+    rows: [
+      oneElement,
+      multipleElements,
+      withActive,
+      withBadges,
+      withCustomColor,
+      withCustomColorBg,
+    ],
   },
 };

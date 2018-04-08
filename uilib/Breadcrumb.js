@@ -4,7 +4,6 @@
 
 import * as React from 'react';
 import {View, Text, TouchableOpacity} from 'react-native-web';
-import type {FixtureList} from './fixture.js';
 import {OutlineButton} from './OutlineButton.js';
 import * as cfg from './config.js';
 import {MdHome, MdKeyboardArrowRight} from 'react-icons/lib/md';

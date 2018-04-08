@@ -15,6 +15,11 @@ type _Fixture<P> = {
 export type Fixture = _Fixture<*>;
 export type FixtureList = Array<Fixture>;
 
+function getComponentDisplayName(Component: React.ComponentType<*>) {
+  // $FlowFixMe: awaiting official React Reflection API (or whatever)
+  return Component.displayName || Component.name || 'Unknown';
+}
+
 type ShowcaseListProps = {
   rows: Array<{
     title: string,
@@ -23,7 +28,7 @@ type ShowcaseListProps = {
 };
 
 export function createShowcaseList(
-  displayName: string,
+  Component: React.ComponentType<*>,
 ): React.ComponentType<ShowcaseListProps> {
   function ShowcaseList({rows}: ShowcaseListProps) {
     let rowsRendered = rows.map(row => (
@@ -43,7 +48,7 @@ export function createShowcaseList(
     ));
     return <ScrollView style={{padding: cfg.padding.size4}}>{rowsRendered}</ScrollView>;
   }
-  ShowcaseList.displayName = displayName;
+  ShowcaseList.displayName = getComponentDisplayName(Component);
   return ShowcaseList;
 }
 
@@ -54,7 +59,7 @@ type ShowcaseMatrixProps = {
   }>,
 };
 
-export function createShowcaseMatrix(displayName: string) {
+export function createShowcaseMatrix(Component: React.ComponentType<*>) {
   function ShowcaseMatrix({rows}: ShowcaseMatrixProps) {
     let casesRendered = rows.map(item => (
       <View>
@@ -71,6 +76,6 @@ export function createShowcaseMatrix(displayName: string) {
 
     return <ScrollView style={{padding: cfg.padding.size4}}>{casesRendered}</ScrollView>;
   }
-  ShowcaseMatrix.displayName = displayName;
+  ShowcaseMatrix.displayName = getComponentDisplayName(Component);
   return ShowcaseMatrix;
 }

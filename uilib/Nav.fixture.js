@@ -3,7 +3,7 @@
  */
 
 import * as React from 'react';
-import {TouchableOpacity} from 'react-native-web';
+import {TouchableOpacity, View} from 'react-native-web';
 import {MdExitToApp} from 'react-icons/lib/md';
 
 import {Nav, NavButton} from './Nav.js';
@@ -11,8 +11,7 @@ import {OutlineButton} from './OutlineButton.js';
 import * as cfg from './config.js';
 import {type FixtureList, createShowcaseList} from './FixtureUtil.js';
 
-const displayName = Nav.displayName || Nav.name;
-const ShowcaseList = createShowcaseList(displayName);
+const ShowcaseList = createShowcaseList(Nav);
 
 const renderNav = ({outlineColor: textColor}) => [
   <NavButton textColor={textColor} title="Home" />,
@@ -71,11 +70,35 @@ const customOutlineColor = {
   ),
 };
 
+const customOutlineColorOnBg = {
+  title: 'Custom Outline Color (on background)',
+  element: (
+    <View style={{backgroundColor: cfg.color.pinkLightest}}>
+      <Nav
+        renderNav={renderNav}
+        outlineColor={cfg.color.indigo}
+        breadcrumb={[
+          {title: 'Documentation'},
+          {title: 'API References'},
+          {title: 'Combinators'},
+        ]}
+      />
+    </View>
+  ),
+};
+
 const fixtures: FixtureList = [
   {
     component: ShowcaseList,
     props: {
-      rows: [noNav, withNav, withNavExtra, withBreadcrumb, customOutlineColor],
+      rows: [
+        noNav,
+        withNav,
+        withNavExtra,
+        withBreadcrumb,
+        customOutlineColor,
+        customOutlineColorOnBg,
+      ],
     },
   },
   ,

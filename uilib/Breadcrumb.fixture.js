@@ -63,8 +63,7 @@ const customTextColor = {
   ),
 };
 
-const displayName = Breadcrumb.displayName || Breadcrumb.name;
-const ShowcaseList = createShowcaseList(displayName);
+const ShowcaseList = createShowcaseList(Breadcrumb);
 
 const fixture: Fixture = {
   component: ShowcaseList,
