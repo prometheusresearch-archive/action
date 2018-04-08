@@ -1,5 +1,5 @@
 {
-  "name": "uilib",
+  "name": "components",
   "version": "0.0.1",
   "description": "A set of reusable UI components",
   "main": "index.js",
