@@ -11,12 +11,11 @@ import {ScreenTitle} from './ScreenTitle.js';
 type P = {
   state: State,
   args: Args,
-  toolbar: React.Node,
   onPick: mixed => void,
 };
 
 export function Pick(props: P) {
-  const {id, title, data, metadata: meta} = W.query(
+  const result = W.query(
     props.state,
     `
       {
@@ -27,6 +26,8 @@ export function Pick(props: P) {
       }
     `,
   );
+  // $FlowFixMe: ...
+  const {id, title, data, metadata: meta} = result;
   const onSelect = id => {
     props.onPick(id);
   };
@@ -34,7 +35,6 @@ export function Pick(props: P) {
   return (
     <View>
       <ScreenTitle>{title}</ScreenTitle>
-      <View>{props.toolbar}</View>
       <View style={{padding: 5}}>
         <Table selectedId={id} data={data} onSelect={onSelect} fields={fields} />
       </View>
@@ -94,5 +94,5 @@ function Table(props) {
       </TouchableHighlight>
     );
   });
-  return <View>{rows}</View>;
+  return <View style={{overflow: 'auto'}}>{rows}</View>;
 }
