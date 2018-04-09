@@ -24,7 +24,7 @@ let style = StyleSheet.create({
 type P = {
   label?: React.Node,
   hint?: React.Node,
-  renderInput: ({ref: React.Ref<*>}) => React.Node,
+  renderInput: ({ref: React.Ref<*>, outlineColor: string}) => React.Node,
   outlineColor: string,
 };
 
@@ -52,6 +52,7 @@ export class FormField extends React.Component<P> {
       <View>
         {this.props.label != null && (
           <TouchableOpacity
+            activeOpacity={1.0}
             accessible={false}
             onPress={this.onLabelPress}
             style={style.label}>
@@ -71,7 +72,12 @@ export class FormField extends React.Component<P> {
             )}
           </TouchableOpacity>
         )}
-        <View>{this.props.renderInput({ref: this._inputRef})}</View>
+        <View>
+          {this.props.renderInput({
+            ref: this._inputRef,
+            outlineColor: this.props.outlineColor,
+          })}
+        </View>
       </View>
     );
   }
