@@ -105,7 +105,12 @@ export function Nav({outlineColor, items, itemsExtra, breadcrumb, active, onActi
           }}>
           <NavTitle title="Action" textColor={textColor} />
           <View
-            style={{flex: 1, flexDirection: 'row', paddingHorizontal: cfg.padding.size8}}>
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              paddingHorizontal: cfg.padding.size8,
+            }}>
             {items != null &&
               items.map(item => (
                 <NavElement key={item.id}>
