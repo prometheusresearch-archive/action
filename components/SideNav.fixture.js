@@ -6,7 +6,7 @@ import * as React from 'react';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import * as cfg from './config.js';
 import {Badge} from './Badge.js';
-import {SideNav, SideNavButton, SideNavDivider} from './SideNav.js';
+import {SideNav, SideNavButton, divider} from './SideNav.js';
 import {MdHome, MdPeople} from 'react-icons/lib/md';
 import {createShowcaseList, StateContainer} from './FixtureUtil.js';
 
@@ -177,7 +177,7 @@ const itemsWithDivider = [
     render: props => <SideNavButton {...props} label="Tutorial" />,
     id: 'tutorial',
   },
-  {node: <SideNavDivider key="divider" />},
+  divider,
   {
     render: props => (
       <SideNavButton
