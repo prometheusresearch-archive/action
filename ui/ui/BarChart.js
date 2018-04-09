@@ -27,7 +27,7 @@ type P = {
 };
 
 export const BarChart = withScreenSize(({state, width = 400, height = 400}: P) => {
-  const {title, data} = W.query(
+  const result = W.query(
     state,
     `
       {
@@ -36,6 +36,8 @@ export const BarChart = withScreenSize(({state, width = 400, height = 400}: P) =
       }
     `,
   );
+  // $FlowFixMe: ...
+  const {title, data} = result;
   if (width < 10) return null;
 
   // bounds

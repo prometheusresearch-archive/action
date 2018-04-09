@@ -22,4 +22,8 @@ declare module 'react-native-web' {
   declare export var TouchableHighlight: ComponentType<any>;
   declare export var Button: ComponentType<any>;
   declare export var Text: ComponentType<any>;
+  declare export var StyleSheet: {
+    create: Function,
+  };
+  declare export function processColor(string, number): string;
 }

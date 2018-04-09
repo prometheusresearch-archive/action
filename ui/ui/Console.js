@@ -5,17 +5,14 @@
 import * as React from 'react';
 import outdent from 'outdent/lib/index';
 import {View, Text, TouchableOpacity} from 'react-native-web';
-import {type BreadcrumbItem} from './Header.js';
 import Textarea from 'react-textarea-autosize';
 import * as W from 'core';
 import {Workflow} from './Workflow.js';
+import {TextInput} from 'components/TextInput';
+import {Picker} from 'components/Picker';
+import {FormField} from 'components/FormField';
 
-type P = {
-  renderHeader: ({
-    breadcrumb: Array<BreadcrumbItem>,
-    toolbar?: ?React.Node,
-  }) => React.Node,
-};
+type P = {};
 
 type S = {
   value: string,
@@ -62,6 +59,7 @@ export class Console extends React.Component<P, S> {
     this.setState(state => {
       const nextState = this.getStateFromQuery(value);
       if (nextState.view == null) {
+        // $FlowFixMe: ...
         nextState.view = state.view;
       }
       return nextState;
@@ -71,16 +69,21 @@ export class Console extends React.Component<P, S> {
   render() {
     return (
       <View>
-        {this.props.renderHeader({breadcrumb: []})}
         <Help value={this.state.value} onPress={this.onValue} />
         <View style={{padding: 10}}>
-          <View style={{paddingVertical: 5}}>
-            <Hint message="Enter action expression and see the evaluated result" />
-          </View>
-          <Input
-            isError={this.state.result != null && this.state.result.error != null}
-            value={this.state.value}
-            onValue={this.onValue}
+          <FormField
+            label="...or enter your query:"
+            error={this.state.result != null && this.state.result.error != null}
+            renderInput={props => (
+              <TextInput
+                {...props}
+                monospace={true}
+                multiline={true}
+                numberOfLines={12}
+                value={this.state.value}
+                onChangeText={this.onValue}
+              />
+            )}
           />
           <TouchableOpacity onPress={this.onClear}>
             <View style={{padding: 5}}>
@@ -103,41 +106,37 @@ function Help({value, onPress}) {
   function Item({title, query}) {
     return <option value={query}>{title}</option>;
   }
-  const onChange = e => {
-    onPress(e.target.value || '');
+  const onChange = value => {
+    onPress(value);
   };
-  return (
-    <View style={{padding: 10}}>
-      <View style={{padding: 5}}>
-        <Text style={{fontSize: '11pt', fontWeight: '400'}}>Example queries:</Text>
-      </View>
-      <select style={{fontSize: '11pt'}} value={value} onChange={onChange}>
-        <Item title="" query="" />
-        <Item title="Data: List of regions" query="region" />
-        <Item title="Data: List of nations" query="region.nation" />
-        <Item title="Data: First region" query="region:first" />
-        <Item title="Screen: List of all regions" query="region:pick" />
-        <Item title="Screen: View first region" query="region:first:view" />
-        <Item
-          title="Screen: Basic customers per region report"
-          query={outdent`
+
+  const options = [
+    {label: '', value: ''},
+    {label: 'Data: List of regions', value: 'region'},
+    {label: 'Data: List of nations', value: 'region.nation'},
+    {label: 'Data: First region', value: 'region:first'},
+    {label: 'Screen: List of all regions', value: 'region:pick'},
+    {label: 'Screen: View first region', value: 'region:first:view'},
+    {
+      label: 'Screen: Basic customers per region report',
+      value: outdent`
           region {
             label: name,
             value: nation.customer:count
           }:barChart(title: "Customers per Region")
-        `}
-        />
-        <Item
-          title="Workflow: Simple workflow with regions"
-          query={outdent`
+        `,
+    },
+    {
+      label: 'Workflow: Simple workflow with regions',
+      value: outdent`
           render(region:pick(title: "Regions")) {
             render(value:view)
           }
-        `}
-        />
-        <Item
-          title="Workflow: Nested workflow with regions"
-          query={outdent`
+        `,
+    },
+    {
+      label: 'Workflow: Nested workflow with regions',
+      value: outdent`
           render(region:pick(title: "Regions")) {
 
             render(value:view),
@@ -151,11 +150,11 @@ function Help({value, onPress}) {
             }
 
           }
-        `}
-        />
-        <Item
-          title="Workflow: Custom data views"
-          query={outdent`
+        `,
+    },
+    {
+      label: 'Workflow: Custom data views',
+      value: outdent`
           render(region:pick(title: "Regions")) {
 
             render(value:view(
@@ -178,9 +177,17 @@ function Help({value, onPress}) {
             ))
 
           }
-        `}
-        />
-      </select>
+        `,
+    },
+  ];
+  return (
+    <View style={{padding: 10}}>
+      <FormField
+        label="Choose from one of the example queries below:"
+        renderInput={props => (
+          <Picker {...props} options={options} value={value} onValueChange={onChange} />
+        )}
+      />
     </View>
   );
 }
@@ -219,14 +226,6 @@ function Error(props) {
   return (
     <View>
       <Text style={{fontSize: '10pt', color: 'red'}}>{props.message}</Text>
-    </View>
-  );
-}
-
-function Hint(props) {
-  return (
-    <View>
-      <Text style={{fontSize: '10pt', color: '#888'}}>{props.message}</Text>
     </View>
   );
 }
