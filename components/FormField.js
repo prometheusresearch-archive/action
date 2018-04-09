@@ -19,9 +19,13 @@ let style = StyleSheet.create({
     fontWeight: cfg.fontWeight.medium,
     fontSize: cfg.fontSize.small,
   },
+  labelErrorText: {
+    color: cfg.color.red,
+  },
 });
 
 type P = {
+  error?: boolean,
   label?: React.Node,
   hint?: React.Node,
   renderInput: ({ref: React.Ref<*>, outlineColor: string}) => React.Node,
@@ -58,14 +62,24 @@ export class FormField extends React.Component<P> {
             style={style.label}>
             {this.props.label != null && (
               <View>
-                <Text style={[style.labelText, labelTextColorStyle]}>
+                <Text
+                  style={[
+                    style.labelText,
+                    labelTextColorStyle,
+                    Boolean(this.props.error) && style.labelErrorText,
+                  ]}>
                   {this.props.label}
                 </Text>
               </View>
             )}
             {this.props.hint != null && (
               <View>
-                <Text style={[style.hintText, hintTextColorStyle]}>
+                <Text
+                  style={[
+                    style.hintText,
+                    hintTextColorStyle,
+                    Boolean(this.props.error) && style.labelErrorText,
+                  ]}>
                   {this.props.hint}
                 </Text>
               </View>
@@ -74,6 +88,7 @@ export class FormField extends React.Component<P> {
         )}
         <View>
           {this.props.renderInput({
+            error: this.props.error,
             ref: this._inputRef,
             outlineColor: this.props.outlineColor,
           })}
