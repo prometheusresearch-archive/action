@@ -51,9 +51,18 @@ const withBreadcrumb = {
     <Nav
       items={items}
       breadcrumb={[
-        {title: 'Documentation'},
-        {title: 'API References'},
-        {title: 'Combinators'},
+        {
+          id: 'docs',
+          title: 'Documentation',
+        },
+        {
+          id: 'api',
+          title: 'API References',
+        },
+        {
+          id: 'combinators',
+          title: 'Combinators',
+        },
       ]}
     />
   ),
@@ -67,9 +76,18 @@ const withActive = {
         items={items}
         active="documentation"
         breadcrumb={[
-          {title: 'Documentation'},
-          {title: 'API References'},
-          {title: 'Combinators'},
+          {
+            id: 'docs',
+            title: 'Documentation',
+          },
+          {
+            id: 'api',
+            title: 'API References',
+          },
+          {
+            id: 'combinators',
+            title: 'Combinators',
+          },
         ]}
       />
     </View>
@@ -84,9 +102,18 @@ const onBg = {
         items={items}
         active="documentation"
         breadcrumb={[
-          {title: 'Documentation'},
-          {title: 'API References'},
-          {title: 'Combinators'},
+          {
+            id: 'docs',
+            title: 'Documentation',
+          },
+          {
+            id: 'api',
+            title: 'API References',
+          },
+          {
+            id: 'combinators',
+            title: 'Combinators',
+          },
         ]}
       />
     </View>
@@ -101,9 +128,18 @@ const customOutlineColor = {
       outlineColor={cfg.color.indigo}
       active="documentation"
       breadcrumb={[
-        {title: 'Documentation'},
-        {title: 'API References'},
-        {title: 'Combinators'},
+        {
+          id: 'docs',
+          title: 'Documentation',
+        },
+        {
+          id: 'api',
+          title: 'API References',
+        },
+        {
+          id: 'combinators',
+          title: 'Combinators',
+        },
       ]}
     />
   ),
@@ -118,9 +154,18 @@ const customOutlineColorOnBg = {
         outlineColor={cfg.color.indigo}
         active="documentation"
         breadcrumb={[
-          {title: 'Documentation'},
-          {title: 'API References'},
-          {title: 'Combinators'},
+          {
+            id: 'docs',
+            title: 'Documentation',
+          },
+          {
+            id: 'api',
+            title: 'API References',
+          },
+          {
+            id: 'combinators',
+            title: 'Combinators',
+          },
         ]}
       />
     </View>
@@ -139,9 +184,18 @@ const stateful = {
             active={state.active}
             onActive={ev => onState({active: ev.id})}
             breadcrumb={[
-              {title: 'Documentation'},
-              {title: 'API References'},
-              {title: 'Combinators'},
+              {
+                id: 'docs',
+                title: 'Documentation',
+              },
+              {
+                id: 'api',
+                title: 'API References',
+              },
+              {
+                id: 'combinators',
+                title: 'Combinators',
+              },
             ]}
           />
         )}
