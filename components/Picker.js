@@ -41,7 +41,7 @@ const focusRingColor = cfg.color.blue;
 
 export function Picker(props: P) {
   let colorStyle = {
-    borderColor: props.color,
+    borderColor: props.outlineColor,
     outlineColor: focusRingColor,
   };
   let options = props.options.map(option => (
@@ -65,7 +65,7 @@ export function Picker(props: P) {
 }
 
 Picker.defaultProps = {
-  color: cfg.color.black,
+  outlineColor: cfg.color.black,
 };
 
 export const PickerItem = Picker.Item;

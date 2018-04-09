@@ -14,6 +14,7 @@ import * as cfg from './config.js';
 
 let style = StyleSheet.create({
   base: {
+    backgroundColor: cfg.color.white,
     padding: cfg.padding.size2,
     borderWidth: 2,
     borderRadius: cfg.borderRadius.small,
@@ -31,19 +32,22 @@ type P = any;
 
 const focusRingColor = cfg.color.blue;
 
-export function TextInput(props: P) {
+export function TextInput(props: P, ref) {
   const colorStyle = {
-    borderColor: props.color,
+    borderColor: props.outlineColor,
     outlineColor: focusRingColor,
   };
   return (
     <TextInputBase
       {...props}
+      ref={ref}
       style={[style.base, props.monospace && style.monospace, colorStyle]}
     />
   );
 }
 
 TextInput.defaultProps = {
-  color: cfg.color.black,
+  outlineColor: cfg.color.black,
 };
+
+TextInput = React.forwardRef(TextInput);
