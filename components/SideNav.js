@@ -24,34 +24,29 @@ type NavItem = {
   }) => React.Node,
 };
 
-type ReactNodeItem = {node: React.Node};
+type ReactNodeItem = {type: 'ReactNode', node: React.Node};
 
-type P = {
-  items: Array<NavItem | ReactNodeItem>,
+type P<Item: NavItem> = {
+  items: Array<Item | ReactNodeItem>,
   outlineColor: string,
   active?: string,
-  onActive?: ({id: string}) => void,
+  onActive?: Item => void,
 };
 
-export function SideNav({items, active, onActive, outlineColor}: P) {
+export function SideNav<Item: NavItem>({items, active, onActive, outlineColor}: P<Item>) {
   return (
     <View>
       {items.map(item => {
-        if (
-          typeof item === 'object' &&
-          typeof item.render === 'function' &&
-          typeof item.id === 'string'
-        ) {
+        if (item.type === 'ReactNode') {
+          // $FlowFixMe: ...
+          return item.node;
+        } else {
           return item.render({
             key: item.id,
             outlineColor,
             active: active === item.id,
-            onPress:
-              onActive != null ? onActive.bind(null, {id: item.id}) : emptyFunction,
+            onPress: onActive != null ? onActive.bind(null, item) : emptyFunction,
           });
-        } else {
-          // $FlowFixMe: ...
-          return item.node;
         }
       })}
     </View>
@@ -131,3 +126,8 @@ export function SideNavDivider() {
   };
   return <View style={style} />;
 }
+
+export const divider = {
+  type: 'ReactNode',
+  node: <SideNavDivider />,
+};

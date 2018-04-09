@@ -8,12 +8,18 @@ import {OutlineButton} from './OutlineButton.js';
 import * as cfg from './config.js';
 import {MdHome, MdKeyboardArrowRight} from 'react-icons/lib/md';
 
-export type BreadcrumbItem = {title: string};
+export type BreadcrumbItem = {id: string, title: string};
 
-export function BreadcrumbButton({title, textColor}: {title: string, textColor: string}) {
+type BreadcrumbButtonProps = {
+  title: string,
+  textColor: string,
+  onPress: () => void,
+};
+
+export function BreadcrumbButton({title, textColor, onPress}: BreadcrumbButtonProps) {
   return (
-    <View style={{paddingHorizontal: cfg.padding.size2}}>
-      <TouchableOpacity>
+    <View>
+      <TouchableOpacity onPress={onPress} style={{paddingHorizontal: cfg.padding.size2}}>
         <Text
           style={{
             color: textColor,
@@ -27,20 +33,25 @@ export function BreadcrumbButton({title, textColor}: {title: string, textColor: 
   );
 }
 
-type P = {
-  items: Array<BreadcrumbItem>,
+type P<Item: BreadcrumbItem> = {
+  items: Array<Item>,
   textColor: string,
+  onSelect: Item => void,
 };
 
-export function Breadcrumb({items, textColor}: P) {
-  let itemsRendered = items.map((item, idx) => (
+export function Breadcrumb<Item: BreadcrumbItem>({onSelect, items, textColor}: P<Item>) {
+  let itemsRendered = items.map(item => (
     <View
-      key={idx}
+      key={item.id}
       style={{
         flexDirection: 'row',
         alignItems: 'flex-end',
       }}>
-      <BreadcrumbButton title={item.title} textColor={textColor} />
+      <BreadcrumbButton
+        onPress={onSelect.bind(null, item)}
+        title={item.title}
+        textColor={textColor}
+      />
       <MdKeyboardArrowRight size={cfg.fontSize.small} color={textColor} />
     </View>
   ));
@@ -67,4 +78,5 @@ export function Breadcrumb({items, textColor}: P) {
 
 Breadcrumb.defaultProps = {
   textColor: cfg.color.black,
+  onSelect: _item => {},
 };
