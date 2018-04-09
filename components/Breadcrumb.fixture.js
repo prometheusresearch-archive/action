@@ -18,6 +18,7 @@ const oneElement = {
     <Breadcrumb
       items={[
         {
+          id: 'home',
           title: 'Home',
         },
       ]}
@@ -30,12 +31,15 @@ const manyElements = {
     <Breadcrumb
       items={[
         {
+          id: 'docs',
           title: 'Documentation',
         },
         {
+          id: 'api',
           title: 'API Reference',
         },
         {
+          id: 'combinators',
           title: 'Combinators',
         },
       ]}
@@ -50,12 +54,15 @@ const customTextColor = {
       textColor={cfg.color.indigoDark}
       items={[
         {
+          id: 'docs',
           title: 'Documentation',
         },
         {
+          id: 'api',
           title: 'API Reference',
         },
         {
+          id: 'combinators',
           title: 'Combinators',
         },
       ]}
