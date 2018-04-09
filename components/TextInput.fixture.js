@@ -12,34 +12,65 @@ const ShowcaseList = createShowcaseList(TextInput);
 
 const simple = {
   title: 'Default',
-  element: <TextInput value="" />,
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput value="" />
+    </View>
+  ),
 };
 
 const withValue = {
   title: 'With a Value',
-  element: <TextInput value="Hello, world!" />,
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput value="Hello, world!" />
+    </View>
+  ),
 };
 
 const withPlaceholder = {
   title: 'With a Placeholder',
-  element: <TextInput placeholder="Enter your story here..." />,
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput placeholder="Enter your story here..." />
+    </View>
+  ),
 };
 
 const multiline = {
   title: 'Multiline',
-  element: <TextInput multiline placeholder="Enter your story here..." />,
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput multiline placeholder="Enter your story here..." />
+    </View>
+  ),
 };
 
 const multilineConfigNumLines = {
   title: 'Multiline (with configurable numbers of lines)',
   element: (
-    <TextInput multiline numberOfLines={5} placeholder="Enter your story here..." />
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput multiline numberOfLines={5} placeholder="Enter your story here..." />
+    </View>
+  ),
+};
+
+const errorState = {
+  title: 'Error State',
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput error={true} value="" />
+    </View>
   ),
 };
 
 const withCustomColor = {
   title: 'With a Custom Color',
-  element: <TextInput value="" color={cfg.color.indigoDark} />,
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <TextInput value="" color={cfg.color.indigoDark} />
+    </View>
+  ),
 };
 
 const withCustomColorOnBg = {
@@ -60,6 +91,7 @@ export default {
       withPlaceholder,
       multiline,
       multilineConfigNumLines,
+      errorState,
       withCustomColor,
       withCustomColorOnBg,
     ],

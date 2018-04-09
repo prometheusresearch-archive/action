@@ -15,7 +15,7 @@ import * as cfg from './config.js';
 let style = StyleSheet.create({
   base: {
     appearance: 'none',
-    backgroundColor: cfg.color.white,
+    backgroundColor: cfg.color.transparent,
     padding: cfg.padding.size2,
     borderWidth: 2,
     borderRadius: cfg.borderRadius.small,

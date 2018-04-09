@@ -14,13 +14,16 @@ import * as cfg from './config.js';
 
 let style = StyleSheet.create({
   base: {
-    backgroundColor: cfg.color.white,
+    backgroundColor: cfg.color.transparent,
     padding: cfg.padding.size2,
     borderWidth: 2,
     borderRadius: cfg.borderRadius.small,
     outlineWidth: 6,
     fontWeight: cfg.fontWeight.medium,
     fontFamily: cfg.fontFamily.sans,
+  },
+  error: {
+    borderColor: cfg.color.red,
   },
   monospace: {
     fontFamily: cfg.fontFamily.mono,
@@ -32,7 +35,7 @@ type P = any;
 
 const focusRingColor = cfg.color.blue;
 
-export function TextInput(props: P, ref) {
+export function TextInput(props: P, ref: React.Ref<*>) {
   const colorStyle = {
     borderColor: props.outlineColor,
     outlineColor: focusRingColor,
@@ -41,7 +44,12 @@ export function TextInput(props: P, ref) {
     <TextInputBase
       {...props}
       ref={ref}
-      style={[style.base, props.monospace && style.monospace, colorStyle]}
+      style={[
+        style.base,
+        props.monospace && style.monospace,
+        props.error && style.error,
+        colorStyle,
+      ]}
     />
   );
 }
@@ -51,3 +59,5 @@ TextInput.defaultProps = {
 };
 
 TextInput = React.forwardRef(TextInput);
+
+TextInput.displayName = 'TextInput';
