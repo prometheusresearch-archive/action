@@ -37,9 +37,24 @@ const withSelectedValue = {
   ),
 };
 
+const errorState = {
+  title: 'Error State',
+  element: (
+    <Picker
+      error={true}
+      selectedValue="male"
+      options={[
+        {label: '', value: 'unknown'},
+        {label: 'Female', value: 'female'},
+        {label: 'Male', value: 'male'},
+      ]}
+    />
+  ),
+};
+
 export default {
   component: ShowcaseList,
   props: {
-    rows: [simple, withSelectedValue],
+    rows: [simple, withSelectedValue, errorState],
   },
 };

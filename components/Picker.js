@@ -24,6 +24,9 @@ let style = StyleSheet.create({
     fontWeight: cfg.fontWeight.medium,
     fontFamily: cfg.fontFamily.sans,
   },
+  error: {
+    borderColor: cfg.color.red,
+  },
   icon: {
     width: 20,
     position: 'absolute',
@@ -49,7 +52,7 @@ export function Picker(props: P) {
   ));
   return (
     <View>
-      <PickerBase {...props} style={[style.base, colorStyle]}>
+      <PickerBase {...props} style={[style.base, colorStyle, props.error && style.error]}>
         {options}
       </PickerBase>
       <View style={style.icon}>

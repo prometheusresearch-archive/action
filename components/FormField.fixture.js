@@ -42,6 +42,20 @@ const withHint = {
   ),
 };
 
+const errorState = {
+  title: 'Error State',
+  element: (
+    <View style={{padding: cfg.padding.size4}}>
+      <FormField
+        error={true}
+        label="First Name"
+        hint="Enter your first name here"
+        renderInput={props => <TextInput {...props} />}
+      />
+    </View>
+  ),
+};
+
 const onBg = {
   title: 'On Background',
   element: (
@@ -86,6 +100,14 @@ const withCustomColorOnBg = {
 export default {
   component: ShowcaseList,
   props: {
-    rows: [onlyInput, withLabel, withHint, onBg, withCustomColor, withCustomColorOnBg],
+    rows: [
+      onlyInput,
+      withLabel,
+      withHint,
+      errorState,
+      onBg,
+      withCustomColor,
+      withCustomColorOnBg,
+    ],
   },
 };

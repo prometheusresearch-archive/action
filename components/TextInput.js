@@ -47,8 +47,8 @@ export function TextInput(props: P, ref: React.Ref<*>) {
       style={[
         style.base,
         props.monospace && style.monospace,
-        props.error && style.error,
         colorStyle,
+        props.error && style.error,
       ]}
     />
   );
