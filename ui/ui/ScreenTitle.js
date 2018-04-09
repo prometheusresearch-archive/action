@@ -1,9 +1,10 @@
 /**
- * @flow strict
+ * @flow
  */
 
 import * as React from 'react';
 import {Text} from 'react-native-web';
+import * as cfg from 'components/config';
 
 type P = {
   children: React.Node,
@@ -11,7 +12,12 @@ type P = {
 
 export function ScreenTitle(props: P) {
   return (
-    <Text style={{padding: 10, fontSize: '18pt', fontWeight: '700'}}>
+    <Text
+      style={{
+        paddingVertical: cfg.padding.size4,
+        fontSize: cfg.fontSize.xxLarge,
+        fontWeight: cfg.fontWeight.bold,
+      }}>
       {props.children}
     </Text>
   );

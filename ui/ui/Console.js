@@ -31,7 +31,7 @@ const initialState = {
 export class Console extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
-    this.state = this.getStateFromQuery(outdent``);
+    this.state = this.getStateFromQuery(outdent`region:first:edit`);
   }
 
   getStateFromQuery = (value: string) => {
