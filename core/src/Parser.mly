@@ -1,6 +1,7 @@
 %token VOID
 %token PICK
 %token VIEW
+%token EDIT
 %token BAR_CHART
 %token COUNT
 %token META
@@ -94,6 +95,9 @@ screen:
   | VIEW { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; RIGHT_PAREN { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args} }
+  | EDIT { {name = "edit"; args = [] } }
+  | EDIT; LEFT_PAREN; RIGHT_PAREN { {name = "edit"; args = [] } }
+  | EDIT; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "edit"; args} }
   | BAR_CHART { {name = "barChart"; args = [] } }
   | BAR_CHART; LEFT_PAREN; RIGHT_PAREN { {name = "barChart"; args = [] } }
   | BAR_CHART; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "barChart"; args} }

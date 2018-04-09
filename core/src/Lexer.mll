@@ -29,6 +29,7 @@ rule read = parse
   | '/'        { VOID }
   | "pick"     { PICK }
   | "view"     { VIEW }
+  | "edit"     { EDIT }
   | "barChart" { BAR_CHART }
   | "count"    { COUNT }
   | "first"    { FIRST }

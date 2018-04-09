@@ -1,5 +1,5 @@
 
-** Conflict (shift/reduce) in state 39.
+** Conflict (shift/reduce) in state 44.
 ** Tokens involved: LT LEFT_BRACE DOT COLON
 ** The following explanations concentrate on token LT.
 ** This state is reached from start after reading:
@@ -14,13 +14,13 @@ program EOF
 query 
 (?)
 
-** In state 39, looking ahead at LT, shifting is permitted
+** In state 44, looking ahead at LT, shifting is permitted
 ** because of the following sub-derivation:
 
 query LT query 
          query . LT query 
 
-** In state 39, looking ahead at LT, reducing production
+** In state 44, looking ahead at LT, reducing production
 ** query -> query LT query 
 ** is permitted because of the following sub-derivation:
 

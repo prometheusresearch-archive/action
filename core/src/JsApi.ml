@@ -99,6 +99,22 @@ let viewScreen =
     )
   )
 
+let editScreen =
+  Screen.Syntax.(screen
+    ~inputCard:Query.Card.One
+    ~args:[
+      arg "title" ~default:(Q.string "Edit") (one string);
+    ]
+    Q.(
+      void
+      |> select [
+        field ~alias:"data" (name "parent");
+        field ~alias:"value" (name "parent");
+        field ~alias:"title" (name "title");
+      ]
+    )
+  )
+
 let barChartScreen =
   Screen.Syntax.(screen
     ~inputCard:Query.Card.Many
@@ -151,6 +167,7 @@ let univ =
 
     |> hasScreen "pick" pickScreen
     |> hasScreen "view" viewScreen
+    |> hasScreen "edit" editScreen
     |> hasScreen "barChart" barChartScreen
   )
 
