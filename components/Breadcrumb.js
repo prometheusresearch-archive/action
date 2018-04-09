@@ -23,8 +23,8 @@ export function BreadcrumbButton({title, textColor, onPress}: BreadcrumbButtonPr
         <Text
           style={{
             color: textColor,
-            fontWeight: cfg.fontWeight.semibold,
-            fontSize: cfg.fontSize.xSmall,
+            fontWeight: cfg.fontWeight.normal,
+            fontSize: cfg.fontSize.small,
           }}>
           {title}
         </Text>
@@ -52,7 +52,7 @@ export function Breadcrumb<Item: BreadcrumbItem>({onSelect, items, textColor}: P
         title={item.title}
         textColor={textColor}
       />
-      <MdKeyboardArrowRight size={cfg.fontSize.small} color={textColor} />
+      <MdKeyboardArrowRight size={cfg.fontSize.base} color={textColor} />
     </View>
   ));
   return (
@@ -69,7 +69,7 @@ export function Breadcrumb<Item: BreadcrumbItem>({onSelect, items, textColor}: P
         <View style={{paddingHorizontal: cfg.padding.size2}}>
           <MdHome color={textColor} />
         </View>
-        <MdKeyboardArrowRight color={textColor} size={cfg.fontSize.small} />
+        <MdKeyboardArrowRight color={textColor} size={cfg.fontSize.base} />
       </View>
       {itemsRendered}
     </View>
