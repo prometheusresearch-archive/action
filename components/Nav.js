@@ -58,7 +58,7 @@ export function NavButton({title, active, outlineColor, onPress}: NavButtonProps
           style={{
             color: outlineColor,
             fontSize: active ? cfg.fontSize.base : cfg.fontSize.small,
-            fontWeight: active ? cfg.fontWeight.black : cfg.fontWeight.semibold,
+            fontWeight: active ? cfg.fontWeight.black : cfg.fontWeight.normal,
           }}>
           {title}
         </Text>
