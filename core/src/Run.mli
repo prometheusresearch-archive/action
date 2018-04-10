@@ -62,6 +62,8 @@ module List : sig
 
   val map : f:('a -> ('b, 'errctx) t) -> 'a list -> ('b list, 'errctx) t
 
+  val iter : f:('a -> (unit, 'errctx) t) -> 'a list -> (unit, 'errctx) t
+
   val foldLeft : f:('a -> 'b -> ('a, 'errctx) t) -> init:'a -> 'b list -> ('a, 'errctx) t
 end
 

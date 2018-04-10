@@ -7,10 +7,13 @@
  *)
 module type DATABASE = sig
 
+  (** Abstract type which represents a database instance/handle *)
   type t
 
-  type error = [ `DatabaseError of string | `QueryTypeError of string ]
+  (** Errors in which database computations could result *)
+  type error = [ `DatabaseError of string | QueryTyper.error ]
 
+  (** Computations performed with the database *)
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
   (**
@@ -31,6 +34,65 @@ module type DATABASE = sig
     -> db : t
     -> Query.Typed.t
     -> (Value.t, 'err) comp
+
+
+  (**
+   * Database mutation specification.
+   *)
+  module Mutation : sig
+
+    (**
+     * This type represents database mutations.
+     *
+     * Any concrete database would need to define a representation for this and
+     * an interpreter which executes mutations to produce a new database state.
+     *)
+    type t
+
+    (**
+     * Create a new entity.
+     *)
+    val createEntity :
+      name : string
+      -> t list
+      -> t
+
+    (**
+     * Update an entity.
+     *)
+    val updateEntity :
+      name : string
+      -> t list
+      -> t
+
+    (**
+     * Update a value.
+     *)
+    val setValue :
+      name : string
+      -> Value.t
+      -> t
+  end
+
+  (**
+   * Update an entity inside a db following a list of mutation specs.
+   *)
+  val updateEntity :
+    db : t
+    -> name : string
+    -> id : string
+    -> Mutation.t list
+    -> (string, 'err) comp
+
+  (**
+   * Create a new entity inside a db following a list of mutation specs.
+   *)
+  val createEntity :
+    db : t
+    -> name : string
+    -> Mutation.t list
+    -> (string, 'err) comp
+
 
 end
 

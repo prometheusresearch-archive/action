@@ -42,6 +42,14 @@ module List = struct
       let%bind xs = map ~f xs in
       return (x::xs)
 
+  let rec iter ~f =
+    let module Let_syntax = Syntax.Let_syntax in
+    function
+    | [] -> return ()
+    | x::xs ->
+      let%bind () = f x in
+      iter ~f xs
+
   let rec foldLeft ~f ~init:v =
     let module Let_syntax = Syntax.Let_syntax in
     function

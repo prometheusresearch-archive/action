@@ -3,25 +3,57 @@ module Option = Common.Option
 module Card = Query.Card
 module Type = Query.Type
 module Const = Query.Const
-
-let liftResult = function
-  | Result.Ok v -> Run.return v
-  | Result.Error err -> Run.error (`DatabaseError err)
-
-let executionError err = Run.error (`DatabaseError err)
+module StringMap = Common.StringMap
 
 type t = {
   value : Value.t;
   univ : Universe.t;
 }
 
-type error = [ `DatabaseError of string | `QueryTypeError of string ]
+type error = [ `DatabaseError of string | QueryTyper.error ]
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
-type entityRef = {
-  refEntityName : string;
-  refEntityId : string;
-}
+let liftResult = function
+  | Result.Ok v -> Run.return v
+  | Result.Error err -> Run.error (`DatabaseError err)
+
+let liftOption ~err = function
+  | Some v -> Run.return v
+  | None -> Run.error (`DatabaseError err)
+
+let executionError err = Run.error (`DatabaseError err)
+
+module Ref = struct
+  type t = {
+    name : string;
+    id : string;
+  }
+
+  let ofValue value =
+    let open Common.Option.Syntax in
+    match Value.classify value with
+    | Value.Object dict ->
+      let%bind ref = Js.Dict.get dict "$ref" in
+      let%bind ref = Value.decodeObj ref in
+      let%bind name = Js.Dict.get ref "entity" in
+      let%bind name = Value.decodeString name in
+      let%bind id = Js.Dict.get ref "id" in
+      let%bind id = Value.decodeString id in
+      return {name; id}
+    | _ -> None
+
+  let toValue ref =
+    let ref =
+      let v = Js.Dict.empty () in
+      Js.Dict.set v "entity" (Value.string ref.name);
+      Js.Dict.set v "id" (Value.string ref.id);
+      (Value.obj v)
+    in
+    let v = Js.Dict.empty () in
+    Js.Dict.set v "$ref" ref;
+    (Value.obj v)
+
+end
 
 let univ {univ;_} = univ
 
@@ -35,18 +67,31 @@ let ofStringExn ~univ value =
   let value = value |> Js.Json.parseExn |> Value.ofJson in
   {univ; value}
 
-let parseRefOpt value =
-  let open Common.Option.Syntax in
-  match Value.classify value with
-  | Value.Object dict ->
-    let%bind ref = Js.Dict.get dict "$ref" in
-    let%bind ref = Value.decodeObj ref in
-    let%bind refEntityName = Js.Dict.get ref "entity" in
-    let%bind refEntityName = Value.decodeString refEntityName in
-    let%bind refEntityId = Js.Dict.get ref "id" in
-    let%bind refEntityId = Value.decodeString refEntityId in
-    return {refEntityName; refEntityId}
-  | _ -> None
+let getEntity ~db ~name ~id =
+    let resolved =
+      let open! Option.Syntax in
+      let%bind coll = Value.get ~name:name db.value in
+      let%bind value = Value.get ~name:id coll in
+      return value
+    in
+    begin match resolved with
+    | Some value -> Run.return value
+    | None -> executionError {j|unable to resolve ref $name@$id|j}
+    end
+
+let setEntity ~db ~name ~id value =
+    let open Run.Syntax in
+    let%bind coll = liftOption ~err:"unknown collection" (Value.get ~name:name db.value) in
+    let%bind coll = liftOption ~err:"malformed collection" (Value.decodeObj coll) in
+    Js.Dict.set coll id value;
+    return ()
+
+let generateEntityId ~db ~name =
+    let open Run.Syntax in
+    let%bind coll = liftOption ~err:"unknown collection" (Value.get ~name:name db.value) in
+    let%bind coll = liftOption ~err:"malformed collection" (Value.decodeObj coll) in
+    let length = Array.length (Js.Dict.keys coll) in
+    return {j|$name.$length|j}
 
 (*
  * Format value by removing all not explicitly mentioned references according to
@@ -332,18 +377,9 @@ let execute ?value ~db query =
 
   and expandRef value =
     let resolveRef value =
-      match parseRefOpt value with
+      match Ref.ofValue value with
       | Some ref ->
-        let resolved =
-          let open! Option.Syntax in
-          let%bind coll = Value.get ~name:ref.refEntityName db.value in
-          let%bind value = Value.get ~name:ref.refEntityId coll in
-          return value
-        in
-        begin match resolved with
-        | Some value -> return value
-        | None -> executionError {j|unable to resolve ref $ref.refEntityName@ref.refEntityId|j}
-        end
+        getEntity ~db ~name:ref.name ~id:ref.id
       | None -> return value
     in
     match Value.classify value with
@@ -368,3 +404,72 @@ let execute ?value ~db query =
   in
 
   return value
+
+module Mutation = struct
+
+  type t = string * spec
+
+  and spec =
+    | CreateEntity of t list
+    | UpdateEntity of t list
+    | SetValue of Value.t
+
+  let createEntity ~name mutations =
+    name, CreateEntity mutations
+
+  let updateEntity ~name mutations =
+    name, UpdateEntity mutations
+
+  let setValue ~name value =
+    name, SetValue value
+
+end
+
+let rec applyMutation ~db dict =
+  let open Run.Syntax in
+  let getRef name =
+    let open! Option.Syntax in
+    let%bind ref = Js.Dict.get dict name in
+    let%bind ref = Ref.ofValue ref in
+    return ref
+  in
+  function
+  | name, Mutation.UpdateEntity muts ->
+    begin match getRef name with
+    | Some ref ->
+      let%bind _ = updateEntity ~db ~name:ref.name ~id:ref.id muts in
+      return ()
+    | None ->
+      return ()
+    end
+  | name, Mutation.CreateEntity muts ->
+    begin match getRef name with
+    | Some ref ->
+      let%bind id = createEntity ~db ~name:ref.name muts in
+      Js.log id;
+      Js.Dict.set dict name (Ref.toValue {Ref. name = ref.name; id = id});
+      return ()
+    | None ->
+      return ()
+    end
+  | name, Mutation.SetValue value ->
+    Js.Dict.set dict name value;
+    return ()
+
+and updateEntity ~db ~name ~id muts =
+  let open Run.Syntax in
+  let%bind entity = getEntity ~db ~name ~id in
+  let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
+  let%bind () = Run.List.iter ~f:(applyMutation ~db dict) muts in
+  let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
+  let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
+  return id
+
+and createEntity ~db ~name muts =
+  let open Run.Syntax in
+  let dict = Js.Dict.empty () in
+  let%bind () = Run.List.iter ~f:(applyMutation ~db dict) muts in
+  let value = (Value.obj dict) in
+  let%bind id = generateEntityId ~db ~name in
+  let%bind () = setEntity ~db ~name ~id value in
+  return id
