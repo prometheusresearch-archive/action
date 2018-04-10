@@ -45,33 +45,34 @@ export function Breadcrumb<Item: BreadcrumbItem>({onSelect, items, textColor}: P
       key={item.id}
       style={{
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'center',
+        height: '100%',
       }}>
       <BreadcrumbButton
         onPress={onSelect.bind(null, item)}
         title={item.title}
         textColor={textColor}
       />
-      <MdKeyboardArrowRight size={cfg.fontSize.small} color={textColor} />
+      <MdKeyboardArrowRight size={cfg.fontSize.base} color={textColor} />
     </View>
   ));
   return (
     <View
       style={{
         flexDirection: 'row',
-        alignItems: 'center',
         padding: cfg.padding.size2,
         height: cfg.fontSize.base,
       }}>
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
+          height: '100%',
         }}>
         <View style={{paddingHorizontal: cfg.padding.size2}}>
-          <MdHome color={textColor} size={cfg.fontSize.small} />
+          <MdHome color={textColor} size={cfg.fontSize.base} />
         </View>
-        <MdKeyboardArrowRight color={textColor} size={cfg.fontSize.small} />
+        <MdKeyboardArrowRight color={textColor} size={cfg.fontSize.base} />
       </View>
       {itemsRendered}
     </View>

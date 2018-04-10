@@ -19,8 +19,9 @@ let style = StyleSheet.create({
     borderWidth: cfg.borderWidth.default,
     borderRadius: cfg.borderRadius.small,
     outlineWidth: 6,
-    fontWeight: cfg.fontWeight.medium,
+    fontWeight: cfg.fontWeight.normal,
     fontFamily: cfg.fontFamily.sans,
+    fontSize: cfg.fontSize.small,
   },
   error: {
     borderColor: cfg.color.red,

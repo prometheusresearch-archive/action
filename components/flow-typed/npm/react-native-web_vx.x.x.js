@@ -26,4 +26,6 @@ declare module 'react-native-web' {
   declare export var Picker: ComponentType<any>;
   declare export var StyleSheet: any;
   declare export function processColor(string, number): string;
+
+  declare export type Style = Object;
 }

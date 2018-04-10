@@ -143,6 +143,7 @@ export function Nav({outlineColor, items, itemsExtra, breadcrumb, active, onActi
               style={{
                 borderTopWidth: cfg.borderWidth.default,
                 borderTopColor: borderColor,
+                paddingVertical: cfg.padding.size2,
               }}>
               <Breadcrumb items={breadcrumb} textColor={textColor} />
             </View>

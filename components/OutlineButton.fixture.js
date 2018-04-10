@@ -33,7 +33,7 @@ const fixtures: FixtureList = [
             <OutlineButton
               size={size}
               label="Press Me"
-              fillColor={cfg.color.pinkLightest}
+              fillColor={cfg.color.greyLighter}
             />
           )),
         },
