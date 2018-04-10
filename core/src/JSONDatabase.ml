@@ -405,27 +405,25 @@ let execute ?value ~db query =
 
   return value
 
-module Mutation = struct
+let rec createEntity ~db ~name (mut : Mutation.t) =
+  let open Run.Syntax in
+  let dict = Js.Dict.empty () in
+  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db dict) in
+  let value = (Value.obj dict) in
+  let%bind id = generateEntityId ~db ~name in
+  let%bind () = setEntity ~db ~name ~id value in
+  return id
 
-  type t = string * spec
+and updateEntity ~db ~name ~id (mut : Mutation.t) =
+  let open Run.Syntax in
+  let%bind entity = getEntity ~db ~name ~id in
+  let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
+  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db dict) in
+  let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
+  let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
+  return id
 
-  and spec =
-    | CreateEntity of t list
-    | UpdateEntity of t list
-    | SetValue of Value.t
-
-  let createEntity ~name mutations =
-    name, CreateEntity mutations
-
-  let updateEntity ~name mutations =
-    name, UpdateEntity mutations
-
-  let setValue ~name value =
-    name, SetValue value
-
-end
-
-let rec applyMutation ~db dict =
+and applyMutation ~db dict =
   let open Run.Syntax in
   let getRef name =
     let open! Option.Syntax in
@@ -434,36 +432,21 @@ let rec applyMutation ~db dict =
     return ref
   in
   function
-  | name, Mutation.UpdateEntity muts ->
+  | name, Mutation.UpdateEntity mut ->
     begin match getRef name with
     | Some ref ->
-      let%bind _ = updateEntity ~db ~name:ref.name ~id:ref.id muts in
+      let%bind _ = updateEntity ~db ~name:ref.name ~id:ref.id mut in
       return ()
     | None ->
       return ()
     end
-  | name, Mutation.CreateEntity muts ->
-    let%bind id = createEntity ~db ~name:name muts in
+  | name, Mutation.CreateEntity mut ->
+    let%bind id = createEntity ~db ~name:name mut in
     Js.Dict.set dict name (Ref.toValue {Ref. name = name; id = id});
     return ()
-  | name, Mutation.SetValue value ->
+  | name, Mutation.Update q ->
+    let univ = univ db in
+    let%bind q = QueryTyper.typeQuery ~univ q in
+    let%bind value = execute ~db q in
     Js.Dict.set dict name value;
     return ()
-
-and updateEntity ~db ~name ~id muts =
-  let open Run.Syntax in
-  let%bind entity = getEntity ~db ~name ~id in
-  let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-  let%bind () = Run.List.iter ~f:(applyMutation ~db dict) muts in
-  let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
-  let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
-  return id
-
-and createEntity ~db ~name muts =
-  let open Run.Syntax in
-  let dict = Js.Dict.empty () in
-  let%bind () = Run.List.iter ~f:(applyMutation ~db dict) muts in
-  let value = (Value.obj dict) in
-  let%bind id = generateEntityId ~db ~name in
-  let%bind () = setEntity ~db ~name ~id value in
-  return id

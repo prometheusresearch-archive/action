@@ -35,45 +35,6 @@ module type DATABASE = sig
     -> Query.Typed.t
     -> (Value.t, 'err) comp
 
-
-  (**
-   * Database mutation specification.
-   *)
-  module Mutation : sig
-
-    (**
-     * This type represents database mutations.
-     *
-     * Any concrete database would need to define a representation for this and
-     * an interpreter which executes mutations to produce a new database state.
-     *)
-    type t
-
-    (**
-     * Create a new entity.
-     *)
-    val createEntity :
-      name : string
-      -> t list
-      -> t
-
-    (**
-     * Update an entity.
-     *)
-    val updateEntity :
-      name : string
-      -> t list
-      -> t
-
-    (**
-     * Update a value.
-     *)
-    val setValue :
-      name : string
-      -> Value.t
-      -> t
-  end
-
   (**
    * Update an entity inside a db following a list of mutation specs.
    *)
@@ -81,7 +42,7 @@ module type DATABASE = sig
     db : t
     -> name : string
     -> id : string
-    -> Mutation.t list
+    -> Mutation.t
     -> (string, 'err) comp
 
   (**
@@ -90,7 +51,7 @@ module type DATABASE = sig
   val createEntity :
     db : t
     -> name : string
-    -> Mutation.t list
+    -> Mutation.t
     -> (string, 'err) comp
 
 

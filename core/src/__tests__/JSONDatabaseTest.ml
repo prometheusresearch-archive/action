@@ -3,6 +3,7 @@ open! Expect
 open! Expect.Operators
 
 module Q = Query.Untyped.Syntax
+module M = Mutation.Syntax
 
 let liftResult = function
   | Js.Result.Ok v -> Run.return v
@@ -393,13 +394,13 @@ let () =
     test "setValue" begin fun () ->
       let db = getDb () in
 
-      let mut = JSONDatabase.Mutation.(
-        setValue ~name:"name" (Value.string "UPDATED")
-      ) in
+      let mut = M.(mutation [
+        update ~name:"name" (Q.string "UPDATED")
+      ]) in
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.updateEntity ~db ~name:"region" ~id:"ASIA" [mut] in
+        let%bind _ = JSONDatabase.updateEntity ~db ~name:"region" ~id:"ASIA" mut in
         return (expectDbToMatchSnapshot db)
       )
     end;
@@ -407,15 +408,15 @@ let () =
     test "updateEntity" begin fun () ->
       let db = getDb () in
 
-      let mut = JSONDatabase.Mutation.(
+      let mut = M.(mutation [
         updateEntity ~name:"region" [
-          setValue ~name:"name" (Value.string "UPDATED")
+          update ~name:"name" (Q.string "UPDATED")
         ]
-      ) in
+      ]) in
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" [mut] in
+        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" mut in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -424,15 +425,15 @@ let () =
     test "createEntity" begin fun () ->
       let db = getDb () in
 
-      let mut = JSONDatabase.Mutation.(
+      let mut = M.(mutation [
         createEntity ~name:"region" [
-          setValue ~name:"name" (Value.string "NEWREGION")
+          update ~name:"name" (Q.string "NEWREGION")
         ]
-      ) in
+      ]) in
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" [mut] in
+        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" mut in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -445,13 +446,13 @@ let () =
     test "simple" begin fun () ->
       let db = getDb () in
 
-      let mut = JSONDatabase.Mutation.(
-        setValue ~name:"name" (Value.string "NEWREGION")
-      ) in
+      let mut = M.(mutation [
+        update ~name:"name" (Q.string "NEWREGION")
+      ]) in
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.createEntity ~db ~name:"region" [mut] in
+        let%bind _ = JSONDatabase.createEntity ~db ~name:"region" mut in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -460,16 +461,16 @@ let () =
     test "with nested" begin fun () ->
       let db = getDb () in
 
-      let muts = JSONDatabase.Mutation.[
-        setValue ~name:"name" (Value.string "NEWNATION");
+      let mut = M.(mutation [
+        update ~name:"name" (Q.string "NEWNATION");
         createEntity ~name:"region" [
-          setValue ~name:"name" (Value.string "NEWREGION");
+          update ~name:"name" (Q.string "NEWREGION");
         ]
-      ] in
+      ]) in
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.createEntity ~db ~name:"nation" muts in
+        let%bind _ = JSONDatabase.createEntity ~db ~name:"nation" mut in
         return (expectDbToMatchSnapshot db)
       )
 
