@@ -71,6 +71,9 @@ let getDb () =
     }
   |}
 
+let expectDbToMatchSnapshot db =
+  expect(JSONDatabase.root db) |> toMatchSnapshot
+
 let runQuery ~db q =
   let open Run.Syntax in
   let%bind q = Core.QueryTyper.typeQuery ~univ q in
@@ -387,10 +390,6 @@ let () =
 
   describe "JSONDatabase.updateEntity" begin fun () ->
 
-    let expectSnapshot db =
-      expect(JSONDatabase.root db) |> toMatchSnapshot
-    in
-
     test "setValue" begin fun () ->
       let db = getDb () in
 
@@ -401,7 +400,7 @@ let () =
       unwrapAssertionResult (
         let open Run.Syntax in
         let%bind _ = JSONDatabase.updateEntity ~db ~name:"region" ~id:"ASIA" [mut] in
-        return (expectSnapshot db)
+        return (expectDbToMatchSnapshot db)
       )
     end;
 
@@ -417,7 +416,7 @@ let () =
       unwrapAssertionResult (
         let open Run.Syntax in
         let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" [mut] in
-        return (expectSnapshot db)
+        return (expectDbToMatchSnapshot db)
       )
 
     end;
@@ -434,7 +433,44 @@ let () =
       unwrapAssertionResult (
         let open Run.Syntax in
         let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" [mut] in
-        return (expectSnapshot db)
+        return (expectDbToMatchSnapshot db)
+      )
+
+    end;
+
+  end;
+
+  describe "JSONDatabase.createEntity" begin fun () ->
+
+    test "simple" begin fun () ->
+      let db = getDb () in
+
+      let mut = JSONDatabase.Mutation.(
+        setValue ~name:"name" (Value.string "NEWREGION")
+      ) in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let%bind _ = JSONDatabase.createEntity ~db ~name:"region" [mut] in
+        return (expectDbToMatchSnapshot db)
+      )
+
+    end;
+
+    test "with nested" begin fun () ->
+      let db = getDb () in
+
+      let muts = JSONDatabase.Mutation.[
+        setValue ~name:"name" (Value.string "NEWNATION");
+        createEntity ~name:"region" [
+          setValue ~name:"name" (Value.string "NEWREGION");
+        ]
+      ] in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let%bind _ = JSONDatabase.createEntity ~db ~name:"nation" muts in
+        return (expectDbToMatchSnapshot db)
       )
 
     end;

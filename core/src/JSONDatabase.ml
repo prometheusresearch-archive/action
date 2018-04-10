@@ -443,15 +443,9 @@ let rec applyMutation ~db dict =
       return ()
     end
   | name, Mutation.CreateEntity muts ->
-    begin match getRef name with
-    | Some ref ->
-      let%bind id = createEntity ~db ~name:ref.name muts in
-      Js.log id;
-      Js.Dict.set dict name (Ref.toValue {Ref. name = ref.name; id = id});
-      return ()
-    | None ->
-      return ()
-    end
+    let%bind id = createEntity ~db ~name:name muts in
+    Js.Dict.set dict name (Ref.toValue {Ref. name = name; id = id});
+    return ()
   | name, Mutation.SetValue value ->
     Js.Dict.set dict name value;
     return ()
