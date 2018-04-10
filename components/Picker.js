@@ -17,7 +17,7 @@ let style = StyleSheet.create({
     appearance: 'none',
     backgroundColor: cfg.color.transparent,
     padding: cfg.padding.size2,
-    borderWidth: 2,
+    borderWidth: cfg.borderWidth.default,
     borderRadius: cfg.borderRadius.small,
     outlineWidth: 6,
     fontSize: cfg.fontSize.small,
