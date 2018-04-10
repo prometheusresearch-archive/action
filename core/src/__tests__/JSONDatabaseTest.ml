@@ -30,73 +30,86 @@ let univ =
     |> hasMany "nation" (Lazy.force nation)
   )
 
-let db = JSONDatabase.ofStringExn ~univ {|
-  {
-    "region": {
-      "AMERICA": {
-        "id": "AMERICA",
-        "name": "America",
-        "nation": [
-          {"$ref": {"entity": "nation", "id": "US"}}
-        ]
+let getDb () =
+  JSONDatabase.ofStringExn ~univ {|
+    {
+      "region": {
+        "AMERICA": {
+          "id": "AMERICA",
+          "name": "America",
+          "nation": [
+            {"$ref": {"entity": "nation", "id": "US"}}
+          ]
+        },
+        "ASIA": {
+          "id": "ASIA",
+          "name": "Asia",
+          "nation": [
+            {"$ref": {"entity": "nation", "id": "RUSSIA"}},
+            {"$ref": {"entity": "nation", "id": "CHINA"}}
+          ]
+        }
       },
-      "ASIA": {
-        "id": "ASIA",
-        "name": "Asia",
-        "nation": [
-          {"$ref": {"entity": "nation", "id": "RUSSIA"}},
-          {"$ref": {"entity": "nation", "id": "CHINA"}}
-        ]
-      }
-    },
 
-    "nation": {
-      "US": {
-        "id": "US",
-        "name": "United States of America",
-        "region": {"$ref": {"entity": "region", "id": "AMERICA"}}
-      },
-      "CHINA": {
-        "id": "CHINA",
-        "name": "China",
-        "region": {"$ref": {"entity": "region", "id": "ASIA"}}
-      },
-      "RUSSIA": {
-        "id": "RUSSIA",
-        "name": "Russia",
-        "region": {"$ref": {"entity": "region", "id": "ASIA"}}
+      "nation": {
+        "US": {
+          "id": "US",
+          "name": "United States of America",
+          "region": {"$ref": {"entity": "region", "id": "AMERICA"}}
+        },
+        "CHINA": {
+          "id": "CHINA",
+          "name": "China",
+          "region": {"$ref": {"entity": "region", "id": "ASIA"}}
+        },
+        "RUSSIA": {
+          "id": "RUSSIA",
+          "name": "Russia",
+          "region": {"$ref": {"entity": "region", "id": "ASIA"}}
+        }
       }
     }
-  }
-|}
+  |}
+
+let runQuery ~db q =
+  let open Run.Syntax in
+  let%bind q = Core.QueryTyper.typeQuery ~univ q in
+  let%bind r = JSONDatabase.execute ~db q in
+  return r
 
 let unwrapAssertionResult v = match Run.toResult v with
   | Common.Result.Ok assertion -> assertion
   | Common.Result.Error (`DatabaseError err) -> fail err
   | Common.Result.Error (`QueryTypeError err) -> fail err
 
-let runQueryAndExpect q v =
+let runQueryAndExpect ~db q v =
   unwrapAssertionResult (
     let open Run.Syntax in
-    let%bind q = Core.QueryTyper.typeQuery ~univ q in
-    let%bind r = JSONDatabase.execute ~db q in
+    let%bind r = runQuery ~db q in
     return (expect(r) |> toEqual(v))
   )
+
+let expectOk comp = match Run.toResult comp with
+  | Common.Result.Ok _ -> pass
+  | Common.Result.Error (`DatabaseError err) -> fail err
+  | Common.Result.Error (`QueryTypeError err) -> fail err
 
 let valueOfStringExn s = s |> Js.Json.parseExn |> Value.ofJson
 
 let () =
 
-  describe "JSONDatabase" begin fun () ->
+  describe "JSONDatabase.execute" begin fun () ->
+
+    let db = getDb () in
 
     test "/" begin fun () ->
       let q = Q.(void) in
-      runQueryAndExpect q (JSONDatabase.root db)
+      runQueryAndExpect ~db q (JSONDatabase.root db)
     end;
 
     test "/region" begin fun () ->
       let q = Q.(void |> nav "region") in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         [
           {
             "id": "AMERICA",
@@ -112,7 +125,7 @@ let () =
 
     test "/region.name" begin fun () ->
       let q = Q.(void |> nav "region" |> nav "name") in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         [
           "America",
           "Asia"
@@ -127,7 +140,7 @@ let () =
           field ~alias:"regions" (here |> nav "region");
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "regions": [
             {
@@ -150,7 +163,7 @@ let () =
           field ~alias:"regionNames" (here |> nav "region" |> nav "name");
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "regionNames": [
             "America",
@@ -162,7 +175,7 @@ let () =
 
     test "/region[\"ASIA\"]" begin fun () ->
       let q = Q.(void |> nav "region" |> locate (string "ASIA")) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "id": "ASIA",
           "name": "Asia"
@@ -177,7 +190,7 @@ let () =
         |> locate (string "ASIA")
         |> nav "nation"
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         [
           {"id": "RUSSIA", "name": "Russia"},
           {"id": "CHINA", "name": "China"}
@@ -193,7 +206,7 @@ let () =
         |> nav "nation"
         |> nav "name"
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         [
           "Russia",
           "China"
@@ -212,7 +225,7 @@ let () =
           )
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asia": {
             "id": "ASIA",
@@ -234,7 +247,7 @@ let () =
           )
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asia": "Asia"
         }
@@ -253,7 +266,7 @@ let () =
           )
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asiaNations": [
             {"id": "RUSSIA", "name": "Russia"},
@@ -276,7 +289,7 @@ let () =
           )
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asiaNationNames": [
             "Russia",
@@ -303,7 +316,7 @@ let () =
           )
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "data": {
             "nations": [
@@ -333,7 +346,7 @@ let () =
           )
         ]
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "data": {
             "nationNames": [
@@ -352,7 +365,7 @@ let () =
         |> nav "nation"
         |> nav "region"
       ) in
-      runQueryAndExpect q (valueOfStringExn {|
+      runQueryAndExpect ~db q (valueOfStringExn {|
         [
           {
             "id": "AMERICA",
@@ -368,6 +381,62 @@ let () =
           }
         ]
       |})
+    end;
+
+  end;
+
+  describe "JSONDatabase.updateEntity" begin fun () ->
+
+    let expectSnapshot db =
+      expect(JSONDatabase.root db) |> toMatchSnapshot
+    in
+
+    test "setValue" begin fun () ->
+      let db = getDb () in
+
+      let mut = JSONDatabase.Mutation.(
+        setValue ~name:"name" (Value.string "UPDATED")
+      ) in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let%bind _ = JSONDatabase.updateEntity ~db ~name:"region" ~id:"ASIA" [mut] in
+        return (expectSnapshot db)
+      )
+    end;
+
+    test "updateEntity" begin fun () ->
+      let db = getDb () in
+
+      let mut = JSONDatabase.Mutation.(
+        updateEntity ~name:"region" [
+          setValue ~name:"name" (Value.string "UPDATED")
+        ]
+      ) in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" [mut] in
+        return (expectSnapshot db)
+      )
+
+    end;
+
+    test "createEntity" begin fun () ->
+      let db = getDb () in
+
+      let mut = JSONDatabase.Mutation.(
+        createEntity ~name:"region" [
+          setValue ~name:"name" (Value.string "NEWREGION")
+        ]
+      ) in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" [mut] in
+        return (expectSnapshot db)
+      )
+
     end;
 
   end;

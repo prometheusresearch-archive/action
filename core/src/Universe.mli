@@ -19,5 +19,7 @@ val hasScreen : string -> Screen.t -> t -> t
 val fields : t -> Query.Type.field list
 
 val lookupScreen : string -> t -> Screen.t option
+val lookupEntity : string -> t -> Query.Type.entity option
 
 val lookupScreenResult : string -> t -> (Screen.t, string) Common.Result.t
+val lookupEntityResult : string -> t -> (Query.Type.entity, string) Common.Result.t

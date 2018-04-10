@@ -1,0 +1,211 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`JSONDatabase.updateEntity createEntity 1`] = `
+Object {
+  "nation": Object {
+    "CHINA": Object {
+      "id": "CHINA",
+      "name": "China",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "region.2",
+        },
+      },
+    },
+    "RUSSIA": Object {
+      "id": "RUSSIA",
+      "name": "Russia",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "ASIA",
+        },
+      },
+    },
+    "US": Object {
+      "id": "US",
+      "name": "United States of America",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "AMERICA",
+        },
+      },
+    },
+  },
+  "region": Object {
+    "AMERICA": Object {
+      "id": "AMERICA",
+      "name": "America",
+      "nation": Array [
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "US",
+          },
+        },
+      ],
+    },
+    "ASIA": Object {
+      "id": "ASIA",
+      "name": "Asia",
+      "nation": Array [
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "RUSSIA",
+          },
+        },
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "CHINA",
+          },
+        },
+      ],
+    },
+    "region.2": Object {
+      "name": "NEWREGION",
+    },
+  },
+}
+`;
+
+exports[`JSONDatabase.updateEntity setValue 1`] = `
+Object {
+  "nation": Object {
+    "CHINA": Object {
+      "id": "CHINA",
+      "name": "China",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "ASIA",
+        },
+      },
+    },
+    "RUSSIA": Object {
+      "id": "RUSSIA",
+      "name": "Russia",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "ASIA",
+        },
+      },
+    },
+    "US": Object {
+      "id": "US",
+      "name": "United States of America",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "AMERICA",
+        },
+      },
+    },
+  },
+  "region": Object {
+    "AMERICA": Object {
+      "id": "AMERICA",
+      "name": "America",
+      "nation": Array [
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "US",
+          },
+        },
+      ],
+    },
+    "ASIA": Object {
+      "id": "ASIA",
+      "name": "UPDATED",
+      "nation": Array [
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "RUSSIA",
+          },
+        },
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "CHINA",
+          },
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`JSONDatabase.updateEntity updateEntity 1`] = `
+Object {
+  "nation": Object {
+    "CHINA": Object {
+      "id": "CHINA",
+      "name": "China",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "ASIA",
+        },
+      },
+    },
+    "RUSSIA": Object {
+      "id": "RUSSIA",
+      "name": "Russia",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "ASIA",
+        },
+      },
+    },
+    "US": Object {
+      "id": "US",
+      "name": "United States of America",
+      "region": Object {
+        "$ref": Object {
+          "entity": "region",
+          "id": "AMERICA",
+        },
+      },
+    },
+  },
+  "region": Object {
+    "AMERICA": Object {
+      "id": "AMERICA",
+      "name": "America",
+      "nation": Array [
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "US",
+          },
+        },
+      ],
+    },
+    "ASIA": Object {
+      "id": "ASIA",
+      "name": "UPDATED",
+      "nation": Array [
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "RUSSIA",
+          },
+        },
+        Object {
+          "$ref": Object {
+            "entity": "nation",
+            "id": "CHINA",
+          },
+        },
+      ],
+    },
+  },
+}
+`;
