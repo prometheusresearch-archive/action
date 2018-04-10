@@ -84,7 +84,7 @@ export function SideNavButton({
     height: 34,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: cfg.borderRadius.default,
+    borderRadius: cfg.borderRadius.small,
     paddingVertical: cfg.padding.size2,
     paddingHorizontal: cfg.padding.size4,
   };
@@ -99,10 +99,7 @@ export function SideNavButton({
         underlayColor={processColor(outlineColor, 0.1)}
         delayPressOut={0}
         style={{
-          borderRadius: cfg.borderRadius.default,
-          // backgroundColor: active
-          //   ? processColor(outlineColor, 0.25)
-          //   : cfg.color.transparent,
+          borderRadius: cfg.borderRadius.small,
         }}>
         <View style={viewStyle}>
           <View style={iconWrapperStyle}>{icon}</View>

@@ -52,14 +52,16 @@ export function Breadcrumb<Item: BreadcrumbItem>({onSelect, items, textColor}: P
         title={item.title}
         textColor={textColor}
       />
-      <MdKeyboardArrowRight size={cfg.fontSize.base} color={textColor} />
+      <MdKeyboardArrowRight size={cfg.fontSize.small} color={textColor} />
     </View>
   ));
   return (
     <View
       style={{
         flexDirection: 'row',
+        alignItems: 'center',
         padding: cfg.padding.size2,
+        height: cfg.fontSize.base,
       }}>
       <View
         style={{
@@ -67,9 +69,9 @@ export function Breadcrumb<Item: BreadcrumbItem>({onSelect, items, textColor}: P
           alignItems: 'flex-end',
         }}>
         <View style={{paddingHorizontal: cfg.padding.size2}}>
-          <MdHome color={textColor} />
+          <MdHome color={textColor} size={cfg.fontSize.small} />
         </View>
-        <MdKeyboardArrowRight color={textColor} size={cfg.fontSize.base} />
+        <MdKeyboardArrowRight color={textColor} size={cfg.fontSize.small} />
       </View>
       {itemsRendered}
     </View>

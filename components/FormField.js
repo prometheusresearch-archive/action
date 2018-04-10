@@ -13,7 +13,7 @@ let style = StyleSheet.create({
   },
   labelText: {
     fontWeight: cfg.fontWeight.medium,
-    fontSize: cfg.fontSize.base,
+    fontSize: cfg.fontSize.small,
   },
   hintText: {
     fontWeight: cfg.fontWeight.medium,

@@ -17,7 +17,7 @@ const style = StyleSheet.create({
   view: {
     backgroundColor: 'transparent',
     borderWidth: cfg.borderWidth.size2,
-    borderRadius: cfg.borderRadius.default,
+    borderRadius: cfg.borderRadius.small,
     borderStyle: 'solid',
     flexShrink: 1,
   },
