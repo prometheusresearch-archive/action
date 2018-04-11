@@ -213,7 +213,7 @@ let executeQuery q =
   let res =
     let open Run.Syntax in
     let%bind q = q in
-    let%bind data = JSONDatabase.execute ~db q in
+    let%bind data = JSONDatabase.query ~db q in
     return data
   in match runToResult res with
   | Result.Ok data -> data
@@ -277,7 +277,7 @@ let parse s =
         makeWorkflow w
       | ParserResult.Query q ->
         let%bind tq = QueryTyper.typeQuery ~univ q in
-        let%bind value = JSONDatabase.execute ~db tq in
+        let%bind value = JSONDatabase.query ~db tq in
         match Value.classify value with
         | Value.UI _ -> makeUi q
         | _ -> makeData value

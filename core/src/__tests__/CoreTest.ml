@@ -30,7 +30,7 @@ let expectQueryOk query =
   let result =
     let open Run.Syntax in
     let%bind query = QueryTyper.typeQuery ~univ query in
-    let%bind _result = JSONDatabase.execute ~db query in
+    let%bind _result = JSONDatabase.query ~db query in
     return ()
   in
   expectOk (runToResult result)
@@ -43,7 +43,7 @@ let runQueryAndExpect q v =
   unwrapAssertionResult (runToResult (
     let open Run.Syntax in
     let%bind q = Core.QueryTyper.typeQuery ~univ q in
-    let%bind r = JSONDatabase.execute ~db q in
+    let%bind r = JSONDatabase.query ~db q in
     return (expect(r) |> toEqual(v))
   ))
 

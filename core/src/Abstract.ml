@@ -29,7 +29,7 @@ module type DATABASE = sig
   (**
    * Execute typed query.
    *)
-  val execute :
+  val query :
     ?value : Value.t
     -> db : t
     -> Query.Typed.t
