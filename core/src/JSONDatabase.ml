@@ -416,7 +416,7 @@ let query ?value ~db query =
 
   return value
 
-let rec createEntity ~db ~query (mut : Mutation.t) =
+let rec createEntity ~db ~query mut =
   let open Run.Syntax in
   match query with
   | (_, (_, Query.Type.Entity {entityName;_})), _ ->
@@ -431,7 +431,7 @@ let rec createEntity ~db ~query (mut : Mutation.t) =
     let ctyp = Query.Type.showCt ctyp in
     executionError {j|createEntity could not be called at $query of type $ctyp|j}
 
-and updateEntity ~db ~query:queryEntity (mut : Mutation.t) =
+and updateEntity ~db ~query:queryEntity mut =
   let open Run.Syntax in
   match queryEntity with
   | (_, (Card.One, Query.Type.Entity {entityName;_})), _
@@ -451,7 +451,7 @@ and updateEntity ~db ~query:queryEntity (mut : Mutation.t) =
 and applyMutation ~db baseQuery dict =
   let open Run.Syntax in
   function
-  | key, Mutation.UpdateEntity mut ->
+  | key, Mutation.Typed.UpdateEntity mut ->
     let%bind baseQuery =
       QueryTyper.growQuery
         ~univ:(univ db)
@@ -460,7 +460,7 @@ and applyMutation ~db baseQuery dict =
     in
     let%bind _ = updateEntity ~query:baseQuery ~db mut in
     return ()
-  | key, Mutation.CreateEntity mut ->
+  | key, Mutation.Typed.CreateEntity mut ->
     let%bind baseQuery =
       QueryTyper.growQuery
         ~univ:(univ db)
@@ -470,7 +470,7 @@ and applyMutation ~db baseQuery dict =
     let%bind id = createEntity ~query:baseQuery ~db mut in
     Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
     return ()
-  | name, Mutation.Update q ->
+  | name, Mutation.Typed.Update q ->
     let univ = univ db in
     let%bind q = QueryTyper.growQuery ~univ ~base:baseQuery q in
     let%bind value = query ~db q in

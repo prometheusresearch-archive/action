@@ -3,7 +3,7 @@ open! Expect
 open! Expect.Operators
 
 module Q = Query.Untyped.Syntax
-module M = Mutation.Syntax
+module M = Mutation.Untyped.Syntax
 
 let liftResult = function
   | Js.Result.Ok v -> Run.return v
@@ -394,14 +394,14 @@ let () =
     test "setValue" begin fun () ->
       let db = getDb () in
 
-      let mut = M.(mutation [
-        update ~name:"name" (Q.string "UPDATED")
-      ]) in
-
       unwrapAssertionResult (
         let open Run.Syntax in
         let query = Q.(void |> nav "region" |> locate (string "ASIA")) in
+        let mut = M.(mutation [
+          update ~name:"name" (Q.string "UPDATED")
+        ]) in
         let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind mut = Mutation.Typer.typeMutation ~univ ~query mut in
         let%bind _ = JSONDatabase.updateEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
@@ -410,16 +410,16 @@ let () =
     test "updateEntity" begin fun () ->
       let db = getDb () in
 
-      let mut = M.(mutation [
-        updateEntity ~name:"region" [
-          update ~name:"name" (Q.string "UPDATED")
-        ]
-      ]) in
-
       unwrapAssertionResult (
         let open Run.Syntax in
         let query = Q.(void |> nav "nation" |> locate (string "CHINA")) in
+        let mut = M.(mutation [
+          updateEntity ~name:"region" [
+            update ~name:"name" (Q.string "UPDATED")
+          ]
+        ]) in
         let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind mut = Mutation.Typer.typeMutation ~univ ~query mut in
         let%bind _ = JSONDatabase.updateEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
@@ -429,16 +429,16 @@ let () =
     test "createEntity" begin fun () ->
       let db = getDb () in
 
-      let mut = M.(mutation [
-        createEntity ~name:"region" [
-          update ~name:"name" (Q.string "NEWREGION")
-        ]
-      ]) in
-
       unwrapAssertionResult (
         let open Run.Syntax in
         let query = Q.(void |> nav "nation" |> locate (string "CHINA")) in
+        let mut = M.(mutation [
+          createEntity ~name:"region" [
+            update ~name:"name" (Q.string "NEWREGION")
+          ]
+        ]) in
         let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind mut = Mutation.Typer.typeMutation ~univ ~query mut in
         let%bind _ = JSONDatabase.updateEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
@@ -452,14 +452,15 @@ let () =
     test "simple" begin fun () ->
       let db = getDb () in
 
-      let mut = M.(mutation [
-        update ~name:"name" (Q.string "NEWREGION")
-      ]) in
 
       unwrapAssertionResult (
         let open Run.Syntax in
         let query = Q.(void |> nav "region") in
+        let mut = M.(mutation [
+          update ~name:"name" (Q.string "NEWREGION")
+        ]) in
         let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind mut = Mutation.Typer.typeMutation ~univ ~query mut in
         let%bind _ = JSONDatabase.createEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
@@ -469,17 +470,17 @@ let () =
     test "with nested" begin fun () ->
       let db = getDb () in
 
-      let mut = M.(mutation [
-        update ~name:"name" (Q.string "NEWNATION");
-        createEntity ~name:"region" [
-          update ~name:"name" (Q.string "NEWREGION");
-        ]
-      ]) in
-
       unwrapAssertionResult (
         let open Run.Syntax in
         let query = Q.(void |> nav "nation") in
         let%bind query = QueryTyper.typeQuery ~univ query in
+        let mut = M.(mutation [
+          update ~name:"name" (Q.string "NEWNATION");
+          createEntity ~name:"region" [
+            update ~name:"name" (Q.string "NEWREGION");
+          ]
+        ]) in
+        let%bind mut = Mutation.Typer.typeMutation ~univ ~query mut in
         let%bind _ = JSONDatabase.createEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
