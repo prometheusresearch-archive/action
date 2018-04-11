@@ -400,7 +400,9 @@ let () =
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.updateEntity ~db ~name:"region" ~id:"ASIA" mut in
+        let query = Q.(void |> nav "region" |> locate (string "ASIA")) in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind _ = JSONDatabase.updateEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
     end;
@@ -416,7 +418,9 @@ let () =
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" mut in
+        let query = Q.(void |> nav "nation" |> locate (string "CHINA")) in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind _ = JSONDatabase.updateEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -433,7 +437,9 @@ let () =
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.updateEntity ~db ~name:"nation" ~id:"CHINA" mut in
+        let query = Q.(void |> nav "nation" |> locate (string "CHINA")) in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind _ = JSONDatabase.updateEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -452,7 +458,9 @@ let () =
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.createEntity ~db ~name:"region" mut in
+        let query = Q.(void |> nav "region") in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind _ = JSONDatabase.createEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -470,7 +478,9 @@ let () =
 
       unwrapAssertionResult (
         let open Run.Syntax in
-        let%bind _ = JSONDatabase.createEntity ~db ~name:"nation" mut in
+        let query = Q.(void |> nav "nation") in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind _ = JSONDatabase.createEntity ~db ~query mut in
         return (expectDbToMatchSnapshot db)
       )
 

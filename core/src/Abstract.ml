@@ -39,20 +39,17 @@ module type DATABASE = sig
    * Update an entity inside a db following a list of mutation specs.
    *)
   val updateEntity :
-    ?query : Query.Typed.t
-    -> db : t
-    -> name : string
-    -> id : string
+    db : t
+    -> query : Query.Typed.t
     -> Mutation.t
     -> (string, 'err) comp
 
   (**
-   * Create a new entity inside a db following a list of mutation specs.
+   * Create a new entity and add it to the collection specified by the query.
    *)
   val createEntity :
-    ?query : Query.Typed.t
-    -> db : t
-    -> name : string
+    db : t
+    -> query : Query.Typed.t
     -> Mutation.t
     -> (string, 'err) comp
 
