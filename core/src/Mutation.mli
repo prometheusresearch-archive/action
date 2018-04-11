@@ -27,13 +27,13 @@ end
 module Typed : sig
 
   (**
-  * A mutation is a set of ops, one per field.
-  *)
+   * A mutation is a set of ops, one per field.
+   *)
   type t
 
   (**
-  * Operation on a single field.
-  *)
+   * Operation on a single field.
+   *)
   and op =
     (** Update value with the query result *)
     | Update of Query.Untyped.t
@@ -55,5 +55,12 @@ module Typer : sig
 
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
-  val typeMutation : univ : Universe.t -> query : Query.Typed.t -> Untyped.t -> (Typed.t, 'err) comp
+  (**
+   * Typecheck mutation against a query.
+   *)
+  val typeMutation :
+    univ : Universe.t
+    -> query : Query.Typed.t
+    -> Untyped.t
+    -> (Typed.t, 'err) comp
 end
