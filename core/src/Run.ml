@@ -66,3 +66,15 @@ module Array = struct
     let%bind v = List.map ~f v in
     return (Array.of_list v)
 end
+
+module StringMap = struct
+
+  let foldLeft ~f ~init:v map =
+    let open Syntax in
+    let f map key value =
+      match map with
+      | R.Error err -> R.Error err
+      | R.Ok map -> f map key value
+    in
+    Common.StringMap.reduce map (R.Ok v) f
+end

@@ -74,3 +74,14 @@ module Array : sig
 
   val map : f:('a -> ('b, 'errctx) t) -> 'a array -> ('b array, 'errctx) t
 end
+
+(**
+ * Utilities to deal with maps with string keys.
+ *)
+module StringMap : sig
+
+  val foldLeft :
+    f:('a -> Core.Common.StringMap.key -> 'b -> ('a, 'c) t)
+    -> init:'a
+    -> 'b Core.Common.StringMap.t -> ('a, 'c) t
+end

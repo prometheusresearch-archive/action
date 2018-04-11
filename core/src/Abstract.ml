@@ -41,7 +41,7 @@ module type DATABASE = sig
   val updateEntity :
     db : t
     -> query : Query.Typed.t
-    -> Mutation.t
+    -> Mutation.Typed.t
     -> (string, 'err) comp
 
   (**
@@ -50,7 +50,7 @@ module type DATABASE = sig
   val createEntity :
     db : t
     -> query : Query.Typed.t
-    -> Mutation.t
+    -> Mutation.Typed.t
     -> (string, 'err) comp
 
 
