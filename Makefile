@@ -1,3 +1,19 @@
+define HELP
+Welcome to action development repository!
+
+Common tasks:
+
+- make bootstrap - run bootstrap process
+- make serve - serve demo app
+- make test - run test suite
+
+Start with "make bootstrap" if not sure. Have fun hacking on action!
+endef
+export HELP
+
+help:
+	@echo "$$HELP"
+
 bootstrap:
 	@$(MAKE) -C core/ bootstrap
 	@$(MAKE) -C ui/ bootstrap
