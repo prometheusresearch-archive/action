@@ -42,6 +42,9 @@ module Typed : sig
     (** Create new entity *)
     | CreateEntity of t
 
+  (**
+   * Get a list of ops with corresponding field names.
+   *)
   val ops : t -> (string * op) list
 
 end
