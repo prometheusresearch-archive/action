@@ -67,7 +67,10 @@ let ofStringExn ~univ value =
   let value = value |> Js.Json.parseExn |> Value.ofJson in
   {univ; value}
 
-let getEntity ~db ~name ~id =
+external jsDictAssign : 'a Js.Dict.t -> 'a Js.Dict.t -> unit =
+  "assign" [@@bs.val] [@@bs.scope "Object"]
+
+let getEntityInternal ~db ~name ~id =
     let resolved =
       let open! Option.Syntax in
       let%bind coll = Value.get ~name:name db.value in
@@ -79,11 +82,19 @@ let getEntity ~db ~name ~id =
     | None -> executionError {j|unable to resolve ref $name@$id|j}
     end
 
-let setEntity ~db ~name ~id value =
+let setEntityInternal ~db ~name ~id value =
     let open Run.Syntax in
     let%bind coll = liftOption ~err:"unknown collection" (Value.get ~name:name db.value) in
     let%bind coll = liftOption ~err:"malformed collection" (Value.decodeObj coll) in
     Js.Dict.set coll id value;
+    return ()
+
+let updateEntityInternal ~db ~name ~id update =
+    let open Run.Syntax in
+    let%bind value = getEntityInternal ~db ~name ~id in
+    let%bind value = liftOption ~err:"invalid entity" (Value.decodeObj value) in
+    let%bind update = liftOption ~err:"invalid entity update" (Value.decodeObj update) in
+    jsDictAssign value update;
     return ()
 
 let generateEntityId ~db ~name =
@@ -379,7 +390,7 @@ let query ?value ~db query =
     let resolveRef value =
       match Ref.ofValue value with
       | Some ref ->
-        getEntity ~db ~name:ref.name ~id:ref.id
+        getEntityInternal ~db ~name:ref.name ~id:ref.id
       | None -> return value
     in
     match Value.classify value with
@@ -405,44 +416,59 @@ let query ?value ~db query =
 
   return value
 
-let rec createEntity ?(query=Query.Typed.void) ~db ~name (mut : Mutation.t) =
+let rec createEntity ~db ~query (mut : Mutation.t) =
   let open Run.Syntax in
-  let dict = Js.Dict.empty () in
-  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db query dict) in
-  let value = (Value.obj dict) in
-  let%bind id = generateEntityId ~db ~name in
-  let%bind () = setEntity ~db ~name ~id value in
-  return id
+  match query with
+  | (_, (_, Query.Type.Entity {entityName;_})), _ ->
+    let dict = Js.Dict.empty () in
+    let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db query dict) in
+    let value = (Value.obj dict) in
+    let%bind id = generateEntityId ~db ~name:entityName in
+    let%bind () = setEntityInternal ~db ~name:entityName ~id value in
+    return id
+  | (_, ctyp), _ ->
+    let query = Query.Typed.show query in
+    let ctyp = Query.Type.showCt ctyp in
+    executionError {j|createEntity could not be called at $query of type $ctyp|j}
 
-and updateEntity ?(query=Query.Typed.void) ~db ~name ~id (mut : Mutation.t) =
+and updateEntity ~db ~query:queryEntity (mut : Mutation.t) =
   let open Run.Syntax in
-  let%bind entity = getEntity ~db ~name ~id in
-  let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db query dict) in
-  let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
-  let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
-  return id
+  match queryEntity with
+  | (_, (Card.One, Query.Type.Entity {entityName;_})), _
+  | (_, (Card.Opt, Query.Type.Entity {entityName;_})), _ ->
+    let%bind entity = query ~db queryEntity in
+    let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
+    let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db queryEntity dict) in
+    let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
+    let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
+    let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
+    return id
+  | (_, ctyp), _ ->
+    let query = Query.Typed.show queryEntity in
+    let ctyp = Query.Type.showCt ctyp in
+    executionError {j|updateEntity could not be called at $query of type $ctyp|j}
 
 and applyMutation ~db baseQuery dict =
   let open Run.Syntax in
-  let getRef name =
-    let open! Option.Syntax in
-    let%bind ref = Js.Dict.get dict name in
-    let%bind ref = Ref.ofValue ref in
-    return ref
-  in
   function
-  | name, Mutation.UpdateEntity mut ->
-    begin match getRef name with
-    | Some ref ->
-      let%bind _ = updateEntity ~query:baseQuery ~db ~name:ref.name ~id:ref.id mut in
-      return ()
-    | None ->
-      return ()
-    end
-  | name, Mutation.CreateEntity mut ->
-    let%bind id = createEntity ~query:baseQuery ~db ~name:name mut in
-    Js.Dict.set dict name (Ref.toValue {Ref. name = name; id = id});
+  | key, Mutation.UpdateEntity mut ->
+    let%bind baseQuery =
+      QueryTyper.growQuery
+        ~univ:(univ db)
+        ~base:baseQuery
+        Query.Untyped.Syntax.(here |> nav key)
+    in
+    let%bind _ = updateEntity ~query:baseQuery ~db mut in
+    return ()
+  | key, Mutation.CreateEntity mut ->
+    let%bind baseQuery =
+      QueryTyper.growQuery
+        ~univ:(univ db)
+        ~base:baseQuery
+        Query.Untyped.Syntax.(here |> nav key)
+    in
+    let%bind id = createEntity ~query:baseQuery ~db mut in
+    Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
     return ()
   | name, Mutation.Update q ->
     let univ = univ db in
