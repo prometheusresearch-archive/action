@@ -39,7 +39,8 @@ module type DATABASE = sig
    * Update an entity inside a db following a list of mutation specs.
    *)
   val updateEntity :
-    db : t
+    ?query : Query.Typed.t
+    -> db : t
     -> name : string
     -> id : string
     -> Mutation.t
@@ -49,7 +50,8 @@ module type DATABASE = sig
    * Create a new entity inside a db following a list of mutation specs.
    *)
   val createEntity :
-    db : t
+    ?query : Query.Typed.t
+    -> db : t
     -> name : string
     -> Mutation.t
     -> (string, 'err) comp
