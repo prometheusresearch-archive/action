@@ -3,12 +3,12 @@
  *)
 
 (**
- * A mutation is a set of ops, one per entity's field.
+ * A mutation is a set of ops, one per field.
  *)
 type t = op Common.StringMap.t
 
 (**
- * Operation of a single field
+ * Operation on a single field.
  *)
 and op =
   (** Update value with the query result *)

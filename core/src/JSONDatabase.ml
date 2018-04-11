@@ -405,25 +405,25 @@ let query ?value ~db query =
 
   return value
 
-let rec createEntity ~db ~name (mut : Mutation.t) =
+let rec createEntity ?(query=Query.Typed.void) ~db ~name (mut : Mutation.t) =
   let open Run.Syntax in
   let dict = Js.Dict.empty () in
-  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db dict) in
+  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db query dict) in
   let value = (Value.obj dict) in
   let%bind id = generateEntityId ~db ~name in
   let%bind () = setEntity ~db ~name ~id value in
   return id
 
-and updateEntity ~db ~name ~id (mut : Mutation.t) =
+and updateEntity ?(query=Query.Typed.void) ~db ~name ~id (mut : Mutation.t) =
   let open Run.Syntax in
   let%bind entity = getEntity ~db ~name ~id in
   let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db dict) in
+  let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db query dict) in
   let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
   let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
   return id
 
-and applyMutation ~db dict =
+and applyMutation ~db baseQuery dict =
   let open Run.Syntax in
   let getRef name =
     let open! Option.Syntax in
@@ -435,18 +435,18 @@ and applyMutation ~db dict =
   | name, Mutation.UpdateEntity mut ->
     begin match getRef name with
     | Some ref ->
-      let%bind _ = updateEntity ~db ~name:ref.name ~id:ref.id mut in
+      let%bind _ = updateEntity ~query:baseQuery ~db ~name:ref.name ~id:ref.id mut in
       return ()
     | None ->
       return ()
     end
   | name, Mutation.CreateEntity mut ->
-    let%bind id = createEntity ~db ~name:name mut in
+    let%bind id = createEntity ~query:baseQuery ~db ~name:name mut in
     Js.Dict.set dict name (Ref.toValue {Ref. name = name; id = id});
     return ()
   | name, Mutation.Update q ->
     let univ = univ db in
-    let%bind q = QueryTyper.typeQuery ~univ q in
+    let%bind q = QueryTyper.growQuery ~univ ~base:baseQuery q in
     let%bind value = query ~db q in
     Js.Dict.set dict name value;
     return ()
