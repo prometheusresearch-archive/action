@@ -147,20 +147,6 @@ module Make (Db : Abstract.DATABASE) = struct
     | [] -> return state
     | state::_ -> return state
 
-  let dataQuery (frame, _ as state) =
-    let open Run.Syntax in
-    let univ = Db.univ frame.db in
-    let%bind q = uiQuery state in
-    let%bind q = QueryTyper.nav ~univ "data" q in
-    return q
-
-  let titleQuery (frame, _ as state) =
-    let open Run.Syntax in
-    let univ = Db.univ frame.db in
-    let%bind q = uiQuery state in
-    let%bind q = QueryTyper.nav ~univ "title" q in
-    return q
-
   let setArgs ~args (frame, ui) =
     let open Run.Syntax in
     let%bind frame = match frame.workflow with

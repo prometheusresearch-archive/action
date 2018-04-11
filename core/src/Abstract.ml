@@ -35,25 +35,6 @@ module type DATABASE = sig
     -> Query.Typed.t
     -> (Value.t, 'err) comp
 
-  (**
-   * Update an entity inside a db following a list of mutation specs.
-   *)
-  val updateEntity :
-    db : t
-    -> query : Query.Typed.t
-    -> Mutation.Typed.t
-    -> (string, 'err) comp
-
-  (**
-   * Create a new entity and add it to the collection specified by the query.
-   *)
-  val createEntity :
-    db : t
-    -> query : Query.Typed.t
-    -> Mutation.Typed.t
-    -> (string, 'err) comp
-
-
 end
 
 (**
@@ -83,10 +64,6 @@ module type RUN_WORKFLOW = functor (DB : DATABASE) -> sig
    * Render workflow state and return a new state and a UI screen to render.
    *)
   val render : t -> ((t * Value.UI.t option), 'err) comp
-
-  val dataQuery : t -> (Query.Typed.t, 'err) comp
-
-  val titleQuery : t -> (Query.Typed.t, 'err) comp
 
   val uiQuery : t -> (Query.Typed.t, 'err) comp
 

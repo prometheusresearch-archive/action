@@ -94,6 +94,7 @@ module Untyped = struct
     | First of t
     | Count of t
     | Screen of (t * screen)
+    | Mutation of (t * mutation)
     | Const of Const.t
     | Where of (t * args)
     | Name of string
@@ -118,6 +119,20 @@ module Untyped = struct
     query: t
   }
 
+  and mutation =
+    | Update of ops
+    | Create of ops
+
+  and ops = op Common.StringMap.t
+
+  and op =
+    | OpUpdate of t
+    | OpUpdateEntity of ops
+    | OpCreateEntity of ops
+
+  let ops mut =
+    StringMap.toList mut
+
   let rec showArgs args =
     let args =
       let f (name, query) =
@@ -129,6 +144,8 @@ module Untyped = struct
       |> List.map f
       |> String.concat ", "
     in {j|($args)|j}
+
+  and showMutation _ = "MUT"
 
   and show (_, syn) =
 
@@ -170,6 +187,10 @@ module Untyped = struct
       let parent = show parent in
       let screenArgs = showArgs screenArgs in
       {j|$parent:$screenName$screenArgs|j}
+    | Mutation (parent, mut) ->
+      let parent = show parent in
+      let mut = showMutation mut in
+      {j|$parent:$mut|j}
     | Name name ->
       "$" ^ name
     | Locate (parent, id) ->
@@ -255,6 +276,25 @@ module Untyped = struct
 
     let arg = Arg.make
     let define = Arg.make
+
+    let collectOps ops =
+      let f map (k, v) = StringMap.set map k v in
+      Belt.List.reduce ops StringMap.empty f
+
+    let create ops parent =
+      (), Mutation (parent, Create (collectOps ops))
+
+    let update ops parent =
+      (), Mutation (parent, Update (collectOps ops))
+
+    let opCreateEntity ops =
+      OpCreateEntity (collectOps ops)
+
+    let opUpdateEntity ops =
+      OpUpdateEntity (collectOps ops)
+
+    let opUpdate q =
+      OpUpdate q
 
   end
 
@@ -434,6 +474,7 @@ module Typed = struct
     | First of t
     | Count of t
     | Screen of (t * screen)
+    | Mutation of (t * mutation)
     | Const of Const.t
     | Where of (t * Untyped.args)
     | Name of (string * t)
@@ -455,6 +496,17 @@ module Typed = struct
     alias : string option;
     query: t
   }
+
+  and mutation =
+    | Update of ops
+    | Create of ops
+
+  and ops = op Common.StringMap.t
+
+  and op =
+    | OpUpdate of Untyped.t
+    | OpUpdateEntity of ops
+    | OpCreateEntity of ops
 
   let rec stripTypes (q : t) =
     match q with

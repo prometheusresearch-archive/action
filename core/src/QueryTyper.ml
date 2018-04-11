@@ -31,7 +31,7 @@ let rec extractField ~univ fieldName (typ : Type.t) =
   | Type.Value _ ->
     queryTypeError {j|cannot extract field "$fieldName" from value|j}
 
-let nav ~univ name parent =
+let navQuery ~univ ~name parent =
   let open Run.Syntax in
   let navigation = { Query.Typed. navName = name; } in
   let (scope, (parentCard, parentTyp)), _parentSyn = parent in
@@ -218,7 +218,13 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
     | Query.Untyped.Navigate (parent, navigation) ->
       let { Query.Untyped. navName; } = navigation in
       let%bind parent = aux ~here ~ctx parent in
-      nav ~univ navName parent
+      navQuery ~univ ~name:navName parent
+
+    | Query.Untyped.Mutation (parent, mut) ->
+      let%bind parentCtx, _ as parent = aux ~here ~ctx parent in
+      let%bind mut = typeMutation ~univ ~query:parent mut in
+      (** TODO: Need to track mutation in type (as effect probably) *)
+      return (parentCtx, Query.Typed.Mutation (parent, mut))
 
     | Query.Untyped.Select (parent, selection) ->
       let%bind parent = aux ~here ~ctx parent in
@@ -271,6 +277,38 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
 
 
   in aux ~here ~ctx query
+
+and typeMutation ~univ ~query mut =
+  let open Run.Syntax in
+  let module Q = Query.Untyped.Syntax in
+  let rec typeOp ~query map key op =
+    let ctx, _ = query in
+    let%bind op = match op with
+    | Query.Untyped.OpUpdate q ->
+      let%bind _ = typeQueryImpl ~univ ~ctx ~here:query Q.(here |> nav key) in
+      let%bind _ = typeQueryImpl ~univ ~ctx ~here:query q in
+      (* TODO: check that types can unified from both nav and value *)
+      return (Query.Typed.OpUpdate q)
+    | Query.Untyped.OpUpdateEntity ops ->
+      let%bind query = typeQueryImpl ~univ ~ctx ~here:query Q.(here |> nav key) in
+      let%bind ops = typeOps ~query ops in
+      return (Query.Typed.OpUpdateEntity ops)
+    | Query.Untyped.OpCreateEntity ops ->
+      let%bind query = typeQueryImpl ~univ ~ctx ~here:query Q.(here |> nav key) in
+      let%bind ops = typeOps ~query ops in
+      return (Query.Typed.OpCreateEntity ops)
+    in
+    return (StringMap.set map key op)
+  and typeOps ~query ops =
+    Run.StringMap.foldLeft ~f:(typeOp ~query) ~init:StringMap.empty ops
+  in
+  match mut with
+  | Query.Untyped.Update ops ->
+    let%bind ops = typeOps ~query ops in
+    return (Query.Typed.Update ops)
+  | Query.Untyped.Create ops ->
+    let%bind ops = typeOps ~query ops in
+    return (Query.Typed.Create ops)
 
 let typeQuery ?ctx ~univ query =
   typeQueryImpl ?ctx ~univ query

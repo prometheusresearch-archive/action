@@ -52,6 +52,7 @@ module Untyped : sig
     | First of t
     | Count of t
     | Screen of (t * screen)
+    | Mutation of (t * mutation)
     | Const of Const.t
     | Where of (t * args)
     | Name of string
@@ -69,6 +70,17 @@ module Untyped : sig
   and select = field list
 
   and field = { alias : string option; query : t; }
+
+  and mutation =
+    | Update of ops
+    | Create of ops
+
+  and ops = op Common.StringMap.t
+
+  and op =
+    | OpUpdate of t
+    | OpUpdateEntity of ops
+    | OpCreateEntity of ops
 
   val show : t -> string
 
@@ -105,6 +117,11 @@ module Untyped : sig
     val lessThan : t -> t -> unit * syntax
     val arg : string -> t -> Arg.arg
     val define : string -> t -> Arg.arg
+    val update : (string * op) list -> t -> t
+    val create : (string * op) list -> t -> t
+    val opUpdate : t -> op
+    val opUpdateEntity : (string * op) list -> op
+    val opCreateEntity : (string * op) list -> op
   end
 end
 
@@ -201,6 +218,7 @@ module Typed : sig
     | First of t
     | Count of t
     | Screen of (t * screen)
+    | Mutation of (t * mutation)
     | Const of Const.t
     | Where of (t * Untyped.args)
     | Name of (string * t)
@@ -216,6 +234,17 @@ module Typed : sig
   and select = field list
 
   and field = { alias : string option; query : t; }
+
+  and mutation =
+    | Update of ops
+    | Create of ops
+
+  and ops = op Common.StringMap.t
+
+  and op =
+    | OpUpdate of Untyped.t
+    | OpUpdateEntity of ops
+    | OpCreateEntity of ops
 
   val stripTypes : t -> Untyped.t
 
