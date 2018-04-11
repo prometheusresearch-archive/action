@@ -29,7 +29,7 @@ module Typed : sig
   (**
   * A mutation is a set of ops, one per field.
   *)
-  type t = op Common.StringMap.t
+  type t
 
   (**
   * Operation on a single field.
@@ -41,6 +41,9 @@ module Typed : sig
     | UpdateEntity of t
     (** Create new entity *)
     | CreateEntity of t
+
+  val ops : t -> (string * op) list
+
 end
 
 module Typer : sig
