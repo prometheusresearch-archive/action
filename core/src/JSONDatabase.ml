@@ -421,7 +421,7 @@ let rec createEntity ~db ~query mut =
   match query with
   | (_, (_, Query.Type.Entity {entityName;_})), _ ->
     let dict = Js.Dict.empty () in
-    let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db query dict) in
+    let%bind () = mut |> Mutation.Typed.ops |> Run.List.iter ~f:(applyMutation ~db query dict) in
     let value = (Value.obj dict) in
     let%bind id = generateEntityId ~db ~name:entityName in
     let%bind () = setEntityInternal ~db ~name:entityName ~id value in
@@ -438,7 +438,7 @@ and updateEntity ~db ~query:queryEntity mut =
   | (_, (Card.Opt, Query.Type.Entity {entityName;_})), _ ->
     let%bind entity = query ~db queryEntity in
     let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-    let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyMutation ~db queryEntity dict) in
+    let%bind () = mut |> Mutation.Typed.ops |> Run.List.iter ~f:(applyMutation ~db queryEntity dict) in
     let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
     let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
     let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in

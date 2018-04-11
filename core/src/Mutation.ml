@@ -37,6 +37,8 @@ module Typed = struct
     | UpdateEntity of t
     | CreateEntity of t
 
+  let ops mut = StringMap.toList mut
+
 end
 
 module Typer = struct
