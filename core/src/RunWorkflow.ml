@@ -82,7 +82,7 @@ module Make (Db : Abstract.DATABASE) = struct
         aux state
       | Workflow.Typed.Render _ ->
         let%bind q = uiQuery state in
-        let%bind ui = Db.execute ~db:frame.db q in
+        let%bind ui = Db.query ~db:frame.db q in
         begin match Value.classify ui with
         | Value.Null -> return None
         | Value.UI _ -> return (Some state)
@@ -97,7 +97,7 @@ module Make (Db : Abstract.DATABASE) = struct
 
     let render (frame, _ as state) =
       let%bind q = uiQuery state in
-      let%bind res = Db.execute ~db:frame.db q in
+      let%bind res = Db.query ~db:frame.db q in
       match Value.classify res with
       | Value.UI ui ->
         let ui = Value.UI.setArgs ~args:frame.args ui in

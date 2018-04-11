@@ -78,7 +78,7 @@ let expectDbToMatchSnapshot db =
 let runQuery ~db q =
   let open Run.Syntax in
   let%bind q = Core.QueryTyper.typeQuery ~univ q in
-  let%bind r = JSONDatabase.execute ~db q in
+  let%bind r = JSONDatabase.query ~db q in
   return r
 
 let unwrapAssertionResult v = match Run.toResult v with

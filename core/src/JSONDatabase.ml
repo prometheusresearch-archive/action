@@ -160,7 +160,7 @@ let formatValue ~ctyp value =
 
   format ~ctyp value
 
-let execute ?value ~db query =
+let query ?value ~db query =
   let open Run.Syntax in
 
   let isRoot value = value == db.value in
@@ -447,6 +447,6 @@ and applyMutation ~db dict =
   | name, Mutation.Update q ->
     let univ = univ db in
     let%bind q = QueryTyper.typeQuery ~univ q in
-    let%bind value = execute ~db q in
+    let%bind value = query ~db q in
     Js.Dict.set dict name value;
     return ()
