@@ -171,7 +171,7 @@ let formatValue ~ctyp value =
 
   format ~ctyp value
 
-let query ?value ~db query =
+let query ?value ~db q =
   let open Run.Syntax in
 
   let isRoot value = value == db.value in
@@ -371,6 +371,14 @@ let query ?value ~db query =
       let%bind value = aux ~value next in
       return value
 
+    | _, Query.Typed.Mutation (parent, Query.Typed.Update ops) ->
+      let%bind _ = updateEntity ~value ~query:parent ops in
+      aux ~value parent
+
+    | _, Query.Typed.Mutation (parent, Query.Typed.Create ops) ->
+      let%bind _ = createEntity ~value ~query:parent ops in
+      aux ~value parent
+
     | _, Query.Typed.LessThan (left, right) ->
       let%bind left = aux ~value left in
       let%bind right = aux ~value right in
@@ -399,6 +407,65 @@ let query ?value ~db query =
       let%bind items = Run.Array.map ~f:resolveRef items in
       return (Value.array items)
     | _ -> return value
+
+  and createEntity ~query ~value mut =
+    match query with
+    | (_, (_, Query.Type.Entity {entityName;_})), _ ->
+      let dict = Js.Dict.empty () in
+      let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query dict) in
+      let value = (Value.obj dict) in
+      let%bind id = generateEntityId ~db ~name:entityName in
+      let%bind () = setEntityInternal ~db ~name:entityName ~id value in
+      return id
+    | (_, ctyp), _ ->
+      let query = Query.Typed.show query in
+      let ctyp = Query.Type.showCt ctyp in
+      executionError {j|createEntity could not be called at $query of type $ctyp|j}
+
+  and updateEntity ~query ~value ops =
+    match query with
+    | (_, (Card.One, Query.Type.Entity {entityName;_})), _
+    | (_, (Card.Opt, Query.Type.Entity {entityName;_})), _ ->
+      let%bind entity = aux ~value query in
+      let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
+      let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query dict) in
+      let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
+      let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
+      let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
+      return id
+    | (_, ctyp), _ ->
+      let query = Query.Typed.show query in
+      let ctyp = Query.Type.showCt ctyp in
+      executionError {j|updateEntity could not be called at $query of type $ctyp|j}
+
+  and applyOp ~value ~query dict =
+    function
+    | key, Query.Typed.OpUpdateEntity ops ->
+      let%bind query =
+        QueryTyper.growQuery
+          ~univ:(univ db)
+          ~base:query
+          Query.Untyped.Syntax.(here |> nav key)
+      in
+      let%bind _ = updateEntity ~value ~query ops in
+      return ()
+    | key, Query.Typed.OpCreateEntity ops ->
+      let%bind query =
+        QueryTyper.growQuery
+          ~univ:(univ db)
+          ~base:query
+          Query.Untyped.Syntax.(here |> nav key)
+      in
+      let%bind id = createEntity ~value ~query ops in
+      Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
+      return ()
+    | key, Query.Typed.OpUpdate q ->
+      let univ = univ db in
+      let%bind q = QueryTyper.growQuery ~univ ~base:query q in
+      let%bind value = aux ~value q in
+      Js.Dict.set dict key value;
+      return ()
+
   in
 
   let value = match value with
@@ -406,73 +473,12 @@ let query ?value ~db query =
   | None -> db.value
   in
 
-  let%bind value = aux ~value query in
+  let%bind value = aux ~value q in
   let%bind value = expandRef value in
 
   let%bind value =
-    let (_, ctyp), _ = query in
+    let (_, ctyp), _ = q in
     formatValue ~ctyp value
   in
 
   return value
-
-let rec createEntity ~db ~query mut =
-  let open Run.Syntax in
-  match query with
-  | (_, (_, Query.Type.Entity {entityName;_})), _ ->
-    let dict = Js.Dict.empty () in
-    let%bind () = mut |> Mutation.Typed.ops |> Run.List.iter ~f:(applyMutation ~db query dict) in
-    let value = (Value.obj dict) in
-    let%bind id = generateEntityId ~db ~name:entityName in
-    let%bind () = setEntityInternal ~db ~name:entityName ~id value in
-    return id
-  | (_, ctyp), _ ->
-    let query = Query.Typed.show query in
-    let ctyp = Query.Type.showCt ctyp in
-    executionError {j|createEntity could not be called at $query of type $ctyp|j}
-
-and updateEntity ~db ~query:queryEntity mut =
-  let open Run.Syntax in
-  match queryEntity with
-  | (_, (Card.One, Query.Type.Entity {entityName;_})), _
-  | (_, (Card.Opt, Query.Type.Entity {entityName;_})), _ ->
-    let%bind entity = query ~db queryEntity in
-    let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-    let%bind () = mut |> Mutation.Typed.ops |> Run.List.iter ~f:(applyMutation ~db queryEntity dict) in
-    let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
-    let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
-    let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
-    return id
-  | (_, ctyp), _ ->
-    let query = Query.Typed.show queryEntity in
-    let ctyp = Query.Type.showCt ctyp in
-    executionError {j|updateEntity could not be called at $query of type $ctyp|j}
-
-and applyMutation ~db baseQuery dict =
-  let open Run.Syntax in
-  function
-  | key, Mutation.Typed.UpdateEntity mut ->
-    let%bind baseQuery =
-      QueryTyper.growQuery
-        ~univ:(univ db)
-        ~base:baseQuery
-        Query.Untyped.Syntax.(here |> nav key)
-    in
-    let%bind _ = updateEntity ~query:baseQuery ~db mut in
-    return ()
-  | key, Mutation.Typed.CreateEntity mut ->
-    let%bind baseQuery =
-      QueryTyper.growQuery
-        ~univ:(univ db)
-        ~base:baseQuery
-        Query.Untyped.Syntax.(here |> nav key)
-    in
-    let%bind id = createEntity ~query:baseQuery ~db mut in
-    Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
-    return ()
-  | name, Mutation.Typed.Update q ->
-    let univ = univ db in
-    let%bind q = QueryTyper.growQuery ~univ ~base:baseQuery q in
-    let%bind value = query ~db q in
-    Js.Dict.set dict name value;
-    return ()

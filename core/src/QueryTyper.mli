@@ -29,9 +29,3 @@ val checkArgsPartial :
   argTyps : Query.Type.args
   -> Query.Untyped.args
   -> (Query.Untyped.args, 'err) comp
-
-val nav :
-  univ:Universe.t
-  -> string
-  -> Query.Typed.t
-  -> (Query.Typed.t, 'err) comp
