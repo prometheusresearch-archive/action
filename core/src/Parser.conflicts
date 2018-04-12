@@ -1,6 +1,6 @@
 
 ** Conflict (shift/reduce) in state 38.
-** Tokens involved: LT LEFT_BRACE DOT COLON
+** Tokens involved: LT LEFT_BRACKET LEFT_BRACE DOT COLON
 ** The following explanations concentrate on token LT.
 ** This state is reached from start after reading:
 

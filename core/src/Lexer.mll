@@ -40,6 +40,8 @@ rule read = parse
   | "create"   { CREATE }
   | "true"     { BOOL true }
   | "false"    { BOOL false }
+  | '['        { LEFT_BRACKET }
+  | ']'        { RIGHT_BRACKET }
   | '{'        { LEFT_BRACE }
   | '}'        { RIGHT_BRACE }
   | '('        { LEFT_PAREN }
