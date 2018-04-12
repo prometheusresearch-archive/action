@@ -3,6 +3,8 @@
 %token VIEW
 %token EDIT
 %token BAR_CHART
+%token UPDATE
+%token CREATE
 %token COUNT
 %token META
 %token FIRST
@@ -62,8 +64,10 @@ query:
   | VOID { S.void }
   | name = ID { S.nav name S.here }
   | COLON; nav = screen { S.screen ~args:nav.args nav.name S.here }
+  | COLON; mut = mutation { mut S.here }
   | VOID; name = ID { S.nav name S.void }
   | VOID; COLON; s = screen { S.screen ~args:s.args s.name S.void }
+  | VOID; COLON; mut = mutation { mut S.void }
   | COLON; COUNT { S.count S.here }
   | parent = query; COLON; COUNT { S.count parent }
   | COLON; META { S.meta S.here }
@@ -72,6 +76,7 @@ query:
   | parent = query; COLON; FIRST { S.first parent }
   | parent = query; DOT; name = ID { S.nav name parent }
   | parent = query; COLON; s = screen { S.screen ~args:s.args s.name parent }
+  | parent = query; COLON; mut = mutation { mut parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
   | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
@@ -87,6 +92,23 @@ nav:
   | name = ID { {name; args = []} }
   | name = ID; LEFT_PAREN; RIGHT_PAREN { {name; args = StringMap.empty} }
   | name = ID; LEFT_PAREN; args = argList; RIGHT_PAREN { {name; args = Some args} }
+
+mutation:
+  | UPDATE; LEFT_BRACE; RIGHT_BRACE { (fun query -> S.update [] query)  }
+  | UPDATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { (fun query -> S.update ops query) }
+  | CREATE; LEFT_BRACE; RIGHT_BRACE { (fun query -> S.create [] query)  }
+  | CREATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { (fun query -> S.create ops query) }
+
+opList:
+  | op = op { [op] }
+  | op = op; COMMA { [op] }
+  | op = op; COMMA; ops = opList { op::ops }
+
+op:
+  | name = ID; COLON; q = query { name, S.opUpdate q }
+  | name = ID; COLON; q = query { name, S.opUpdate q }
+  | name = ID; COLON; UPDATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { name, S.opUpdateEntity ops }
+  | name = ID; COLON; CREATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { name, S.opCreateEntity ops }
 
 screen:
   | PICK { {name = "pick"; args = [] } }

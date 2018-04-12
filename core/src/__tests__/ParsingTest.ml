@@ -63,4 +63,22 @@ let () =
     expectParseOk "1 < 2";
     expectParseOk "null";
 
+    (** Mutations *)
+
+    expectParseOk "individual:update{}";
+    expectParseOk "individual:update{name: true}";
+    expectParseOk "individual:update{name: true, surname: false}";
+    expectParseOk "individual:update{name: true, identity: update { name: false }}";
+    expectParseOk "individual:update{name: true, identity: create { name: false }}";
+    expectParseOk "individual:create{}";
+    expectParseOk "individual:create{name: true}";
+    expectParseOk "individual:create{name: true, surname: false}";
+    expectParseOk "individual:create{name: true, identity: update { name: false }}";
+    expectParseOk "individual:create{name: true, identity: create { name: false }}";
+
+    expectParseOk ":update{}";
+    expectParseOk ":create{}";
+    expectParseOk "/:update{}";
+    expectParseOk "/:create{}";
+
   end;
