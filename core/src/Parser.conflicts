@@ -1,5 +1,5 @@
 
-** Conflict (shift/reduce) in state 44.
+** Conflict (shift/reduce) in state 38.
 ** Tokens involved: LT LEFT_BRACE DOT COLON
 ** The following explanations concentrate on token LT.
 ** This state is reached from start after reading:
@@ -14,18 +14,48 @@ program EOF
 query 
 (?)
 
-** In state 44, looking ahead at LT, shifting is permitted
+** In state 38, looking ahead at LT, shifting is permitted
 ** because of the following sub-derivation:
 
 query LT query 
          query . LT query 
 
-** In state 44, looking ahead at LT, reducing production
+** In state 38, looking ahead at LT, reducing production
 ** query -> query LT query 
 ** is permitted because of the following sub-derivation:
 
 query LT query // lookahead token appears
 query LT query . 
+
+** Conflict (reduce/reduce) in state 36.
+** Tokens involved: RIGHT_BRACE COMMA
+** The following explanations concentrate on token RIGHT_BRACE.
+** This state is reached from start after reading:
+
+COLON UPDATE LEFT_BRACE ID COLON query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+COLON mutation 
+      UPDATE LEFT_BRACE opList RIGHT_BRACE // lookahead token appears
+                        op // lookahead token is inherited
+                        (?)
+
+** In state 36, looking ahead at RIGHT_BRACE, reducing production
+** op -> ID COLON query 
+** is permitted because of the following sub-derivation:
+
+ID COLON query . 
+
+** In state 36, looking ahead at RIGHT_BRACE, reducing production
+** op -> ID COLON query 
+** is permitted because of the following sub-derivation:
+
+ID COLON query . 
 
 ** Conflict (shift/reduce) in state 15.
 ** Token involved: COLON
