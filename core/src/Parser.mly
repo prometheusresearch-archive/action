@@ -17,6 +17,8 @@
 %token RIGHT_BRACE
 %token LEFT_PAREN
 %token RIGHT_PAREN
+%token LEFT_BRACKET
+%token RIGHT_BRACKET
 %token <string> NAME
 %token <string> ID
 %token <string> STRING
@@ -79,6 +81,7 @@ query:
   | parent = query; COLON; mut = mutation { mut parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
+  | parent = query; LEFT_BRACKET; id = query RIGHT_BRACKET { S.locate id parent }
   | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
   | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
   | v = STRING { S.string v }
