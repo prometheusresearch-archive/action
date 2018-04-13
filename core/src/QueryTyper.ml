@@ -178,7 +178,8 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       let%bind ctx, _ as parent =
         let ctx =
           let scope =
-            let f scope name value = StringMap.set scope name (Typed.UntypedBinding value)
+            let f scope name value =
+              StringMap.set scope name (Typed.UntypedBinding value)
             in StringMap.reduce args scope f
           in
           deriveCtx ~scope ctx

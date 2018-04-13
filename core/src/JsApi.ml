@@ -127,12 +127,18 @@ let editScreen =
       arg "value" ~default:(Q.null) (one string);
     ]
     Q.(
+      let title = name "title" in
+      let parent = name "parent" in
+      let mutation =
+        parent
+        |> grow (name "spec")
+      in
       void
       |> select [
-        field ~alias:"mutation" (name "parent" |> grow (name "spec"));
-        field ~alias:"data" (name "parent");
-        field ~alias:"value" (name "parent");
-        field ~alias:"title" (name "title");
+        field ~alias:"mutation" mutation;
+        field ~alias:"data" parent;
+        field ~alias:"value" parent;
+        field ~alias:"title" title;
       ]
     )
   )
