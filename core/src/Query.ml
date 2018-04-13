@@ -96,11 +96,11 @@ module Untyped = struct
     | Screen of (t * screen)
     | Mutation of (t * mutation)
     | Const of Const.t
-    | Where of (t * args)
     | Name of string
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
+    | GrowArgs of (t * args)
     | LessThan of (t * t)
 
   and args = t StringMap.t
@@ -129,9 +129,6 @@ module Untyped = struct
     | OpUpdate of t
     | OpUpdateEntity of ops
     | OpCreateEntity of ops
-
-  let ops mut =
-    StringMap.toList mut
 
   let rec showArgs args =
     let args =
@@ -165,7 +162,11 @@ module Untyped = struct
     | Grow (parent, next) ->
       let parent = show parent in
       let next = show next in
-      {j|$parent:$next|j}
+      {j|$parent:grow($next)|j}
+    | GrowArgs (parent, args) ->
+      let parent = show parent in
+      let args = showArgs args in
+      {j|$parent$args|j}
     | Select (parent, fields) ->
       let parent = show parent in
       let fields =
@@ -197,10 +198,6 @@ module Untyped = struct
       let parent = show parent in
       let id = show id in
       {j|$parent[$id]|j}
-    | Where (parent, args) ->
-      let parent = show parent in
-      let args = showArgs args in
-      {j|$parent:where$args|j}
     | LessThan (left, right) ->
       let left = show left in
       let right = show right in
@@ -258,10 +255,6 @@ module Untyped = struct
     let name name =
       (), Name name
 
-    let where bindings parent =
-      let bindings = Arg.toMap bindings in
-      (), Where (parent, bindings)
-
     let locate id parent =
       (), Locate (parent, id)
 
@@ -270,6 +263,10 @@ module Untyped = struct
 
     let grow next parent =
       (), Grow (parent, next)
+
+    let growArgs args parent =
+      let args = Arg.toMap args in
+      (), GrowArgs (parent, args)
 
     let lessThan left right =
       (), LessThan (left, right)
@@ -343,6 +340,8 @@ module Type = struct
   }
 
   and args = arg StringMap.t
+
+  let void = Card.One, Void
 
   let rec show = function
     | Void -> "void"
@@ -456,19 +455,18 @@ end
  *)
 module Typed = struct
 
-  type t = context * syntax
+  type t = Type.ctyp * syntax
 
-  and context = scope * Type.ctyp
-
-  and scope = binding StringMap.t
+  and scope = binding Common.StringMap.t
 
   and binding =
+    | UntypedBinding of Untyped.t
     | TypedBinding of t
-    | Binding of Untyped.t
+    | HardBinding of t
 
   and syntax =
     | Void
-    | Here
+    | Here of t
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
@@ -476,11 +474,11 @@ module Typed = struct
     | Screen of (t * screen)
     | Mutation of (t * mutation)
     | Const of Const.t
-    | Where of (t * Untyped.args)
     | Name of (string * t)
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
+    | GrowArgs of (t * Untyped.args)
     | LessThan of (t * t)
 
   and nav = { navName : string; }
@@ -498,20 +496,13 @@ module Typed = struct
   }
 
   and mutation =
-    | Update of ops
-    | Create of ops
-
-  and ops = op Common.StringMap.t
-
-  and op =
-    | OpUpdate of Untyped.t
-    | OpUpdateEntity of ops
-    | OpCreateEntity of ops
+    | Update of Untyped.ops
+    | Create of Untyped.ops
 
   let rec stripTypes (q : t) =
     match q with
     | _, Void -> (), Untyped.Void
-    | _, Here -> (), Untyped.Here
+    | _, Here _ -> (), Untyped.Here
     | _, Select (parent, fields) ->
       let fields =
         let f {alias; query} = {Untyped. alias; query = stripTypes query} in
@@ -524,49 +515,28 @@ module Typed = struct
     | _, Count parent -> (), Untyped.Count (stripTypes parent)
     | _, Screen (parent, { screenName; screenArgs; }) ->
       (), Untyped.Screen (stripTypes parent, {Untyped. screenName; screenArgs; })
+    | _, Mutation (parent, Update ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Update ops)
+    | _, Mutation (parent, Create ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Create ops)
     | _, Const v -> (), Untyped.Const v
-    | _, Where (parent, bindings) -> (), Untyped.Where (stripTypes parent, bindings)
     | _, Name (name, _) -> (), Untyped.Name name
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
     | _, Meta parent -> (), Untyped.Meta (stripTypes parent)
     | _, Grow (parent, next) -> (), Untyped.Grow (stripTypes parent, stripTypes next)
+    | _, GrowArgs (parent, args) -> (), Untyped.GrowArgs (stripTypes parent, args)
     | _, LessThan (left, right) ->
       (), Untyped.LessThan (stripTypes left, stripTypes right)
 
   let show q =
     Untyped.show (stripTypes q)
 
-  module Context = struct
-
-    type t = context
-
-    let void = StringMap.empty, (Card.One, Type.Void)
-
-    let bindings ctx =
-      let bindings, _ = ctx in
-      bindings
-
-    let addBindings ~bindings ctx =
-      let currBindings, ctyp = ctx in
-      let nextBindings =
-        let f _k a b = match a, b with
-        | Some a, None -> Some a
-        | None, Some b -> Some b
-        | Some _, Some b -> Some b
-        | None, None -> None
-        in
-        StringMap.merge currBindings bindings f
-      in
-      nextBindings, ctyp
-
+  module Scope = struct
+    include StringMap
   end
 
-  let void = Context.void, Void
-
+  let void = Type.void, Void
 
   let ctyp (q : t) =
-    let ctx, _ = q in
-    let _, ctyp = ctx in
+    let ctyp, _ = q in
     ctyp
 
   let card (q : t) =

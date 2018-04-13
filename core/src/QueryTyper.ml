@@ -1,4 +1,7 @@
 module Type = Query.Type
+module Typed = Query.Typed
+module Scope = Query.Typed.Scope
+module Untyped = Query.Untyped
 module StringMap = Common.StringMap
 module Result = Common.Result
 module Option = Common.Option
@@ -33,12 +36,13 @@ let rec extractField ~univ fieldName (typ : Type.t) =
 
 let navQuery ~univ ~name parent =
   let open Run.Syntax in
-  let navigation = { Query.Typed. navName = name; } in
-  let (scope, (parentCard, parentTyp)), _parentSyn = parent in
+  let navigation = { Typed. navName = name; } in
+  let (parentCard, parentTyp), _parentSyn = parent in
   let%bind field = extractField ~univ name parentTyp in
   let fieldCard, fieldTyp = field.fieldCtyp in
   let fieldCard = Query.Card.merge parentCard fieldCard in
-  return ((scope, (fieldCard, fieldTyp)), Query.Typed.Navigate (parent, navigation))
+  let ctx = fieldCard, fieldTyp in
+  return (ctx, Typed.Navigate (parent, navigation))
 
 let rec checkArgsImpl
   ~updateWithDefaultValues
@@ -77,100 +81,115 @@ let rec checkArgsImpl
   in
   return args
 
-and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
-  let rec aux ~here ~ctx ((), query) =
-    let scope, ctyp = ctx in
+and typeQueryImpl ?(ctyp=Type.void) ?(scope=Scope.empty) ~univ query =
+  let rec aux ~ctyp ~scope ((), syn) =
     let open Run.Syntax in
-    match query with
-    | Query.Untyped.Void ->
-      return ((scope, (Query.Card.One, Type.Void)), Query.Typed.Void)
-    | Query.Untyped.Here ->
-      begin match here with
-      | Some here -> return here
-      | None -> return (ctx, Query.Typed.Here)
+    let typedQuery = match syn with
+
+    | Untyped.Void ->
+      return (Query.Type.void, Typed.Void)
+
+    | Untyped.Here ->
+
+      begin match StringMap.get scope "here" with
+      | Some (Typed.UntypedBinding query) ->
+        let%bind query = aux ~ctyp ~scope query in
+        let ctyp, _ = query in
+        return (ctyp, Typed.Here query)
+      | Some (Typed.TypedBinding query) ->
+        let ctyp, _ = query in
+        return (ctyp, Typed.Here query)
+      | Some (Typed.HardBinding query) ->
+        return query
+      | None -> return (Query.Type.void, Typed.Void)
       end
-    | Query.Untyped.Locate (parent, id) ->
-      let%bind ((bindings, (card, typ)), _) as parent = aux ~here ~ctx parent in
+
+    | Untyped.Locate (parent, id) ->
+      let%bind (card, typ), _ as parent = aux ~ctyp ~scope parent in
       begin match card with
       | Query.Card.Many ->
-        let%bind id = aux ~here ~ctx id in
-        return ((bindings, (Query.Card.Opt, typ)), Query.Typed.Locate (parent, id))
+        let%bind id = aux ~ctyp ~scope id in
+        let ctx = Query.Card.Opt, typ in
+        return (ctx, Typed.Locate (parent, id))
       | _ ->
         queryTypeError {j|locate can only be applied to queries with cardinality many|j}
       end
 
-    | Query.Untyped.Meta parent ->
-      let%bind (scope, _ctyp), _ as parent = aux ~here ~ctx parent in
-      return ((scope, Type.ctyp), Query.Typed.Meta parent)
+    | Untyped.Meta parent ->
+      let%bind parent = aux ~ctyp ~scope parent in
+      return (Type.ctyp, Typed.Meta parent)
 
-    | Query.Untyped.Grow (parent, next) ->
-      let%bind ctx, _ as parent = aux ~here ~ctx parent in
-      let%bind ctx, _ as next = aux ~here ~ctx next in
-      return (ctx, Query.Typed.Grow (parent, next))
+    | Untyped.Grow (parent, next) ->
+      let%bind ctyp, _ as parent = aux ~ctyp ~scope parent in
+      let scope = Scope.set scope "here" (Typed.HardBinding parent) in
+      let%bind ctyp, _ as next = aux ~ctyp ~scope next in
+      return (ctyp, Typed.Grow (parent, next))
 
-    | Query.Untyped.Name name ->
-      begin match StringMap.get scope name with
-      | Some (Query.Typed.Binding query) ->
-        let%bind nextCtx, _syn as query = aux ~here ~ctx query in
-        return (nextCtx, Query.Typed.Name (name, query))
-      | Some (Query.Typed.TypedBinding query) ->
-        let nextCtx, _syn = query in
-        let nextCtx =
-          Query.Typed.Context.addBindings
-            ~bindings:(Query.Typed.Context.bindings ctx)
-            nextCtx
+    | Untyped.GrowArgs (parent, args) ->
+      let%bind ctyp, _ as parent = aux ~ctyp ~scope parent in
+      begin match ctyp with
+      | _, Type.Screen { screenName; _ } ->
+        let%bind screen = liftResult (Universe.lookupScreenResult screenName univ) in
+        let%bind args = checkArgsImpl
+          ~updateWithDefaultValues:false
+          ~argTyps:screen.args args
         in
-        return (nextCtx, Query.Typed.Name (name, query))
+        return (ctyp, Typed.GrowArgs (parent, args))
+      | ctyp ->
+        let ctyp = Type.showCt ctyp in
+        queryTypeError {j|unable to grow arguments on $ctyp|j}
+      end
+
+    | Untyped.Name name ->
+      begin match StringMap.get scope name with
+      | Some (Typed.UntypedBinding query) ->
+        let%bind ctyp, _syn as query = aux ~ctyp ~scope query in
+        return (ctyp, Typed.Name (name, query))
+      | Some (Typed.TypedBinding query)
+      | Some (Typed.HardBinding query) ->
+        let ctyp, _syn = query in
+        return (ctyp, Typed.Name (name, query))
       | None ->
         queryTypeError {j|referencing unknown binding "$name"|j}
       end
 
-    | Query.Untyped.Where (parent, bindings) ->
-      let nextScope =
-        let f scope name query =
-          StringMap.set scope name (Query.Typed.Binding query)
-        in
-        StringMap.reduce bindings scope f
-      in
-      let%bind ((_, parentCtyp), _) as parent = aux ~here ~ctx:(nextScope, ctyp) parent in
+    | Untyped.Const (Query.Const.String v) ->
       return (
-        (scope, parentCtyp),
-        Query.Typed.Where (parent, bindings)
+        (Query.Card.One, Type.Value Type.String),
+        Typed.Const (Query.Const.String v)
       )
-    | Query.Untyped.Const (Query.Const.String v) ->
+    | Untyped.Const (Query.Const.Number v) ->
       return (
-        (scope, (Query.Card.One, Type.Value Type.String)),
-        Query.Typed.Const (Query.Const.String v)
+        (Query.Card.One, Type.Value Type.Number),
+        Typed.Const (Query.Const.Number v)
       )
-    | Query.Untyped.Const (Query.Const.Number v) ->
+    | Untyped.Const (Query.Const.Bool v) ->
       return (
-        (scope, (Query.Card.One, Type.Value Type.Number)),
-        Query.Typed.Const (Query.Const.Number v)
+        (Query.Card.One, Type.Value Type.Bool),
+        Typed.Const (Query.Const.Bool v)
       )
-    | Query.Untyped.Const (Query.Const.Bool v) ->
+    | Untyped.Const (Query.Const.Null) ->
       return (
-        (scope, (Query.Card.One, Type.Value Type.Bool)),
-        Query.Typed.Const (Query.Const.Bool v)
+        (Query.Card.Opt, Type.Value Type.Null),
+        Typed.Const (Query.Const.Null)
       )
-    | Query.Untyped.Const (Query.Const.Null) ->
+
+    | Untyped.Count parent ->
+      let%bind parent = aux ~ctyp ~scope parent in
       return (
-        (scope, (Query.Card.Opt, Type.Value Type.Null)),
-        Query.Typed.Const (Query.Const.Null)
+        (Query.Card.One, Type.Syntax.number),
+        Typed.Count parent
       )
-    | Query.Untyped.Count parent ->
-      let%bind parent = aux ~here ~ctx parent in
+
+    | Untyped.First parent ->
+      let%bind (_, parentTyp), _ as parent = aux ~ctyp ~scope parent in
       return (
-        (scope, (Query.Card.One, Type.Syntax.number)),
-        Query.Typed.Count parent
+        (Query.Card.Opt, parentTyp),
+        Typed.First parent
       )
-    | Query.Untyped.First parent ->
-      let%bind ((_, (_, parentType)), _) as parent = aux ~here ~ctx parent in
-      return (
-        (scope, (Query.Card.Opt, parentType)),
-        Query.Typed.First parent
-      )
-    | Query.Untyped.Screen (parent, { screenName; screenArgs; }) ->
-      let%bind (parentCtx, _) as parent = aux ~here ~ctx parent in
+
+    | Untyped.Screen (parent, { screenName; screenArgs; }) ->
+      let%bind parentCtyp, _ as parent = aux ~ctyp ~scope parent in
       let%bind screen = liftResult (Universe.lookupScreenResult screenName univ) in
 
       let%bind screenArgs = checkArgsImpl
@@ -178,7 +197,8 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
         ~argTyps:screen.args screenArgs
       in
 
-      let parentScope, (card, _typ) = parentCtx in
+      let (card, _typ) = parentCtyp in
+
       begin match (screen.inputCard, card) with
       | Query.Card.One, Query.Card.Many
       | Query.Card.Opt, Query.Card.Many
@@ -191,68 +211,76 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
       | Query.Card.Opt, Query.Card.One
       | Query.Card.Many, Query.Card.Many ->
 
-        let%bind (_, screenOut), _ =
-          let bindings =
-            let bindings = StringMap.map screenArgs (fun a -> Query.Typed.Binding a) in
-            let bindings = match StringMap.get parentScope "parent" with
-            | Some _ -> bindings
-            | None -> StringMap.set bindings "parent" (TypedBinding parent)
+        let%bind screenOut, _ =
+          let scope =
+            let scope =
+              let f scope name q = Scope.set scope name (Typed.UntypedBinding q) in
+              Scope.reduce screenArgs scope f
             in
+            let scope = Scope.set scope "here" (Typed.HardBinding parent) in
+            let bindings = Scope.set scope "parent" (Typed.TypedBinding parent) in
             bindings
           in
-          let ctx = Query.Typed.Context.addBindings ~bindings parentCtx in
-          aux ~here:(Some parent) ~ctx screen.grow
+          Run.context (
+            let msg = {j|While expanding screen|j} in
+            `QueryTypeError msg
+          ) (
+            aux ~ctyp:parentCtyp ~scope screen.grow
+          )
         in
 
-        let ctx = (
-          parentScope,
-          (
-            Query.Card.One,
-            Type.Screen { screenName; screenOut; }
-          )
+        let ctyp = (
+          Query.Card.One,
+          Type.Screen { screenName; screenOut; }
         ) in
-        let syn = Query.Typed.Screen (parent, { screenName; screenArgs; }) in
-        return (ctx, syn)
+        let syn = Typed.Screen (parent, { screenName; screenArgs; }) in
+        return (ctyp, syn)
       end
 
-    | Query.Untyped.Navigate (parent, navigation) ->
-      let { Query.Untyped. navName; } = navigation in
-      let%bind parent = aux ~here ~ctx parent in
+    | Untyped.Navigate (parent, navigation) ->
+      let { Untyped. navName; } = navigation in
+      let%bind parent = aux ~ctyp ~scope parent in
       navQuery ~univ ~name:navName parent
 
-    | Query.Untyped.Mutation (parent, mut) ->
-      let%bind parentCtx, _ as parent = aux ~here ~ctx parent in
-      let%bind mut = typeMutation ~univ ~query:parent mut in
+    | Untyped.Mutation (parent, mut) ->
+      let%bind parentCtyp, _ as parent = aux ~ctyp ~scope parent in
+      let scope = Scope.set scope "here" (Typed.HardBinding parent) in
+      let%bind mut = typeMutation ~univ ~ctyp:parentCtyp ~scope mut in
       (** TODO: Need to track mutation in type (as effect probably) *)
-      return (parentCtx, Query.Typed.Mutation (parent, mut))
+      return (parentCtyp, Typed.Mutation (parent, mut))
 
-    | Query.Untyped.Select (parent, selection) ->
-      let%bind parent = aux ~here ~ctx parent in
+    | Untyped.Select (parent, selection) ->
+      let%bind parent = aux ~ctyp ~scope parent in
       let parentCtx, _parentSyn = parent in
-      let parentScope, (parentCard, _parentTyp) = parentCtx in
-      let checkField (fields, selection, index) { Query.Untyped. alias; query } =
-        let%bind query = aux ~here:None ~ctx:parentCtx query in
-        let (_fieldScope, (fieldCard, fieldTyp)), _fieldSyn = query in
-        let fieldName = Option.getWithDefault (string_of_int index) alias in
-        let fieldCard = Query.Card.merge parentCard fieldCard in
-        let fieldCtyp = fieldCard, fieldTyp in
-        let field = { Type. fieldCtyp; fieldName; fieldArgs = StringMap.empty } in
-        let selectionField = { Query.Typed. alias; query; } in
-        return (field::fields, selectionField::selection, index + 1)
+      let (parentCard, _parentTyp) = parentCtx in
+      let checkField (fields, selection, index) { Untyped. alias; query } =
+        let res =
+          let scope = Scope.set scope "here" (Typed.TypedBinding parent) in
+          let%bind query = aux ~ctyp ~scope query in
+          let (fieldCard, fieldTyp), _fieldSyn = query in
+          let fieldName = Option.getWithDefault (string_of_int index) alias in
+          let fieldCard = Query.Card.merge parentCard fieldCard in
+          let fieldCtyp = fieldCard, fieldTyp in
+          let field = { Type. fieldCtyp; fieldName; fieldArgs = StringMap.empty } in
+          let selectionField = { Typed. alias; query; } in
+          return (field::fields, selectionField::selection, index + 1)
+        in
+        Run.context (`QueryTypeError {j|While typing field `$alias`|j}) res
       in
       let%bind (fields, selection, _) =
         let init = ([], [], 0) in
         Run.List.foldLeft ~f:checkField ~init selection
       in
       let typ = Type.Record fields in
-      return ((parentScope, (parentCard, typ)), Query.Typed.Select (parent, selection))
+      let ctyp = parentCard, typ in
+      return (ctyp, Typed.Select (parent, selection))
 
-    | Query.Untyped.LessThan (left, right) ->
-      let%bind left = aux ~here ~ctx left in
-      let%bind right = aux ~here ~ctx right in
-      let syn = Query.Typed.LessThan (left, right) in
+    | Untyped.LessThan (left, right) ->
+      let%bind left = aux ~ctyp ~scope left in
+      let%bind right = aux ~ctyp ~scope right in
+      let syn = Typed.LessThan (left, right) in
       let%bind card =
-        match Query.Typed.card left, Query.Typed.card right with
+        match Typed.card left, Typed.card right with
         | Query.Card.One, Query.Card.One -> return Query.Card.One
         | Query.Card.Opt, Query.Card.One
         | Query.Card.One, Query.Card.Opt
@@ -261,7 +289,7 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
           queryTypeError "'<' cardinality mismatch: expected one / opt"
       in
       let%bind () =
-        match Query.Typed.typ left, Query.Typed.typ right with
+        match Typed.typ left, Typed.typ right with
         | Type.Value Type.Number, Type.Value Type.Number
         | Type.Value Type.Number, Type.Value Type.Null
         | Type.Value Type.Null, Type.Value Type.Number
@@ -273,53 +301,61 @@ and typeQueryImpl ?here ?(ctx=Query.Typed.Context.void) ~univ query =
       (* TODO:
         * Handler for Query.Card.Many < Query.Card.One etc
         * *)
-      return ((scope, (card, Type.Value Type.Bool)), syn)
+      return ((card, Type.Value Type.Bool), syn)
 
+    in
 
-  in aux ~here ~ctx query
+    let msg =
+      let query = Untyped.show ((), syn) in
+      let msg = {j|While typing query `$query`|j} in
+      `QueryTypeError msg
+    in
+    Run.context msg typedQuery
 
-and typeMutation ~univ ~query mut =
+  in
+
+  aux ~ctyp ~scope query
+
+and typeMutation ~univ ~ctyp ~scope mut =
   let open Run.Syntax in
-  let module Q = Query.Untyped.Syntax in
-  let rec typeOp ~query map key op =
-    let ctx, _ = query in
+  let module Q = Untyped.Syntax in
+  let rec typeOp ~ctyp map key op =
     let%bind op = match op with
-    | Query.Untyped.OpUpdate q ->
-      let%bind _ = typeQueryImpl ~univ ~ctx ~here:query Q.(here |> nav key) in
-      let%bind _ = typeQueryImpl ~univ ~ctx ~here:query q in
+    | Untyped.OpUpdate q ->
+      let%bind _ = typeQueryImpl ~univ ~ctyp ~scope Q.(here |> nav key) in
+      let%bind _ = typeQueryImpl ~univ ~ctyp ~scope q in
       (* TODO: check that types can unified from both nav and value *)
-      return (Query.Typed.OpUpdate q)
-    | Query.Untyped.OpUpdateEntity ops ->
-      let%bind query = typeQueryImpl ~univ ~ctx ~here:query Q.(here |> nav key) in
-      let%bind ops = typeOps ~query ops in
-      return (Query.Typed.OpUpdateEntity ops)
-    | Query.Untyped.OpCreateEntity ops ->
-      let%bind query = typeQueryImpl ~univ ~ctx ~here:query Q.(here |> nav key) in
-      let%bind ops = typeOps ~query ops in
-      return (Query.Typed.OpCreateEntity ops)
+      return (Untyped.OpUpdate q)
+    | Untyped.OpUpdateEntity ops ->
+      let%bind ctyp, _ = typeQueryImpl ~univ ~ctyp ~scope Q.(here |> nav key) in
+      let%bind ops = typeOps ~ctyp ops in
+      return (Untyped.OpUpdateEntity ops)
+    | Untyped.OpCreateEntity ops ->
+      let%bind ctyp, _ = typeQueryImpl ~univ ~ctyp ~scope Q.(here |> nav key) in
+      let%bind ops = typeOps ~ctyp ops in
+      return (Untyped.OpCreateEntity ops)
     in
     return (StringMap.set map key op)
-  and typeOps ~query ops =
-    Run.StringMap.foldLeft ~f:(typeOp ~query) ~init:StringMap.empty ops
+  and typeOps ~ctyp ops =
+    Run.StringMap.foldLeft ~f:(typeOp ~ctyp) ~init:StringMap.empty ops
   in
   match mut with
-  | Query.Untyped.Update ops ->
-    let%bind ops = typeOps ~query ops in
-    return (Query.Typed.Update ops)
-  | Query.Untyped.Create ops ->
-    let%bind ops = typeOps ~query ops in
-    return (Query.Typed.Create ops)
+  | Untyped.Update ops ->
+    let%bind ops = typeOps ~ctyp ops in
+    return (Typed.Update ops)
+  | Untyped.Create ops ->
+    let%bind ops = typeOps ~ctyp ops in
+    return (Typed.Create ops)
 
-let typeQuery ?ctx ~univ query =
-  typeQueryImpl ?ctx ~univ query
+let typeQuery ?ctyp ?(scope=Scope.empty) ~univ query =
+  typeQueryImpl ?ctyp ~scope ~univ query
 
-let growQuery ?bindings ~univ ~base query =
-  let ctx, _ = base in
-  let ctx = match bindings with
-  | Some bindings -> Query.Typed.Context.addBindings ~bindings ctx
-  | None -> ctx
-  in
-  typeQueryImpl ~here:base ~ctx ~univ query
+let growQuery ~univ ?(scope=Scope.empty) ~base query =
+  let open Run.Syntax in
+  let ctyp, _ = base in
+  let scope = Scope.set scope "here" (Typed.HardBinding base) in
+  let%bind ctyp, _ as query = typeQueryImpl ~ctyp ~scope ~univ query in
+  return (ctyp, Typed.Grow (base, query))
 
 let checkArgs ~argTyps args =
   checkArgsImpl ~updateWithDefaultValues:true ~argTyps args

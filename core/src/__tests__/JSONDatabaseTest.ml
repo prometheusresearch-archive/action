@@ -136,6 +136,26 @@ let () =
       |})
     end;
 
+    test "region { label: name }" begin fun () ->
+      let q = Q.(
+        here
+        |> nav "region"
+        |> select [
+          field ~alias:"label" (here |> nav "name");
+        ]
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "label": "America"
+          },
+          {
+            "label": "Asia"
+          }
+        ]
+      |})
+    end;
+
     test "{ regions: region }" begin fun () ->
       let q = Q.(
         here

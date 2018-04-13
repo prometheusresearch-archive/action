@@ -26,7 +26,21 @@ val error : 'errctx -> ('a, 'errctx) t
  *)
 val context : 'errctx -> ('a, 'errctx) t -> ('a, 'errctx) t
 
+(**
+ * Unwrap computation into a result value preserving only final error message if
+   * any.
+ *
+ * Use toResultWithContext if you need to preserve error context as well.
+ *)
 val toResult : ('a, 'errctx) t -> ('a, 'errctx) Js.Result.t
+
+(**
+ * Unwrap computation into a result value.
+ *
+ * The error case would contain a pair of a final error message and a list of
+ * context messages.
+ *)
+val toResultWithContext : ('a, 'errctx) t -> ('a, 'errctx * 'errctx list) Js.Result.t
 
 (**
  * A module which is designed to be openned locally for functions which perform

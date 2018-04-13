@@ -48,14 +48,7 @@ module Typer = struct
       match w with
       | Untyped.Render q ->
         let%bind tq = QueryTyper.growQuery ~univ ~base:parent q in
-        begin match tq with
-        | _, Query.Typed.Screen _ ->
-          return (Typed.Render q, tq)
-        | q ->
-          let q = Query.Typed.show q in
-          let msg = {j|workflow can only be defined on screen syntax but got $q|j} in
-          workflowTypeError msg
-        end
+        return (Typed.Render q, tq)
       | Untyped.Next (first, next) ->
         let%bind first, parent = aux ~parent first in
         let%bind next, _ =
