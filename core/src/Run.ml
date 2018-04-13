@@ -17,6 +17,10 @@ let toResult = function
   | R.Ok v -> R.Ok v
   | R.Error (first, _rest) -> R.Error first
 
+let toResultWithContext = function
+  | R.Ok v -> R.Ok v
+  | R.Error (first, rest) -> R.Error (first, rest)
+
 module Syntax = struct
 
   let return = return

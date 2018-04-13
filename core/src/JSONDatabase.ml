@@ -185,7 +185,7 @@ let query ?value ~db q =
         return value
       | None ->
         let msg = {j|no such key "$name"|j} in
-        Js.log3 "ERROR:" msg [%bs.obj { data = value; key = name; }];
+        (* Js.log3 "ERROR:" msg [%bs.obj { data = value; key = name; }]; *)
         executionError msg
       end
     | Value.Null -> return Value.null
@@ -199,22 +199,20 @@ let query ?value ~db q =
       return (Value.array value)
     | _ -> executionError "invalid db structure: expected an entity collection"
 
-  and aux ~(value : Value.t) ((_bindings, (_card, typ)), syn) =
+  and aux ~(value : Value.t) ((_card, typ), syn as q) =
 
-    match typ, syn with
+    let value = match typ, syn with
     | Type.Void, Query.Typed.Void ->
       return db.value
+
     | _, Query.Typed.Void ->
       executionError "invalid type for void"
 
-    | _, Query.Typed.Here ->
+    | _, Query.Typed.Here _ ->
       return value
 
     | _, Query.Typed.Name (_name, query) ->
       aux ~value query
-
-    | _, Query.Typed.Where (parent, _bindings) ->
-      aux ~value parent
 
     | Type.Value Type.String, Query.Typed.Const (Const.String v) ->
       return (Value.string v)
@@ -268,10 +266,9 @@ let query ?value ~db q =
           return (Value.ui ui)
       in
 
-      (* If package expects cardinality One we do a prefetch, ideally we
-        * should prefetch just exists(query) instead of query itself so we
-        * can minimize the work for db to do.
-        *)
+      (* XXX: ideally we should prefetch just exists(query) instead of query
+       * itself so we can minimize the work for db to do.
+       *)
       let%bind prefetch = aux ~value query in
       begin match Value.classify prefetch with
       | Value.Null -> return Value.null
@@ -363,13 +360,23 @@ let query ?value ~db q =
         executionError {j|expected array|j}
       end
 
-    | _, Query.Typed.Meta ((_,ctyp),_) ->
+    | _, Query.Typed.Meta (ctyp, _) ->
       return (Value.ofCtyp ctyp)
 
     | _, Query.Typed.Grow (parent, next) ->
       let%bind value = aux ~value parent in
       let%bind value = aux ~value next in
       return value
+
+    | _, Query.Typed.GrowArgs (parent, args) ->
+      let%bind value = aux ~value parent in
+      begin match Value.classify value with
+      | Value.UI ui ->
+        let ui = Value.UI.setArgs ~args ui in
+        return (Value.ui ui)
+      | _ ->
+        executionError "unable to grow args"
+      end
 
     | _, Query.Typed.Mutation (parent, Query.Typed.Update ops) ->
       let%bind _ = updateEntity ~value ~query:parent ops in
@@ -394,6 +401,14 @@ let query ?value ~db q =
           executionError "'<' type mismatch ..."
       end
 
+    in
+
+    Run.context (
+      let query = Query.Typed.show q in
+      let msg = {j|While evaluating $query|j} in
+      `DatabaseError msg
+    ) value
+
   and expandRef value =
     let resolveRef value =
       match Ref.ofValue value with
@@ -410,37 +425,37 @@ let query ?value ~db q =
 
   and createEntity ~query ~value mut =
     match query with
-    | (_, (_, Query.Type.Entity {entityName;_})), _ ->
+    | (_, Query.Type.Entity {entityName;_}), _ ->
       let dict = Js.Dict.empty () in
       let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query dict) in
       let value = (Value.obj dict) in
       let%bind id = generateEntityId ~db ~name:entityName in
       let%bind () = setEntityInternal ~db ~name:entityName ~id value in
       return id
-    | (_, ctyp), _ ->
+    | ctyp, _ ->
       let query = Query.Typed.show query in
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|createEntity could not be called at $query of type $ctyp|j}
 
   and updateEntity ~query ~value ops =
     match query with
-    | (_, (Card.One, Query.Type.Entity {entityName;_})), _
-    | (_, (Card.Opt, Query.Type.Entity {entityName;_})), _ ->
+    | (Card.One, Query.Type.Entity {entityName;_}), _
+    | (Card.Opt, Query.Type.Entity {entityName;_}), _ ->
       let%bind entity = aux ~value query in
       let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-      let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query dict) in
+      let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value:entity ~query dict) in
       let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
       let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
       let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
       return id
-    | (_, ctyp), _ ->
+    | ctyp, _ ->
       let query = Query.Typed.show query in
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|updateEntity could not be called at $query of type $ctyp|j}
 
   and applyOp ~value ~query dict =
     function
-    | key, Query.Typed.OpUpdateEntity ops ->
+    | key, Query.Untyped.OpUpdateEntity ops ->
       let%bind query =
         QueryTyper.growQuery
           ~univ:(univ db)
@@ -449,7 +464,7 @@ let query ?value ~db q =
       in
       let%bind _ = updateEntity ~value ~query ops in
       return ()
-    | key, Query.Typed.OpCreateEntity ops ->
+    | key, Query.Untyped.OpCreateEntity ops ->
       let%bind query =
         QueryTyper.growQuery
           ~univ:(univ db)
@@ -459,7 +474,7 @@ let query ?value ~db q =
       let%bind id = createEntity ~value ~query ops in
       Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
       return ()
-    | key, Query.Typed.OpUpdate q ->
+    | key, Query.Untyped.OpUpdate q ->
       let univ = univ db in
       let%bind q = QueryTyper.growQuery ~univ ~base:query q in
       let%bind value = aux ~value q in
@@ -477,7 +492,7 @@ let query ?value ~db q =
   let%bind value = expandRef value in
 
   let%bind value =
-    let (_, ctyp), _ = q in
+    let ctyp, _ = q in
     formatValue ~ctyp value
   in
 

@@ -7,14 +7,15 @@ type error = [ `QueryTypeError of string ]
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
 val typeQuery :
-  ?ctx : Query.Typed.context
+  ?ctyp : Query.Type.ctyp
+  -> ?scope : Query.Typed.scope
   -> univ:Universe.t
   -> Query.Untyped.t
   -> (Query.Typed.t, 'err) comp
 
 val growQuery :
-  ?bindings : Query.Typed.scope
-  -> univ : Universe.t
+  univ : Universe.t
+  -> ?scope : Query.Typed.scope
   -> base : Query.Typed.t
   -> Query.Untyped.t
   -> (Query.Typed.t, 'err) comp

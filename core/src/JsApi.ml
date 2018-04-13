@@ -9,22 +9,38 @@ module Result = Common.Result
 
 module WorkflowInterpreter = RunWorkflow.Make(JSONDatabase)
 
-let runToResult v = match Run.toResult v with
+let formatContext ctx =
+  let line = function
+    | `DatabaseError err
+    | `QueryTypeError err
+    | `RunWorkflowError err
+    | `WorkflowTypeError err
+    | `ParseError err -> err
+  in
+  ctx |> List.rev |> List.map line |> String.concat "\n"
+
+let runToResult v =
+  match Run.toResultWithContext v with
   | Result.Ok v -> Result.Ok v
-  | Result.Error (`DatabaseError err) ->
-    let msg = {j|DatabaseError: $err|j} in
+  | Result.Error (`DatabaseError err, ctx) ->
+    let ctx = formatContext ctx in
+    let msg = {j|DatabaseError: $err\nContext: $ctx|j} in
     Result.Error msg
-  | Result.Error (`RunWorkflowError err) ->
-    let msg = {j|WorkflowError: $err|j} in
+  | Result.Error (`RunWorkflowError err, ctx) ->
+    let ctx = formatContext ctx in
+    let msg = {j|WorkflowError: $err\nContext: $ctx|j} in
     Result.Error msg
-  | Result.Error (`WorkflowTypeError err) ->
-    let msg = {j|WorkflowTypeError: $err|j} in
+  | Result.Error (`WorkflowTypeError err, ctx) ->
+    let ctx = formatContext ctx in
+    let msg = {j|WorkflowTypeError: $err\nContext: $ctx|j} in
     Result.Error msg
-  | Result.Error (`QueryTypeError err) ->
-    let msg = {j|QueryTypeError: $err|j} in
+  | Result.Error (`QueryTypeError err, ctx) ->
+    let ctx = formatContext ctx in
+    let msg = {j|QueryTypeError: $err\nContext: $ctx|j} in
     Result.Error msg
-  | Result.Error (`ParseError err) ->
-    let msg = {j|ParseError: $err|j} in
+  | Result.Error (`ParseError err, ctx) ->
+    let ctx = formatContext ctx in
+    let msg = {j|ParseError: $err\nContext: $ctx|j} in
     Result.Error msg
 
 module JsResult = struct

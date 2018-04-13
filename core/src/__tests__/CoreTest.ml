@@ -5,16 +5,35 @@ open! Expect.Operators
 module Result = Common.Result
 
 module Q = Query.Untyped.Syntax
+module W = Workflow.Untyped.Syntax
 
 let univ = JsApi.univ
 let db = JsApi.db
 
-let runToResult v = match Run.toResult v with
+let errorMessage = function
+  | `DatabaseError err
+  | `RunWorkflowError err
+  | `WorkflowTypeError err
+  | `QueryTypeError err -> err
+
+let runToResult v =
+  let formatContext ctx =
+    ctx
+    |> List.rev
+    |> List.map (fun err -> let err = errorMessage err in {j|  $err|j})
+    |> String.concat "\n"
+  in
+  let formatError kind msg ctx =
+    let ctx = formatContext ctx in
+    let msg = {j|$kind: $msg\nContext:\n$ctx|j} in
+    Result.Error msg
+  in
+  match Run.toResultWithContext v with
   | Result.Ok v -> Result.Ok v
-  | Result.Error (`DatabaseError err) -> Result.Error err
-  | Result.Error (`RunWorkflowError err) -> Result.Error err
-  | Result.Error (`WorkflowTypeError err) -> Result.Error err
-  | Result.Error (`QueryTypeError err) -> Result.Error err
+  | Result.Error (`DatabaseError msg, ctx) -> formatError "DatabaseError" msg ctx
+  | Result.Error (`RunWorkflowError msg, ctx) -> formatError "RunWorkflowError" msg ctx
+  | Result.Error (`WorkflowTypeError msg, ctx) -> formatError "WorkflowTypeError" msg ctx
+  | Result.Error (`QueryTypeError msg, ctx) -> formatError "QueryTypeError" msg ctx
 
 let runResult result = match result with
   | Result.Ok () -> ()
@@ -31,6 +50,14 @@ let expectQueryOk query =
     let open Run.Syntax in
     let%bind query = QueryTyper.typeQuery ~univ query in
     let%bind _result = JSONDatabase.query ~db query in
+    return ()
+  in
+  expectOk (runToResult result)
+
+let expectWorkflowTyped workflow =
+  let result =
+    let open Run.Syntax in
+    let%bind _ = Workflow.Typer.typeWorkflow ~univ workflow in
     return ()
   in
   expectOk (runToResult result)
@@ -116,40 +143,6 @@ let () =
     end;
   end;
 
-  describe "define" begin fun () ->
-    test "let name = name in region { regionName: $name }" begin fun () ->
-      expectQueryOk Q.(
-        here
-        |> nav "region"
-        |> select [
-          field ~alias:"regionName" (name "name")
-        ]
-        |> where [
-          define "name" (here |> nav "name");
-        ]
-      );
-    end;
-
-    test "let name = name in region { regionName: $name, nationName: let name = nation.name in $name}" begin fun () ->
-      expectQueryOk Q.(
-        here
-        |> nav "region"
-        |> select [
-          field ~alias:"regionName" (name "name");
-          field ~alias:"nationName" (
-            name "name"
-            |> where [
-              define "name" (here |> nav "nation" |> nav "name");
-            ]
-          );
-        ]
-        |> where [
-          define "name" (here |> nav "name");
-        ]
-      );
-    end;
-  end;
-
   describe "screens" begin fun () ->
     test "region:pick" begin fun () ->
       expectQueryOk Q.(
@@ -165,6 +158,24 @@ let () =
         |> nav "region"
         |> screen "pick"
         |> nav "value"
+      );
+    end;
+
+    test "region:pick()(id: 'ASIA')" begin fun () ->
+      expectQueryOk Q.(
+        here
+        |> nav "region"
+        |> screen "pick"
+        |> growArgs [arg "id" (string "ASIA")]
+      );
+    end;
+
+    test "region:pick()(id: 'ASIA').value" begin fun () ->
+      expectQueryOk Q.(
+        here
+        |> nav "region"
+        |> screen "pick"
+        |> growArgs [arg "id" (string "ASIA")]
       );
     end;
 
@@ -184,6 +195,72 @@ let () =
         |> screen ~args:[arg "id" (string "ASIA")] "pick"
         |> nav "value"
         |> screen "view"
+      );
+    end;
+
+    test "void:grow(here.region:pick(id: 'AFRICA')):grow(here.value:view())" begin fun () ->
+      expectQueryOk Q.(
+        void
+        |> grow (
+          here
+          |> nav "region"
+          |> screen ~args:[arg "id" (string "ASIA")] "pick"
+        )
+        |> grow (
+          here
+          |> nav "value"
+          |> screen "view"
+        )
+      );
+    end;
+
+    test "void:grow(here.region:pick(id: 'AFRICA')):grow(here.value:view()).data" begin fun () ->
+      expectQueryOk Q.(
+        void
+        |> grow (
+          here
+          |> nav "region"
+          |> screen ~args:[arg "id" (string "ASIA")] "pick"
+        )
+        |> grow (
+          here
+          |> nav "value"
+          |> screen "view"
+        )
+        |> nav "data"
+      );
+    end;
+
+    test "void:grow(here.region:pick(id: 'AFRICA'):grow(here.value:view()))" begin fun () ->
+      expectQueryOk Q.(
+        void
+        |> grow (
+          here
+          |> nav "region"
+          |> screen ~args:[arg "id" (string "ASIA")] "pick"
+          |> grow (
+            here
+            |> nav "value"
+            |> screen "view"
+          )
+        )
+      );
+    end;
+
+    test "void:grow(here.region:pick(id: 'AFRICA'):grow(here.value:view())).data" begin fun () ->
+      expectQueryOk Q.(
+        void
+        |> grow (
+          here
+          |> nav "region"
+          |> screen ~args:[arg "id" (string "ASIA")] "pick"
+          |> grow (
+            here
+            |> nav "value"
+            |> screen "view"
+          )
+        )
+        |> nav "data"
       );
     end;
   end;
@@ -256,3 +333,25 @@ let () =
 
 
   end;
+
+  describe "Workflow" begin fun () ->
+
+
+    test "render(region:pick)" begin fun () ->
+      expectWorkflowTyped W.(render Q.(here |> nav "region" |> screen "pick"))
+    end;
+
+    test "render(/region:pick)" begin fun () ->
+      expectWorkflowTyped W.(render Q.(void |> nav "region" |> screen "pick"))
+    end;
+
+    test "render(region:pick) { render(value:view) }" begin fun () ->
+      expectWorkflowTyped W.(
+        render Q.(void |> nav "region" |> screen "pick")
+        |> andThen [
+          render Q.(here |> nav "value" |> screen "view")
+        ]
+      )
+    end;
+
+  end

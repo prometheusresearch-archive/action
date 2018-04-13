@@ -90,12 +90,11 @@ end = struct
     let screen = ui##screen in
     let args = ui##args in
     let bindings =
-      let bindings = StringMap.map args (fun a -> Query.Typed.Binding a) in
+      let bindings = StringMap.map args (fun arg -> Query.Typed.UntypedBinding arg) in
       let bindings = StringMap.set bindings "parent" (Query.Typed.TypedBinding baseQuery) in
       bindings
     in
-    let growQuery = screen.Screen.grow in
-    let%bind outQuery = QueryTyper.growQuery ~bindings ~univ ~base:baseQuery growQuery in
+    let%bind outQuery = QueryTyper.growQuery ~univ ~scope:bindings ~base:baseQuery screen.Screen.grow in
     return outQuery
 
   let value ui = ui##value

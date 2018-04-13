@@ -51,7 +51,11 @@ rule read = parse
   | ','        { COMMA }
   | '<'        { LT }
   | id         { ID (Lexing.lexeme lexbuf) }
-  | name       { NAME (Lexing.lexeme lexbuf) }
+  | name       {
+                 let buf = Lexing.lexeme lexbuf in
+                 let buf = String.sub buf 1 (String.length buf - 1) in
+                 NAME (buf)
+               }
   | float      { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }
   | '"'        { read_string (Buffer.create 17) lexbuf }
   | _          { read lexbuf }

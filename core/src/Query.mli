@@ -54,11 +54,11 @@ module Untyped : sig
     | Screen of (t * screen)
     | Mutation of (t * mutation)
     | Const of Const.t
-    | Where of (t * args)
     | Name of string
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
+    | GrowArgs of (t * args)
     | LessThan of (t * t)
 
   and args = t Common.StringMap.t
@@ -97,24 +97,24 @@ module Untyped : sig
       val ofMap : t Common.StringMap.t -> arg list
     end
 
-    val void : unit * syntax
-    val here : unit * syntax
-    val nav : string -> t -> unit * syntax
-    val select : select -> t -> unit * syntax
+    val void : t
+    val here : t
+    val nav : string -> t -> t
+    val select : select -> t -> t
     val field : ?alias:string -> t -> field
-    val screen : ?args:Arg.arg Belt.List.t -> string -> t -> unit * syntax
-    val count : t -> unit * syntax
-    val first : t -> unit * syntax
-    val string : string -> unit * syntax
-    val number : float -> unit * syntax
-    val bool : bool -> unit * syntax
-    val null : unit * syntax
-    val name : string -> unit * syntax
-    val where : Arg.arg Belt.List.t -> t -> unit * syntax
-    val locate : t -> t -> unit * syntax
-    val meta : t -> unit * syntax
-    val grow : t -> t -> unit * syntax
-    val lessThan : t -> t -> unit * syntax
+    val screen : ?args:Arg.arg list -> string -> t -> t
+    val count : t -> t
+    val first : t -> t
+    val string : string -> t
+    val number : float -> t
+    val bool : bool -> t
+    val null : t
+    val name : string -> t
+    val locate : t -> t -> t
+    val meta : t -> t
+    val grow : t -> t -> t
+    val growArgs : Arg.arg list -> t -> t
+    val lessThan : t -> t -> t
     val arg : string -> t -> Arg.arg
     val define : string -> t -> Arg.arg
     val update : (string * op) list -> t -> t
@@ -151,6 +151,8 @@ module Type : sig
   and arg = { argCtyp : ctyp; argDefault : Untyped.t option; }
 
   and args = arg Common.StringMap.t
+
+  val void : ctyp
 
   val show : t -> string
 
@@ -202,17 +204,18 @@ module Type : sig
 end
 
 module Typed : sig
-  type t = context * syntax
-
-  and context = scope * Type.ctyp
+  type t = Type.ctyp * syntax
 
   and scope = binding Common.StringMap.t
 
-  and binding = TypedBinding of t | Binding of Untyped.t
+  and binding =
+    | UntypedBinding of Untyped.t
+    | TypedBinding of t
+    | HardBinding of t
 
   and syntax =
-      Void
-    | Here
+    | Void
+    | Here of t
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
@@ -220,11 +223,11 @@ module Typed : sig
     | Screen of (t * screen)
     | Mutation of (t * mutation)
     | Const of Const.t
-    | Where of (t * Untyped.args)
     | Name of (string * t)
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
+    | GrowArgs of (t * Untyped.args)
     | LessThan of (t * t)
 
   and nav = { navName : string; }
@@ -236,28 +239,15 @@ module Typed : sig
   and field = { alias : string option; query : t; }
 
   and mutation =
-    | Update of ops
-    | Create of ops
-
-  and ops = op Common.StringMap.t
-
-  and op =
-    | OpUpdate of Untyped.t
-    | OpUpdateEntity of ops
-    | OpCreateEntity of ops
+    | Update of Untyped.ops
+    | Create of Untyped.ops
 
   val stripTypes : t -> Untyped.t
 
   val show : t -> string
 
-  module Context : sig
-    type t = context
-
-    val void : t
-
-    val bindings : t -> scope
-
-    val addBindings : bindings:scope -> t -> t
+  module Scope : sig
+    include module type of Common.StringMap
   end
 
   val void : t
