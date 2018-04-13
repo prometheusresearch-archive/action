@@ -181,7 +181,7 @@ let query ?value ~db q =
     | Value.Object obj ->
       begin match Js.Dict.get obj name with
       | Some value ->
-        let%bind value = expandRef value in
+        let%bind value = maybeExpandRef value in
         return value
       | None ->
         let msg = {j|no such key "$name"|j} in
@@ -282,7 +282,7 @@ let query ?value ~db q =
 
     | _, Query.Typed.Navigate (query, { navName; }) ->
       let%bind value = aux ~value query in
-      let%bind value = expandRef value in
+      let%bind value = maybeExpandRef value in
 
       begin match isRoot value, Value.classify value with
 
@@ -412,7 +412,7 @@ let query ?value ~db q =
       `DatabaseError msg
     ) value
 
-  and expandRef value =
+  and maybeExpandRef value =
     let resolveRef value =
       match Ref.ofValue value with
       | Some ref ->
@@ -494,7 +494,7 @@ let query ?value ~db q =
   in
 
   let%bind value = aux ~value q in
-  let%bind value = expandRef value in
+  let%bind value = maybeExpandRef value in
 
   let%bind value =
     let {Query.Typed. ctyp;_}, _ = q in
