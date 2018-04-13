@@ -18,7 +18,6 @@ let style = StyleSheet.create({
     padding: cfg.padding.size2,
     borderWidth: cfg.borderWidth.default,
     borderRadius: cfg.borderRadius.small,
-    outlineWidth: 6,
     fontWeight: cfg.fontWeight.normal,
     fontFamily: cfg.fontFamily.sans,
     fontSize: cfg.fontSize.small,
@@ -36,21 +35,19 @@ type P = any;
 
 const focusRingColor = cfg.color.blue;
 
-export function TextInput(props: P, ref: React.Ref<*>) {
+export function TextInput(
+  {monospace, error, outlineColor, ...props}: P,
+  ref: React.Ref<*>,
+) {
   const colorStyle = {
-    borderColor: props.outlineColor,
+    borderColor: outlineColor,
     outlineColor: focusRingColor,
   };
   return (
     <TextInputBase
       {...props}
       ref={ref}
-      style={[
-        style.base,
-        props.monospace && style.monospace,
-        colorStyle,
-        props.error && style.error,
-      ]}
+      style={[style.base, monospace && style.monospace, colorStyle, error && style.error]}
     />
   );
 }
