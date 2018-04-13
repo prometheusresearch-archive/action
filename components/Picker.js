@@ -19,7 +19,6 @@ let style = StyleSheet.create({
     padding: cfg.padding.size2,
     borderWidth: cfg.borderWidth.default,
     borderRadius: cfg.borderRadius.small,
-    outlineWidth: 6,
     fontSize: cfg.fontSize.small,
     fontWeight: cfg.fontWeight.medium,
     fontFamily: cfg.fontFamily.sans,
@@ -48,7 +47,7 @@ export function Picker(props: P) {
     outlineColor: focusRingColor,
   };
   let options = props.options.map(option => (
-    <PickerBase.Item label={option.label} value={option.value} />
+    <PickerBase.Item key={option.value} label={option.label} value={option.value} />
   ));
   return (
     <View>
@@ -56,10 +55,7 @@ export function Picker(props: P) {
         {options}
       </PickerBase>
       <View style={style.icon}>
-        <svg
-          class="fill-current h-4 w-4"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
           <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
         </svg>
       </View>
