@@ -106,11 +106,14 @@ let viewScreen =
       arg "title" ~default:(Q.string "View") (one string);
     ]
     Q.(
+      let base = void |> select [
+        field ~alias:"value" (name "parent");
+      ] in
       void
       |> select [
         field ~alias:"data" (name "parent");
         field ~alias:"value" (name "parent");
-        field ~alias:"title" (name "title");
+        field ~alias:"title" (base |> grow (name "title"));
       ]
     )
   )
