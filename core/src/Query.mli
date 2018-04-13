@@ -55,6 +55,7 @@ module Untyped : sig
     | Mutation of (t * mutation)
     | Const of Const.t
     | Name of string
+    | Define of (t * args)
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
@@ -110,13 +111,13 @@ module Untyped : sig
     val bool : bool -> t
     val null : t
     val name : string -> t
+    val define : Arg.arg list -> t -> t
     val locate : t -> t -> t
     val meta : t -> t
     val grow : t -> t -> t
     val growArgs : Arg.arg list -> t -> t
     val lessThan : t -> t -> t
     val arg : string -> t -> Arg.arg
-    val define : string -> t -> Arg.arg
     val update : (string * op) list -> t -> t
     val create : (string * op) list -> t -> t
     val opUpdate : t -> op
@@ -204,7 +205,12 @@ module Type : sig
 end
 
 module Typed : sig
-  type t = Type.ctyp * syntax
+  type t = context * syntax
+
+  and context = {
+    scope : scope;
+    ctyp : Type.ctyp;
+  }
 
   and scope = binding Common.StringMap.t
 
@@ -224,6 +230,7 @@ module Typed : sig
     | Mutation of (t * mutation)
     | Const of Const.t
     | Name of (string * t)
+    | Define of (t * Untyped.args)
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
@@ -248,6 +255,10 @@ module Typed : sig
 
   module Scope : sig
     include module type of Common.StringMap
+  end
+
+  module Context : sig
+    val updateScope : scope -> context -> context
   end
 
   val void : t

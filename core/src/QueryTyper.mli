@@ -7,8 +7,7 @@ type error = [ `QueryTypeError of string ]
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
 val typeQuery :
-  ?ctyp : Query.Type.ctyp
-  -> ?scope : Query.Typed.scope
+  ?ctx : Query.Typed.context
   -> univ:Universe.t
   -> Query.Untyped.t
   -> (Query.Typed.t, 'err) comp
