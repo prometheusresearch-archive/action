@@ -263,6 +263,36 @@ let () =
         |> nav "data"
       );
     end;
+
+    test "here.region:first:edit(spec: :update {name: $value.name})" begin fun () ->
+      expectQueryOk Q.(
+        let spec =
+          here
+          |> update [
+            "name", opUpdate (name "value" |> nav "name");
+          ]
+        in
+        void
+        |> nav "region"
+        |> first
+        |> screen ~args:[arg "spec" spec] "edit"
+      );
+    end;
+
+    test "here.region:first:edit(spec: :update {name: $value.name.nested})" begin fun () ->
+      expectQueryOk Q.(
+        let spec =
+          here
+          |> update [
+            "name", opUpdate (name "value" |> nav "name" |> nav "nested");
+          ]
+        in
+        void
+        |> nav "region"
+        |> first
+        |> screen ~args:[arg "spec" spec] "edit"
+      );
+    end;
   end;
 
   describe "meta" begin fun () ->

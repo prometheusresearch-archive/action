@@ -97,6 +97,7 @@ module Untyped = struct
     | Mutation of (t * mutation)
     | Const of Const.t
     | Name of string
+    | Define of (t * args)
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
@@ -194,6 +195,10 @@ module Untyped = struct
       {j|$parent:$mut|j}
     | Name name ->
       "$" ^ name
+    | Define (parent, args) ->
+      let parent = show parent in
+      let args = showArgs args in
+      {j|$parent:define($args)|j}
     | Locate (parent, id) ->
       let parent = show parent in
       let id = show id in
@@ -255,6 +260,10 @@ module Untyped = struct
     let name name =
       (), Name name
 
+    let define args parent =
+      let args = Arg.toMap args in
+      (), Define (parent, args)
+
     let locate id parent =
       (), Locate (parent, id)
 
@@ -272,7 +281,6 @@ module Untyped = struct
       (), LessThan (left, right)
 
     let arg = Arg.make
-    let define = Arg.make
 
     let collectOps ops =
       let f map (k, v) = StringMap.set map k v in
@@ -455,7 +463,12 @@ end
  *)
 module Typed = struct
 
-  type t = Type.ctyp * syntax
+  type t = context * syntax
+
+  and context = {
+    scope : scope;
+    ctyp : Type.ctyp;
+  }
 
   and scope = binding Common.StringMap.t
 
@@ -475,6 +488,7 @@ module Typed = struct
     | Mutation of (t * mutation)
     | Const of Const.t
     | Name of (string * t)
+    | Define of (t * Untyped.args)
     | Locate of (t * t)
     | Meta of t
     | Grow of (t * t)
@@ -519,6 +533,7 @@ module Typed = struct
     | _, Mutation (parent, Create ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Create ops)
     | _, Const v -> (), Untyped.Const v
     | _, Name (name, _) -> (), Untyped.Name name
+    | _, Define (parent, args) -> (), Untyped.Define (stripTypes parent, args)
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
     | _, Meta parent -> (), Untyped.Meta (stripTypes parent)
     | _, Grow (parent, next) -> (), Untyped.Grow (stripTypes parent, stripTypes next)
@@ -533,10 +548,15 @@ module Typed = struct
     include StringMap
   end
 
-  let void = Type.void, Void
+  module Context = struct
+    let updateScope scope ctx =
+      {ctx with scope}
+  end
+
+  let void = {ctyp = Type.void; scope = Scope.empty}, Void
 
   let ctyp (q : t) =
-    let ctyp, _ = q in
+    let {ctyp;_}, _ = q in
     ctyp
 
   let card (q : t) =

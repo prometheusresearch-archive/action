@@ -123,10 +123,13 @@ let editScreen =
     ~inputCard:Query.Card.One
     ~args:[
       arg "title" ~default:(Q.string "Edit") (one string);
+      arg "spec" (one string);
+      arg "value" ~default:(Q.null) (one string);
     ]
     Q.(
       void
       |> select [
+        field ~alias:"mutation" (name "parent" |> grow (name "spec"));
         field ~alias:"data" (name "parent");
         field ~alias:"value" (name "parent");
         field ~alias:"title" (name "title");

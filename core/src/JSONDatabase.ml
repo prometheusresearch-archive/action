@@ -199,7 +199,7 @@ let query ?value ~db q =
       return (Value.array value)
     | _ -> executionError "invalid db structure: expected an entity collection"
 
-  and aux ~(value : Value.t) ((_card, typ), syn as q) =
+  and aux ~(value : Value.t) ({Query.Typed. ctyp = _card, typ}, syn as q) =
 
     let value = match typ, syn with
     | Type.Void, Query.Typed.Void ->
@@ -213,6 +213,9 @@ let query ?value ~db q =
 
     | _, Query.Typed.Name (_name, query) ->
       aux ~value query
+
+    | _, Query.Typed.Define (parent, _args) ->
+      aux ~value parent
 
     | Type.Value Type.String, Query.Typed.Const (Const.String v) ->
       return (Value.string v)
@@ -360,7 +363,7 @@ let query ?value ~db q =
         executionError {j|expected array|j}
       end
 
-    | _, Query.Typed.Meta (ctyp, _) ->
+    | _, Query.Typed.Meta ({ctyp;_}, _) ->
       return (Value.ofCtyp ctyp)
 
     | _, Query.Typed.Grow (parent, next) ->
@@ -424,23 +427,25 @@ let query ?value ~db q =
     | _ -> return value
 
   and createEntity ~query ~value mut =
-    match query with
-    | (_, Query.Type.Entity {entityName;_}), _ ->
+    let {Query.Typed. ctyp;_}, _ = query in
+    match ctyp with
+    | _, Query.Type.Entity {entityName;_} ->
       let dict = Js.Dict.empty () in
       let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query dict) in
       let value = (Value.obj dict) in
       let%bind id = generateEntityId ~db ~name:entityName in
       let%bind () = setEntityInternal ~db ~name:entityName ~id value in
       return id
-    | ctyp, _ ->
+    | ctyp ->
       let query = Query.Typed.show query in
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|createEntity could not be called at $query of type $ctyp|j}
 
   and updateEntity ~query ~value ops =
-    match query with
-    | (Card.One, Query.Type.Entity {entityName;_}), _
-    | (Card.Opt, Query.Type.Entity {entityName;_}), _ ->
+    let {Query.Typed. ctyp;_}, _ = query in
+    match ctyp with
+    | Card.One, Query.Type.Entity {entityName;_}
+    | Card.Opt, Query.Type.Entity {entityName;_} ->
       let%bind entity = aux ~value query in
       let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
       let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value:entity ~query dict) in
@@ -448,7 +453,7 @@ let query ?value ~db q =
       let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
       let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
       return id
-    | ctyp, _ ->
+    | ctyp ->
       let query = Query.Typed.show query in
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|updateEntity could not be called at $query of type $ctyp|j}
@@ -492,7 +497,7 @@ let query ?value ~db q =
   let%bind value = expandRef value in
 
   let%bind value =
-    let ctyp, _ = q in
+    let {Query.Typed. ctyp;_}, _ = q in
     formatValue ~ctyp value
   in
 
