@@ -8,6 +8,10 @@ let liftResult = function
   | Js.Result.Ok v -> Run.return v
   | Js.Result.Error err -> Run.error (`DatabaseError err)
 
+let liftOption ~err = function
+  | Some v -> Run.return v
+  | None -> Run.error (`DatabaseError err)
+
 let univ =
   let rec nation = lazy Query.Type.Syntax.(
     entity "nation" (fun _ -> [
@@ -551,7 +555,9 @@ let () =
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
-        let%bind _ = JSONDatabase.query ~db query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let%bind () = Mutation.execute mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
     end;
@@ -572,7 +578,9 @@ let () =
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
-        let%bind _ = JSONDatabase.query ~db query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let%bind () = Mutation.execute mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -594,7 +602,9 @@ let () =
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
-        let%bind _ = JSONDatabase.query ~db query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let%bind () = Mutation.execute mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -613,11 +623,34 @@ let () =
           void
           |> nav "region"
           |> create [
-            "name", opUpdate (Q.string "NEWREGION");
+            "name", opUpdate (string "NEWREGION");
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
-        let%bind _ = JSONDatabase.query ~db query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let%bind () = Mutation.execute mut Value.null in
+        return (expectDbToMatchSnapshot db)
+      )
+
+    end;
+
+    test "simple with $value" begin fun () ->
+      let db = getDb () in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let query = Q.(
+          void
+          |> nav "region"
+          |> create [
+            "name", opUpdate (name "value" |> nav "name");
+          ]
+        ) in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let%bind () = Mutation.execute mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -639,7 +672,9 @@ let () =
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
-        let%bind _ = JSONDatabase.query ~db query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let%bind () = Mutation.execute mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 

@@ -33,3 +33,5 @@ val get : Name.t -> 'v t -> 'v option
 (** Resolve name & get a corresponding value *)
 val resolveAndGet : name -> 'v t -> (Name.t * 'v) option
 
+(** Log scope contents *)
+val log : 'v t -> unit

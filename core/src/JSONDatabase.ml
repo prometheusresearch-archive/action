@@ -410,12 +410,20 @@ let query ?value ~db q =
       end
 
     | _, Query.Typed.Mutation (parent, Query.Typed.Update ops) ->
-      let%bind _ = updateEntity ~value ~query:parent ~cache ops in
-      aux ~value ~cache parent
+      let execute value =
+        let%bind _ = updateEntity ~value ~query:parent ~cache ops in
+        return ()
+      in
+      let mut = Mutation.make execute in
+      return (Value.mutation mut)
 
     | _, Query.Typed.Mutation (parent, Query.Typed.Create ops) ->
-      let%bind _ = createEntity ~value ~query:parent ~cache ops in
-      aux ~value ~cache parent
+      let execute value =
+        let%bind _ = createEntity ~value ~query:parent ~cache ops in
+        return ()
+      in
+      let mut = Mutation.make execute in
+      return (Value.mutation mut)
 
     | _, Query.Typed.LessThan (left, right) ->
       let%bind left = aux ~value ~cache left in
