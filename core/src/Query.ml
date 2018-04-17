@@ -470,16 +470,17 @@ module Typed = struct
     ctyp : Type.ctyp;
   }
 
-  and scope = binding Common.StringMap.t
+  and scope = binding Scope.t
+
+  and uniqName = string
 
   and binding =
-    | UntypedBinding of Untyped.t
     | TypedBinding of t
-    | HardBinding of t
+    | UntypedBinding of Untyped.t
 
   and syntax =
     | Void
-    | Here of t
+    | Here
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
@@ -487,7 +488,7 @@ module Typed = struct
     | Screen of (t * screen)
     | Mutation of (t * mutation)
     | Const of Const.t
-    | Name of (string * t)
+    | Name of (Scope.Name.t * t)
     | Define of (t * Untyped.args)
     | Locate of (t * t)
     | Meta of t
@@ -516,7 +517,7 @@ module Typed = struct
   let rec stripTypes (q : t) =
     match q with
     | _, Void -> (), Untyped.Void
-    | _, Here _ -> (), Untyped.Here
+    | _, Here -> (), Untyped.Here
     | _, Select (parent, fields) ->
       let fields =
         let f {alias; query} = {Untyped. alias; query = stripTypes query} in
@@ -532,7 +533,7 @@ module Typed = struct
     | _, Mutation (parent, Update ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Update ops)
     | _, Mutation (parent, Create ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Create ops)
     | _, Const v -> (), Untyped.Const v
-    | _, Name (name, _) -> (), Untyped.Name name
+    | _, Name (name, _) -> (), Untyped.Name (Scope.Name.toString name)
     | _, Define (parent, args) -> (), Untyped.Define (stripTypes parent, args)
     | _, Locate (parent, id) -> (), Locate (stripTypes parent, stripTypes id)
     | _, Meta parent -> (), Untyped.Meta (stripTypes parent)
@@ -543,10 +544,6 @@ module Typed = struct
 
   let show q =
     Untyped.show (stripTypes q)
-
-  module Scope = struct
-    include StringMap
-  end
 
   module Context = struct
     let updateScope scope ctx =

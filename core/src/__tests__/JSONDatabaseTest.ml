@@ -28,6 +28,8 @@ let univ =
     empty
     |> hasMany "region" (Lazy.force region)
     |> hasMany "nation" (Lazy.force nation)
+    |> hasScreen "pick" JsApi.pickScreen
+    |> hasScreen "view" JsApi.viewScreen
   )
 
 let getDb () =
@@ -82,8 +84,8 @@ let runQuery ~db q =
 
 let unwrapAssertionResult v = match Run.toResult v with
   | Common.Result.Ok assertion -> assertion
-  | Common.Result.Error (`DatabaseError err) -> fail err
-  | Common.Result.Error (`QueryTypeError err) -> fail err
+  | Common.Result.Error (`DatabaseError err) -> fail {j|DatabaseError: $err|j}
+  | Common.Result.Error (`QueryTypeError err) -> fail {j|QueryTypeError: $err|j}
 
 let runQueryAndExpect ~db q v =
   unwrapAssertionResult (
@@ -101,7 +103,7 @@ let valueOfStringExn s = s |> Js.Json.parseExn |> Value.ofJson
 
 let () =
 
-  describe "JSONDatabase.execute" begin fun () ->
+  describe "JSONDatabase.query" begin fun () ->
 
     let db = getDb () in
 
@@ -152,6 +154,28 @@ let () =
           {
             "label": "Asia"
           }
+        ]
+      |})
+    end;
+
+    test "region { nation { label: name } }" begin fun () ->
+      let q = Q.(
+        here
+        |> nav "region"
+        |> select [
+          field ~alias:"nation" (
+            here
+            |> nav "nation"
+            |> select [
+              field ~alias:"label" (here |> nav "name");
+            ]
+          )
+        ]
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {"nation": [{"label": "United States of America"}]},
+          {"nation": [{"label": "Russia"}, {"label": "China"}]}
         ]
       |})
     end;
@@ -403,6 +427,109 @@ let () =
             "name": "Asia"
           }
         ]
+      |})
+    end;
+
+    test "region:pick.data" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> screen "pick"
+        |> nav "data"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "id": "AMERICA",
+            "name": "America"
+          },
+          {
+            "id": "ASIA",
+            "name": "Asia"
+          }
+        ]
+      |})
+    end;
+
+    test "region:pick(id: 'ASIA').data" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> screen ~args:[arg "id" (string "ASIA")] "pick"
+        |> nav "data"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "id": "AMERICA",
+            "name": "America"
+          },
+          {
+            "id": "ASIA",
+            "name": "Asia"
+          }
+        ]
+      |})
+    end;
+
+    test "region:pick.value" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> screen "pick"
+        |> nav "value"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        null
+      |})
+    end;
+
+    test "region:pick(id: 'ASIA').value" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> screen ~args:[arg "id" (string "ASIA")] "pick"
+        |> nav "value"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        {
+          "id": "ASIA",
+          "name": "Asia"
+        }
+      |})
+    end;
+
+    test "region:pick(id: 'ASIA').value:view.value" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> screen ~args:[arg "id" (string "ASIA")] "pick"
+        |> nav "value"
+        |> screen "view"
+        |> nav "value"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        {
+          "id": "ASIA",
+          "name": "Asia"
+        }
+      |})
+    end;
+
+    test "region:pick(id: 'ASIA').value:view.data" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> screen ~args:[arg "id" (string "ASIA")] "pick"
+        |> nav "value"
+        |> screen "view"
+        |> nav "data"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        {
+          "id": "ASIA",
+          "name": "Asia"
+        }
       |})
     end;
 

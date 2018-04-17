@@ -212,16 +212,15 @@ module Typed : sig
     ctyp : Type.ctyp;
   }
 
-  and scope = binding Common.StringMap.t
+  and scope = binding Scope.t
 
   and binding =
-    | UntypedBinding of Untyped.t
     | TypedBinding of t
-    | HardBinding of t
+    | UntypedBinding of Untyped.t
 
   and syntax =
     | Void
-    | Here of t
+    | Here
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
@@ -229,7 +228,7 @@ module Typed : sig
     | Screen of (t * screen)
     | Mutation of (t * mutation)
     | Const of Const.t
-    | Name of (string * t)
+    | Name of (Scope.Name.t * t)
     | Define of (t * Untyped.args)
     | Locate of (t * t)
     | Meta of t
@@ -252,10 +251,6 @@ module Typed : sig
   val stripTypes : t -> Untyped.t
 
   val show : t -> string
-
-  module Scope : sig
-    include module type of Common.StringMap
-  end
 
   module Context : sig
     val updateScope : scope -> context -> context

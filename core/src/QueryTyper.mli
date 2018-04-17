@@ -14,7 +14,7 @@ val typeQuery :
 
 val growQuery :
   univ : Universe.t
-  -> ?scope : Query.Typed.scope
+  -> ?bindings : (string * Query.Typed.binding) list
   -> base : Query.Typed.t
   -> Query.Untyped.t
   -> (Query.Typed.t, 'err) comp
