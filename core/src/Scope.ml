@@ -52,3 +52,10 @@ let add bindings {stack; values} =
 let rec bindings {values; _} =
   let f (uniqName, (name, value)) = uniqName, name, value in
   values |. StringMap.toList |. Belt.List.map f
+
+let log {values; _} =
+  let f name value =
+    Js.log2 name value
+  in
+  StringMap.forEach values f
+

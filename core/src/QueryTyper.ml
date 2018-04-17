@@ -290,7 +290,12 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
 
     | Untyped.Mutation (parent, mut) ->
       let%bind {Typed. ctyp = parentCtyp;_} as parentCtx, _ as parent = aux ~ctx parent in
-      let scope = Scope.add ["here", Typed.TypedBinding parent] scope in
+      let scope =
+        Scope.add [
+          "here", Typed.TypedBinding parent;
+          "value", Typed.UntypedBinding Query.Untyped.Syntax.null;
+        ] scope
+      in
       let%bind mut = typeMutation ~univ ~ctx:{Typed. ctyp = parentCtyp; scope} mut in
       (** TODO: Need to track mutation in type (as effect probably) *)
       return (deriveCtx parentCtx, Typed.Mutation (parent, mut))

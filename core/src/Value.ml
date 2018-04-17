@@ -120,6 +120,7 @@ external string : string -> t = "%identity"
 external number : float -> t = "%identity"
 external jsBool : Js.boolean -> t = "%identity"
 external ui : UI.t -> t = "%identity"
+external mutation : (t, 'err) Mutation.t -> t = "%identity"
 external array : t array -> t = "%identity"
 external obj : t Js.Dict.t -> t = "%identity"
 external ofJson : Js.Json.t -> t = "%identity"
@@ -241,13 +242,14 @@ let ofCtyp ctyp =
     |> (fun o -> set o "registry" (obj registry); o)
   )
 
-type tagged =
+type 'err tagged =
   | Object of t Js.Dict.t
   | Array of t array
   | String of string
   | Number of float
   | Bool of bool
   | UI of UI.t
+  | Mutation of (t, 'err) Mutation.t
   | Null
 
 let classify (v : t) =
@@ -265,6 +267,8 @@ let classify (v : t) =
   then Array (Obj.magic v)
   else if UI.test v
   then UI (Obj.magic v)
+  else if Mutation.test v
+  then Mutation (Obj.magic v)
   else Object (Obj.magic v)
 
 let decodeObj v =
@@ -275,6 +279,11 @@ let decodeObj v =
 let decodeString v =
   match classify v with
   | String v -> Some v
+  | _ -> None
+
+let decodeMutation v =
+  match classify v with
+  | Mutation v -> Some v
   | _ -> None
 
 let get ~name value =
