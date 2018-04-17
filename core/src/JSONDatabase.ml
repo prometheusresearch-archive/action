@@ -3,6 +3,7 @@ module Option = Common.Option
 module Card = Query.Card
 module Type = Query.Type
 module Const = Query.Const
+module Typed = Query.Typed
 module StringMap = Common.StringMap
 
 type t = {
@@ -53,6 +54,10 @@ module Ref = struct
     Js.Dict.set v "$ref" ref;
     (Value.obj v)
 
+end
+
+module Cache = struct
+  include Common.MutStringMap
 end
 
 let univ {univ;_} = univ
@@ -199,7 +204,26 @@ let query ?value ~db q =
       return (Value.array value)
     | _ -> executionError "invalid db structure: expected an entity collection"
 
-  and aux ~(value : Value.t) ({Query.Typed. ctyp = _card, typ}, syn as q) =
+  and aux ~(value : Value.t) ~cache ({Query.Typed. ctyp = _card, typ; scope}, syn as q) =
+
+    (** Precompute all typed bindings values as typed binding values has
+     * call-by-value semantics *)
+    let%bind () =
+      let f (uniqName, name, binding) =
+        let uniqName = Scope.Name.toString uniqName in
+        match name, binding, Cache.has cache uniqName with
+        | "here", _, _ ->
+          return ()
+        | _, Query.Typed.TypedBinding q, false ->
+          let%bind value = aux ~cache ~value q in
+          Cache.set cache uniqName value;
+          return ()
+        | _, Query.Typed.TypedBinding _, true
+        | _, Query.Typed.UntypedBinding _, _ ->
+          return ()
+      in
+      Run.List.iter ~f (Scope.bindings scope);
+    in
 
     let value = match typ, syn with
     | Type.Void, Query.Typed.Void ->
@@ -208,14 +232,18 @@ let query ?value ~db q =
     | _, Query.Typed.Void ->
       executionError "invalid type for void"
 
-    | _, Query.Typed.Here _ ->
+    | _, Query.Typed.Here ->
       return value
 
-    | _, Query.Typed.Name (_name, query) ->
-      aux ~value query
+    | _, Query.Typed.Name (name, query) ->
+      (** TypedBinding values should be pre-cached already *)
+      begin match Scope.get name scope, Cache.get cache (Scope.Name.toString name) with
+      | Some (Typed.TypedBinding _), Some value -> return value
+      | _ -> aux ~value ~cache query
+      end
 
     | _, Query.Typed.Define (parent, _args) ->
-      aux ~value parent
+      aux ~value ~cache parent
 
     | Type.Value Type.String, Query.Typed.Const (Const.String v) ->
       return (Value.string v)
@@ -229,7 +257,7 @@ let query ?value ~db q =
       executionError "invalid type for const"
 
     | Type.Value Type.Number, Query.Typed.Count query ->
-      let%bind value = aux ~value query in
+      let%bind value = aux ~value ~cache query in
       begin match Value.classify value with
       | Value.Null -> return (Value.number 0.)
       | Value.Array items -> return (Value.number (float_of_int (Array.length items)))
@@ -239,7 +267,7 @@ let query ?value ~db q =
       executionError "invalid type for count"
 
     | _, Query.Typed.First query ->
-      let%bind value = aux ~value query in
+      let%bind value = aux ~value ~cache query in
       begin match Value.classify value with
       | Value.Array items ->
         if Array.length items > 0
@@ -272,7 +300,7 @@ let query ?value ~db q =
       (* XXX: ideally we should prefetch just exists(query) instead of query
        * itself so we can minimize the work for db to do.
        *)
-      let%bind prefetch = aux ~value query in
+      let%bind prefetch = aux ~value ~cache query in
       begin match Value.classify prefetch with
       | Value.Null -> return Value.null
       | _ -> make value
@@ -281,7 +309,7 @@ let query ?value ~db q =
       executionError "invalid type for screen"
 
     | _, Query.Typed.Navigate (query, { navName; }) ->
-      let%bind value = aux ~value query in
+      let%bind value = aux ~value ~cache query in
       let%bind value = maybeExpandRef value in
 
       begin match isRoot value, Value.classify value with
@@ -307,7 +335,7 @@ let query ?value ~db q =
       | _, Value.UI ui ->
         let%bind outQuery = Value.UI.outQuery ui in
         let queryValue = Value.UI.value ui in
-        let%bind value = aux ~value:queryValue outQuery in
+        let%bind value = aux ~value:queryValue ~cache outQuery in
         navigate navName value
       | _ -> executionError {|Cannot navigate away from this value|}
       end
@@ -316,7 +344,7 @@ let query ?value ~db q =
       let selectFrom value =
         let%bind _, dataset =
           let build (idx, dataset) { Query.Typed. alias; query; } =
-            let%bind selectionValue = aux ~value query in
+            let%bind selectionValue = aux ~value ~cache query in
             let selectionAlias = Option.getWithDefault (string_of_int idx) alias in
             Js.Dict.set dataset selectionAlias selectionValue;
             return (idx + 1, dataset)
@@ -325,13 +353,13 @@ let query ?value ~db q =
         in
         return (Value.obj dataset)
       in
-      let%bind value = aux ~value query in
+      let%bind value = aux ~value ~cache query in
       begin match Value.classify value with
       | Value.Object _ -> selectFrom value
       | Value.UI ui ->
         let%bind outQuery = Value.UI.outQuery ui in
         let queryValue = Value.UI.value ui in
-        let%bind value = aux ~value:queryValue outQuery in
+        let%bind value = aux ~value:queryValue ~cache outQuery in
         selectFrom value
       | Value.Array items ->
         let%bind items = Run.Array.map ~f:selectFrom items in
@@ -346,12 +374,12 @@ let query ?value ~db q =
       executionError "invalid type for select"
 
     | _, Query.Typed.Locate (parent, id) ->
-      let%bind parent = aux ~value parent in
+      let%bind parent = aux ~value ~cache parent in
       begin match Value.classify parent with
       | Value.Null ->
         return Value.null
       | Value.Array items ->
-        let%bind id = aux ~value id in
+        let%bind id = aux ~value ~cache id in
         let f v =
           match Value.get ~name:"id" v with
           | Some v -> v = id
@@ -367,12 +395,12 @@ let query ?value ~db q =
       return (Value.ofCtyp ctyp)
 
     | _, Query.Typed.Grow (parent, next) ->
-      let%bind value = aux ~value parent in
-      let%bind value = aux ~value next in
+      let%bind value = aux ~value ~cache parent in
+      let%bind value = aux ~value ~cache next in
       return value
 
     | _, Query.Typed.GrowArgs (parent, args) ->
-      let%bind value = aux ~value parent in
+      let%bind value = aux ~value ~cache parent in
       begin match Value.classify value with
       | Value.UI ui ->
         let ui = Value.UI.setArgs ~args ui in
@@ -382,16 +410,16 @@ let query ?value ~db q =
       end
 
     | _, Query.Typed.Mutation (parent, Query.Typed.Update ops) ->
-      let%bind _ = updateEntity ~value ~query:parent ops in
-      aux ~value parent
+      let%bind _ = updateEntity ~value ~query:parent ~cache ops in
+      aux ~value ~cache parent
 
     | _, Query.Typed.Mutation (parent, Query.Typed.Create ops) ->
-      let%bind _ = createEntity ~value ~query:parent ops in
-      aux ~value parent
+      let%bind _ = createEntity ~value ~query:parent ~cache ops in
+      aux ~value ~cache parent
 
     | _, Query.Typed.LessThan (left, right) ->
-      let%bind left = aux ~value left in
-      let%bind right = aux ~value right in
+      let%bind left = aux ~value ~cache left in
+      let%bind right = aux ~value ~cache right in
       begin
         match Value.classify left, Value.classify right with
         | Value.Number left, Value.Number right ->
@@ -426,12 +454,12 @@ let query ?value ~db q =
       return (Value.array items)
     | _ -> return value
 
-  and createEntity ~query ~value mut =
+  and createEntity ~query ~value ~cache mut =
     let {Query.Typed. ctyp;_}, _ = query in
     match ctyp with
     | _, Query.Type.Entity {entityName;_} ->
       let dict = Js.Dict.empty () in
-      let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query dict) in
+      let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query ~cache dict) in
       let value = (Value.obj dict) in
       let%bind id = generateEntityId ~db ~name:entityName in
       let%bind () = setEntityInternal ~db ~name:entityName ~id value in
@@ -441,14 +469,14 @@ let query ?value ~db q =
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|createEntity could not be called at $query of type $ctyp|j}
 
-  and updateEntity ~query ~value ops =
+  and updateEntity ~query ~value ~cache ops =
     let {Query.Typed. ctyp;_}, _ = query in
     match ctyp with
     | Card.One, Query.Type.Entity {entityName;_}
     | Card.Opt, Query.Type.Entity {entityName;_} ->
-      let%bind entity = aux ~value query in
+      let%bind entity = aux ~value ~cache query in
       let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-      let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value:entity ~query dict) in
+      let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value:entity ~query ~cache dict) in
       let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
       let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
       let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
@@ -458,7 +486,7 @@ let query ?value ~db q =
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|updateEntity could not be called at $query of type $ctyp|j}
 
-  and applyOp ~value ~query dict =
+  and applyOp ~value ~query ~cache dict =
     function
     | key, Query.Untyped.OpUpdateEntity ops ->
       let%bind query =
@@ -467,7 +495,7 @@ let query ?value ~db q =
           ~base:query
           Query.Untyped.Syntax.(here |> nav key)
       in
-      let%bind _ = updateEntity ~value ~query ops in
+      let%bind _ = updateEntity ~value ~query ~cache ops in
       return ()
     | key, Query.Untyped.OpCreateEntity ops ->
       let%bind query =
@@ -476,13 +504,13 @@ let query ?value ~db q =
           ~base:query
           Query.Untyped.Syntax.(here |> nav key)
       in
-      let%bind id = createEntity ~value ~query ops in
+      let%bind id = createEntity ~value ~query ~cache ops in
       Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
       return ()
     | key, Query.Untyped.OpUpdate q ->
       let univ = univ db in
       let%bind q = QueryTyper.growQuery ~univ ~base:query q in
-      let%bind value = aux ~value q in
+      let%bind value = aux ~value ~cache q in
       Js.Dict.set dict key value;
       return ()
 
@@ -493,7 +521,8 @@ let query ?value ~db q =
   | None -> db.value
   in
 
-  let%bind value = aux ~value q in
+  let cache = Cache.make () in
+  let%bind value = aux ~value ~cache q in
   let%bind value = maybeExpandRef value in
 
   let%bind value =

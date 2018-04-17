@@ -13,6 +13,9 @@ type state
 type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
 type query
 
+val pickScreen : Screen.t
+val viewScreen : Screen.t
+
 val render : state -> renderableState JsResult.t
 
 val pickValue : Js.Json.t -> state -> renderableState JsResult.t

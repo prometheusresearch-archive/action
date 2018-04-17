@@ -1,7 +1,6 @@
 module Type = Query.Type
 module Card = Query.Card
 module Typed = Query.Typed
-module Scope = Query.Typed.Scope
 module Context = Query.Typed.Context
 module Untyped = Query.Untyped
 module StringMap = Common.StringMap
@@ -107,16 +106,14 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
 
     | Untyped.Here ->
 
-      begin match StringMap.get scope "here" with
-      | Some (Typed.UntypedBinding query) ->
+      begin match Scope.resolveAndGet "here" scope with
+      | Some (_, Typed.UntypedBinding query) ->
         let%bind query = aux ~ctx query in
         let ctx, _ = query in
-        return (deriveCtx ctx, Typed.Here query)
-      | Some (Typed.TypedBinding query) ->
+        return (deriveCtx ctx, Typed.Here)
+      | Some (_, Typed.TypedBinding query) ->
         let ctx, _ = query in
-        return (deriveCtx ctx, Typed.Here query)
-      | Some (Typed.HardBinding query) ->
-        return query
+        return (deriveCtx ctx, Typed.Here)
       | None ->
         return (makeCtx Query.Type.void, Typed.Void)
       end
@@ -126,7 +123,7 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       begin match card with
       | Card.Many ->
         let%bind id = aux ~ctx id in
-        return Typed.(makeCtx (Card.Opt, parentTyp), Typed.Locate (parent, id))
+        return (makeCtx (Card.Opt, parentTyp), Typed.Locate (parent, id))
       | _ ->
         queryTypeError {j|locate can only be applied to queries with cardinality many|j}
       end
@@ -139,7 +136,7 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       let%bind ctx, _ as parent = aux ~ctx parent in
       let%bind ctx, _ as next =
         let ctx =
-          let scope = Scope.set scope "here" (Typed.HardBinding parent) in
+          let scope = Scope.add ["here", Typed.TypedBinding parent] scope in
           deriveCtx ~scope ctx
         in
         aux ~ctx next
@@ -162,13 +159,12 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       end
 
     | Untyped.Name name ->
-      begin match StringMap.get scope name with
-      | Some (Typed.UntypedBinding query) ->
-        let%bind ctx, _syn as query = aux ~ctx query in
-        return (deriveCtx ctx, Typed.Name (name, query))
-      | Some (Typed.TypedBinding query)
-      | Some (Typed.HardBinding query) ->
+      begin match Scope.resolveAndGet name scope with
+      | Some (name, Typed.TypedBinding query) ->
         let ctx, _syn = query in
+        return (deriveCtx ctx, Typed.Name (name, query))
+      | Some (name, Typed.UntypedBinding query) ->
+        let%bind ctx, _syn as query = aux ~ctx query in
         return (deriveCtx ctx, Typed.Name (name, query))
       | None ->
         queryTypeError {j|referencing unknown binding "$name"|j}
@@ -178,9 +174,10 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       let%bind ctx, _ as parent =
         let ctx =
           let scope =
-            let f scope name value =
-              StringMap.set scope name (Typed.UntypedBinding value)
-            in StringMap.reduce args scope f
+            let bindings =
+              let f (name, value) = (name, Typed.UntypedBinding value) in
+              args |. StringMap.toList |. Belt.List.map f
+            in Scope.add bindings scope
           in
           deriveCtx ~scope ctx
         in
@@ -254,13 +251,16 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
             let%bind {Typed. ctyp; _}, _ =
               let parentCtx =
                 let scope =
-                  let scope =
-                    let f scope name q = Scope.set scope name (Typed.UntypedBinding q) in
-                    Scope.reduce screenArgs scope f
+                  let bindings =
+                    let f (name, value) = (name, Typed.UntypedBinding value) in
+                    screenArgs |. StringMap.toList |. Belt.List.map f
                   in
-                  let scope = Scope.set scope "here" (Typed.HardBinding parent) in
-                  let bindings = Scope.set scope "parent" (Typed.TypedBinding parent) in
-                  bindings
+                  let bindings =
+                    ("here", Typed.TypedBinding parent)::
+                    ("parent", Typed.TypedBinding parent)::
+                    bindings
+                  in
+                  Scope.add bindings scope
                 in
                 deriveCtx ~scope parentCtx
               in
@@ -290,7 +290,7 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
 
     | Untyped.Mutation (parent, mut) ->
       let%bind {Typed. ctyp = parentCtyp;_} as parentCtx, _ as parent = aux ~ctx parent in
-      let scope = Scope.set scope "here" (Typed.HardBinding parent) in
+      let scope = Scope.add ["here", Typed.TypedBinding parent] scope in
       let%bind mut = typeMutation ~univ ~ctx:{Typed. ctyp = parentCtyp; scope} mut in
       (** TODO: Need to track mutation in type (as effect probably) *)
       return (deriveCtx parentCtx, Typed.Mutation (parent, mut))
@@ -302,7 +302,7 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       let checkField (fields, selection, index) { Untyped. alias; query } =
         let res =
           let%bind query =
-            let scope = Scope.set scope "here" (Typed.TypedBinding parent) in
+            let scope = Scope.add ["here", Typed.TypedBinding parent] scope in
             let ctx = deriveCtx ~scope ctx in
             aux ~ctx query
           in
@@ -355,8 +355,10 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
     let msg =
       let query = Untyped.show ((), syn) in
       let scope =
-        let scope = Scope.mapWithKey scope (fun key _value -> "$" ^ key) in
-        scope |> Scope.valuesToArray |> Array.to_list |> String.concat ", "
+        scope
+        |. Scope.bindings
+        |. Belt.List.map (fun (_, name, _) -> "$" ^ name)
+        |> String.concat ", "
       in
       let msg = {j|While typing query `$query` with scope: $scope|j} in
       `QueryTypeError msg
@@ -401,19 +403,16 @@ and typeMutation ~univ ~ctx mut =
 let typeQuery ?ctx ~univ query =
   typeQueryImpl ?ctx ~univ query
 
-let growQuery ~univ ?(scope=Scope.empty) ~base query =
+let growQuery ~univ ?(bindings=[]) ~base query =
   let open Run.Syntax in
   let ctx =
     let ctx, _ = base in
-    let scope =
-      let scope = Scope.reduce scope ctx.Typed.scope Scope.set in
-      let scope = Scope.set scope "here" (Typed.HardBinding base) in
-      scope
-    in
+    let bindings = ("here", Typed.TypedBinding base)::bindings in
+    let scope = Scope.add bindings ctx.Typed.scope in
     {ctx with scope}
   in
-  let%bind {ctyp;_}, _ as query = typeQueryImpl ~ctx ~univ query in
-  return ({Typed. ctyp; scope}, Typed.Grow (base, query))
+  let%bind ctx, _ as query = typeQueryImpl ~ctx ~univ query in
+  return (ctx, Typed.Grow (base, query))
 
 let checkArgs ~argTyps args =
   checkArgsImpl ~updateWithDefaultValues:true ~argTyps args
