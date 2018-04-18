@@ -31,7 +31,7 @@ const initialState = {
 export class Console extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
-    this.state = this.getStateFromQuery(outdent`region:first:edit`);
+    this.state = this.getStateFromQuery(outdent``);
   }
 
   getStateFromQuery = (value: string) => {
@@ -174,6 +174,22 @@ function Help({value, onPress}) {
               value: customer:count,
             }:barChart(
               title: "Customers per Nation"
+            ))
+
+          }
+        `,
+    },
+    {
+      label: 'Workflow: Edit regions',
+      value: outdent`
+          render(region:pick(title: "Regions")) {
+
+            render(value:edit(
+              title: value.name,
+              spec: :update {
+                name: $value.name,
+                comment: $value.comment,
+              }
             ))
 
           }

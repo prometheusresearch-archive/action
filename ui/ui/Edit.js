@@ -37,12 +37,13 @@ export class Edit extends React.Component<P, S> {
         title: title,
         data: data,
         type: data:meta.type,
+        mutation: mutation,
       }
     `,
     );
     // $FlowFixMe: ...
-    const {title, data, type} = result;
-    return {title, data, type};
+    const {title, data, type, mutation} = result;
+    return {title, data, type, mutation};
   }
 
   onChange = (key: string, update: any) => {
@@ -50,9 +51,14 @@ export class Edit extends React.Component<P, S> {
     this.setState({value});
   };
 
+  onSubmit = mutation => {
+    const value = this.state.value;
+    W.mutate(mutation, value);
+  };
+
   render() {
     let props = this.props;
-    let {title, data, type} = this.fetch();
+    let {title, data, type, mutation} = this.fetch();
     const entityName = getEntityName(type, data);
     const fields = [];
     for (let key in this.state.value) {
@@ -79,6 +85,7 @@ export class Edit extends React.Component<P, S> {
           <View style={{paddingRight: cfg.padding.size2}}>
             <OutlineButton
               label="Save"
+              onPress={this.onSubmit.bind(null, mutation)}
               outlineColor={cfg.color.greenDarker}
               fillColor={cfg.color.greenLightest}
             />
