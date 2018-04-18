@@ -139,6 +139,9 @@ let editScreen =
     Q.(
       let title = name "title" in
       let parent = name "parent" in
+      let base = void |> select [
+        field ~alias:"value" parent;
+      ] in
       let mutation =
         parent
         |> grow (name "spec")
@@ -148,7 +151,7 @@ let editScreen =
         field ~alias:"mutation" mutation;
         field ~alias:"data" parent;
         field ~alias:"value" parent;
-        field ~alias:"title" title;
+        field ~alias:"title" (base |> grow title);
       ]
     )
   )
