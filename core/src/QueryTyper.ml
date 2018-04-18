@@ -6,6 +6,7 @@ module Untyped = Query.Untyped
 module StringMap = Common.StringMap
 module Result = Common.Result
 module Option = Common.Option
+module Mutation = Query.Mutation
 
 type error = [ `QueryTypeError of string ]
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
@@ -377,33 +378,34 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
 and typeMutation ~univ ~ctx mut =
   let open Run.Syntax in
   let module Q = Untyped.Syntax in
+  let module M = Mutation in
   let rec typeOp ~ctx map key op =
     let%bind op = match op with
-    | Untyped.OpUpdate q ->
+    | M.OpUpdate q ->
       let%bind _ = typeQueryImpl ~univ ~ctx Q.(here |> nav key) in
-      let%bind _ = typeQueryImpl ~univ ~ctx q in
+      let%bind q = typeQueryImpl ~univ ~ctx q in
       (* TODO: check that types can unified from both nav and value *)
-      return (Untyped.OpUpdate q)
-    | Untyped.OpUpdateEntity ops ->
+      return (M.OpUpdate q)
+    | M.OpUpdateEntity ops ->
       let%bind ctx, _ = typeQueryImpl ~univ ~ctx Q.(here |> nav key) in
       let%bind ops = typeOps ~ctx ops in
-      return (Untyped.OpUpdateEntity ops)
-    | Untyped.OpCreateEntity ops ->
+      return (M.OpUpdateEntity ops)
+    | M.OpCreateEntity ops ->
       let%bind ctx, _ = typeQueryImpl ~univ ~ctx Q.(here |> nav key) in
       let%bind ops = typeOps ~ctx ops in
-      return (Untyped.OpCreateEntity ops)
+      return (M.OpCreateEntity ops)
     in
     return (StringMap.set map key op)
   and typeOps ~ctx ops =
     Run.StringMap.foldLeft ~f:(typeOp ~ctx) ~init:StringMap.empty ops
   in
   match mut with
-  | Untyped.Update ops ->
+  | M.Update ops ->
     let%bind ops = typeOps ~ctx ops in
-    return (Typed.Update ops)
-  | Untyped.Create ops ->
+    return (M.Update ops)
+  | M.Create ops ->
     let%bind ops = typeOps ~ctx ops in
-    return (Typed.Create ops)
+    return (M.Create ops)
 
 let typeQuery ?ctx ~univ query =
   typeQueryImpl ?ctx ~univ query

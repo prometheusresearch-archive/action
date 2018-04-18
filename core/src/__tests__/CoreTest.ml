@@ -5,6 +5,7 @@ open! Expect.Operators
 module Result = Common.Result
 
 module Q = Query.Untyped.Syntax
+module M = Query.Mutation.Syntax
 module W = Workflow.Untyped.Syntax
 
 let univ = JsApi.univ
@@ -269,7 +270,7 @@ let () =
         let spec =
           here
           |> update [
-            "name", opUpdate (name "value" |> nav "name");
+            "name", M.update (name "value" |> nav "name");
           ]
         in
         void
@@ -284,7 +285,7 @@ let () =
         let spec =
           here
           |> update [
-            "name", opUpdate (name "value" |> nav "name" |> nav "nested");
+            "name", M.update (name "value" |> nav "name" |> nav "nested");
           ]
         in
         void

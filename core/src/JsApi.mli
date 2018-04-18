@@ -13,6 +13,8 @@ type state
 type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
 type query
 
+type mutation
+
 val pickScreen : Screen.t
 val viewScreen : Screen.t
 
@@ -27,6 +29,9 @@ val next : state -> state array
 
 (** Query against the current state *)
 val query : state -> string -> Value.t
+
+(** Mutate database state *)
+val mutate : mutation : mutation -> value : Value.t -> unit
 
 val db : JSONDatabase.t
 val univ : Core.Universe.t
