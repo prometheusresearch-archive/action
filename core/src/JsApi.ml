@@ -60,6 +60,16 @@ type state = WorkflowInterpreter.t
 type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
 type query = Query.Typed.t
 
+type error = [
+  | `DatabaseError of string
+  | `QueryTypeError of string
+  | `RunWorkflowError of string
+  | `WorkflowTypeError of string
+  | `ParseError of string
+]
+
+type mutation = (unit, error) Mutation.t
+
 let showQuery = Query.Typed.show
 
 let unwrapResult v =
@@ -272,6 +282,14 @@ let query state q =
     Js.log3 "QUERY" (WorkflowInterpreter.show state) (Query.Typed.show q);
     return q
   )
+
+let mutate ~mutation ~value =
+  let mut = Obj.magic mutation in
+  (
+    let open Run.Syntax in
+    let%bind _ = Mutation.execute mut value in
+    return ()
+  ) |> runToResult |> unwrapResult
 
 let parse s =
   let module N = Js.Nullable in

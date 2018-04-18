@@ -35,6 +35,26 @@ module Const : sig
     | Null
 end
 
+
+module Mutation : sig
+  type 'q t =
+    | Update of 'q ops
+    | Create of 'q ops
+
+  and 'q ops = 'q op Common.StringMap.t
+
+  and 'q op =
+    | OpUpdate of 'q
+    | OpUpdateEntity of 'q ops
+    | OpCreateEntity of 'q ops
+
+  module Syntax : sig
+    val update : 'q -> 'q op
+    val updateEntity : (string * 'q op) list -> 'q op
+    val createEntity : (string * 'q op) list -> 'q op
+  end
+end
+
 (**
  * Untyped query syntax.
  *)
@@ -72,16 +92,7 @@ module Untyped : sig
 
   and field = { alias : string option; query : t; }
 
-  and mutation =
-    | Update of ops
-    | Create of ops
-
-  and ops = op Common.StringMap.t
-
-  and op =
-    | OpUpdate of t
-    | OpUpdateEntity of ops
-    | OpCreateEntity of ops
+  and mutation = t Mutation.t
 
   val show : t -> string
 
@@ -118,11 +129,8 @@ module Untyped : sig
     val growArgs : Arg.arg list -> t -> t
     val lessThan : t -> t -> t
     val arg : string -> t -> Arg.arg
-    val update : (string * op) list -> t -> t
-    val create : (string * op) list -> t -> t
-    val opUpdate : t -> op
-    val opUpdateEntity : (string * op) list -> op
-    val opCreateEntity : (string * op) list -> op
+    val update : (string * t Mutation.op) list -> t -> t
+    val create : (string * t Mutation.op) list -> t -> t
   end
 end
 
@@ -244,9 +252,7 @@ module Typed : sig
 
   and field = { alias : string option; query : t; }
 
-  and mutation =
-    | Update of Untyped.ops
-    | Create of Untyped.ops
+  and mutation = t Mutation.t
 
   val stripTypes : t -> Untyped.t
 

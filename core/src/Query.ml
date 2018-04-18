@@ -72,6 +72,46 @@ module Const = struct
 
 end
 
+module Mutation = struct
+  type 'q t =
+    | Update of 'q ops
+    | Create of 'q ops
+
+  and 'q ops = 'q op StringMap.t
+
+  and 'q op =
+    | OpUpdate of 'q
+    | OpUpdateEntity of 'q ops
+    | OpCreateEntity of 'q ops
+
+  let rec map f = function
+    | Update ops -> Update (mapOps f ops)
+    | Create ops -> Create (mapOps f ops)
+
+  and mapOps f ops =
+    StringMap.map ops (mapOp f)
+
+  and mapOp f = function
+    | OpUpdate q -> OpUpdate (f q)
+    | OpUpdateEntity ops ->
+      let ops = StringMap.map ops (mapOp f) in
+      OpUpdateEntity ops
+    | OpCreateEntity ops ->
+      let ops = StringMap.map ops (mapOp f) in
+      OpCreateEntity ops
+
+  module Syntax = struct
+
+    let collectOps ops =
+      let f map (k, v) = StringMap.set map k v in
+      Belt.List.reduce ops StringMap.empty f
+
+    let update q = OpUpdate q
+    let updateEntity ops = OpUpdateEntity (collectOps ops)
+    let createEntity ops = OpCreateEntity (collectOps ops)
+  end
+end
+
 (**
  * This defines a query syntax parametrized by the payload.
  *
@@ -120,16 +160,7 @@ module Untyped = struct
     query: t
   }
 
-  and mutation =
-    | Update of ops
-    | Create of ops
-
-  and ops = op Common.StringMap.t
-
-  and op =
-    | OpUpdate of t
-    | OpUpdateEntity of ops
-    | OpCreateEntity of ops
+  and mutation = t Mutation.t
 
   let rec showArgs args =
     let args =
@@ -291,15 +322,6 @@ module Untyped = struct
 
     let update ops parent =
       (), Mutation (parent, Update (collectOps ops))
-
-    let opCreateEntity ops =
-      OpCreateEntity (collectOps ops)
-
-    let opUpdateEntity ops =
-      OpUpdateEntity (collectOps ops)
-
-    let opUpdate q =
-      OpUpdate q
 
   end
 
@@ -510,9 +532,7 @@ module Typed = struct
     query: t
   }
 
-  and mutation =
-    | Update of Untyped.ops
-    | Create of Untyped.ops
+  and mutation = t Mutation.t
 
   let rec stripTypes (q : t) =
     match q with
@@ -530,8 +550,8 @@ module Typed = struct
     | _, Count parent -> (), Untyped.Count (stripTypes parent)
     | _, Screen (parent, { screenName; screenArgs; }) ->
       (), Untyped.Screen (stripTypes parent, {Untyped. screenName; screenArgs; })
-    | _, Mutation (parent, Update ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Update ops)
-    | _, Mutation (parent, Create ops) -> (), Untyped.Mutation (stripTypes parent, Untyped.Create ops)
+    | _, Mutation (parent, mut) ->
+      (), Untyped.Mutation (stripTypes parent, Mutation.map stripTypes mut)
     | _, Const v -> (), Untyped.Const v
     | _, Name (name, _) -> (), Untyped.Name (Scope.Name.toString name)
     | _, Define (parent, args) -> (), Untyped.Define (stripTypes parent, args)

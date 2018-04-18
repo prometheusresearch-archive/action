@@ -239,6 +239,7 @@ let query ?value ~db q =
       (** TypedBinding values should be pre-cached already *)
       begin match Scope.get name scope, Cache.get cache (Scope.Name.toString name) with
       | Some (Typed.TypedBinding _), Some value -> return value
+      | Some (Typed.UntypedBinding _), Some value -> return value
       | _ -> aux ~value ~cache query
       end
 
@@ -409,17 +410,17 @@ let query ?value ~db q =
         executionError "unable to grow args"
       end
 
-    | _, Query.Typed.Mutation (parent, Query.Typed.Update ops) ->
-      let execute value =
-        let%bind _ = updateEntity ~value ~query:parent ~cache ops in
+    | _, Query.Typed.Mutation (parent, Query.Mutation.Update ops) ->
+      let execute formValue =
+        let%bind _ = updateEntity ~value ~query:parent ~formValue ~cache ops in
         return ()
       in
       let mut = Mutation.make execute in
       return (Value.mutation mut)
 
-    | _, Query.Typed.Mutation (parent, Query.Typed.Create ops) ->
-      let execute value =
-        let%bind _ = createEntity ~value ~query:parent ~cache ops in
+    | _, Query.Typed.Mutation (parent, Query.Mutation.Create ops) ->
+      let execute formValue =
+        let%bind _ = createEntity ~value ~query:parent ~formValue ~cache ops in
         return ()
       in
       let mut = Mutation.make execute in
@@ -462,12 +463,16 @@ let query ?value ~db q =
       return (Value.array items)
     | _ -> return value
 
-  and createEntity ~query ~value ~cache mut =
+  and createEntity ~query ~value ~formValue ~cache ops =
     let {Query.Typed. ctyp;_}, _ = query in
     match ctyp with
     | _, Query.Type.Entity {entityName;_} ->
       let dict = Js.Dict.empty () in
-      let%bind () = mut |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value ~query ~cache dict) in
+      let%bind () =
+        ops
+        |> StringMap.toList
+        |> Run.List.iter ~f:(applyOp ~value ~query ~formValue ~cache dict)
+      in
       let value = (Value.obj dict) in
       let%bind id = generateEntityId ~db ~name:entityName in
       let%bind () = setEntityInternal ~db ~name:entityName ~id value in
@@ -477,14 +482,18 @@ let query ?value ~db q =
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|createEntity could not be called at $query of type $ctyp|j}
 
-  and updateEntity ~query ~value ~cache ops =
+  and updateEntity ~query ~value ~formValue ~cache ops =
     let {Query.Typed. ctyp;_}, _ = query in
     match ctyp with
     | Card.One, Query.Type.Entity {entityName;_}
     | Card.Opt, Query.Type.Entity {entityName;_} ->
       let%bind entity = aux ~value ~cache query in
       let%bind dict = liftOption ~err:"invalid entity structure" (Value.decodeObj entity) in
-      let%bind () = ops |> StringMap.toList |> Run.List.iter ~f:(applyOp ~value:entity ~query ~cache dict) in
+      let%bind () =
+        ops
+        |> StringMap.toList
+        |> Run.List.iter ~f:(applyOp ~value:entity ~query ~formValue ~cache dict)
+      in
       let%bind id = liftOption ~err:"No ID after update" (Js.Dict.get dict "id") in
       let%bind id = liftOption ~err:"Invalid ID" (Value.decodeString id) in
       let%bind () = updateEntityInternal ~db ~name:entityName ~id (Value.obj dict) in
@@ -494,30 +503,34 @@ let query ?value ~db q =
       let ctyp = Query.Type.showCt ctyp in
       executionError {j|updateEntity could not be called at $query of type $ctyp|j}
 
-  and applyOp ~value ~query ~cache dict =
+  and applyOp ~value ~query ~formValue ~cache dict =
     function
-    | key, Query.Untyped.OpUpdateEntity ops ->
+    | key, Query.Mutation.OpUpdateEntity ops ->
       let%bind query =
         QueryTyper.growQuery
           ~univ:(univ db)
           ~base:query
           Query.Untyped.Syntax.(here |> nav key)
       in
-      let%bind _ = updateEntity ~value ~query ~cache ops in
+      let%bind _ = updateEntity ~value ~query ~formValue ~cache ops in
       return ()
-    | key, Query.Untyped.OpCreateEntity ops ->
+    | key, Query.Mutation.OpCreateEntity ops ->
       let%bind query =
         QueryTyper.growQuery
           ~univ:(univ db)
           ~base:query
           Query.Untyped.Syntax.(here |> nav key)
       in
-      let%bind id = createEntity ~value ~query ~cache ops in
+      let%bind id = createEntity ~value ~query ~formValue ~cache ops in
       Js.Dict.set dict key (Ref.toValue {Ref. name = key; id = id});
       return ()
-    | key, Query.Untyped.OpUpdate q ->
-      let univ = univ db in
-      let%bind q = QueryTyper.growQuery ~univ ~base:query q in
+    | key, Query.Mutation.OpUpdate q ->
+      let ctx, _ = q in
+      let () = match Scope.resolve "value" ctx.scope with
+        | None -> ()
+        | Some name ->
+          Cache.set cache (Scope.Name.toString name) formValue
+      in
       let%bind value = aux ~value ~cache q in
       Js.Dict.set dict key value;
       return ()

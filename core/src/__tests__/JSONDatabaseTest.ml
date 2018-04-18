@@ -3,6 +3,7 @@ open! Expect
 open! Expect.Operators
 
 module Q = Query.Untyped.Syntax
+module M = Query.Mutation.Syntax
 
 let liftResult = function
   | Js.Result.Ok v -> Run.return v
@@ -539,6 +540,11 @@ let () =
 
   end;
 
+  let createFormValue string =
+    let v = Js.Json.parseExn string in
+    Value.ofJson v
+  in
+
   describe "JSONDatabase.updateEntity" begin fun () ->
 
     test "setValue" begin fun () ->
@@ -551,7 +557,7 @@ let () =
           |> nav "region"
           |> locate (string "ASIA")
           |> update [
-            "name", opUpdate (Q.string "UPDATED")
+            "name", M.update (Q.string "UPDATED")
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
@@ -572,8 +578,8 @@ let () =
           |> nav "nation"
           |> locate (string "CHINA")
           |> update [
-            "region", opUpdateEntity [
-              "name", opUpdate (Q.string "UPDATED");
+            "region", M.updateEntity [
+              "name", M.update (Q.string "UPDATED");
             ]
           ]
         ) in
@@ -596,8 +602,8 @@ let () =
           |> nav "nation"
           |> locate (string "CHINA")
           |> update [
-              "region", opCreateEntity [
-                "name", opUpdate (Q.string "NEWREGION");
+              "region", M.createEntity [
+                "name", M.update (Q.string "NEWREGION");
               ]
           ]
         ) in
@@ -623,13 +629,35 @@ let () =
           void
           |> nav "region"
           |> create [
-            "name", opUpdate (string "NEWREGION");
+            "name", M.update (string "NEWREGION");
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
         let%bind () = Mutation.execute mut Value.null in
+        return (expectDbToMatchSnapshot db)
+      )
+
+    end;
+
+    test "simple with query" begin fun () ->
+      let db = getDb () in
+
+      unwrapAssertionResult (
+        let open Run.Syntax in
+        let query = Q.(
+          void
+          |> nav "region"
+          |> create [
+            "name", M.update (here |> nav "nation" |> locate (string "RUSSIA") |> nav "name");
+          ]
+        ) in
+        let%bind query = QueryTyper.typeQuery ~univ query in
+        let%bind res = JSONDatabase.query ~db query in
+        let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
+        let value = Value.null in
+        let%bind () = Mutation.execute mut value in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -644,13 +672,16 @@ let () =
           void
           |> nav "region"
           |> create [
-            "name", opUpdate (name "value" |> nav "name");
+            "name", M.update (name "value" |> nav "name");
           ]
         ) in
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let value = createFormValue {|
+          {"name": "HEY"}
+        |} in
+        let%bind () = Mutation.execute mut value in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -665,9 +696,9 @@ let () =
           void
           |> nav "nation"
           |> create [
-            "name", opUpdate (Q.string "NEWNATION");
-            "region", opCreateEntity [
-              "name", opUpdate (Q.string "NEWREGION");
+            "name", M.update (Q.string "NEWNATION");
+            "region", M.createEntity [
+              "name", M.update (Q.string "NEWREGION");
             ]
           ]
         ) in

@@ -30,6 +30,7 @@
 %{
 
   module S = Query.Untyped.Syntax
+  module M = Query.Mutation.Syntax
   module W = Workflow.Untyped.Syntax
   module StringMap = Belt.Map.String
 
@@ -108,10 +109,9 @@ opList:
   | op = op; COMMA; ops = opList { op::ops }
 
 op:
-  | name = ID; COLON; q = query { name, S.opUpdate q }
-  | name = ID; COLON; q = query { name, S.opUpdate q }
-  | name = ID; COLON; UPDATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { name, S.opUpdateEntity ops }
-  | name = ID; COLON; CREATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { name, S.opCreateEntity ops }
+  | name = ID; COLON; q = query { name, M.update q }
+  | name = ID; COLON; UPDATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { name, M.updateEntity ops }
+  | name = ID; COLON; CREATE; LEFT_BRACE; ops = opList; RIGHT_BRACE { name, M.updateEntity ops }
 
 screen:
   | PICK { {name = "pick"; args = [] } }
