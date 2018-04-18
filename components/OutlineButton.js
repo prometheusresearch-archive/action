@@ -12,6 +12,7 @@ type P = {
   outlineColor?: string,
   fillColor?: string,
   style?: ?Style,
+  onPress?: () => void,
 };
 
 const style = StyleSheet.create({
@@ -63,9 +64,11 @@ export function OutlineButton({
   outlineColor,
   fillColor,
   style: extraStyle,
+  onPress,
 }: P) {
   return (
     <TouchableOpacity
+      onPress={onPress}
       activeOpacity={0.4}
       style={[
         style.view,
