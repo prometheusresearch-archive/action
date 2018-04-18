@@ -494,8 +494,6 @@ module Typed = struct
 
   and scope = binding Scope.t
 
-  and uniqName = string
-
   and binding =
     | TypedBinding of t
     | UntypedBinding of Untyped.t
