@@ -50,7 +50,12 @@ let () =
     expectParseOk "individual.nation:meta";
 
     expectParseOk "render(individual:pick)";
+    expectParseOk "let name = render(individual:pick)";
     expectParseOk "render(individual:pick) { render(here:view) }";
+    expectParseOk "let name = render(individual:pick) { render(here:view) }";
+    expectParseOk "render(individual:pick) { let name = render(here:view) }";
+    expectParseOk "render(individual:pick) { goto name }";
+    expectParseOk "goto name";
     expectParseOk "render(individual:pick) { render(here:view), }";
     expectParseOk {|
 

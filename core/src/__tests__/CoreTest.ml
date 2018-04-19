@@ -367,7 +367,6 @@ let () =
 
   describe "Workflow" begin fun () ->
 
-
     test "render(region:pick)" begin fun () ->
       expectWorkflowTyped W.(render Q.(here |> nav "region" |> screen "pick"))
     end;
@@ -381,6 +380,39 @@ let () =
         render Q.(void |> nav "region" |> screen "pick")
         |> andThen [
           render Q.(here |> nav "value" |> screen "view")
+        ]
+      )
+    end;
+
+    test "main: render(region:pick) { main }" begin fun () ->
+      expectWorkflowTyped W.(
+        render ~label:"main" Q.(void |> nav "region" |> screen "pick")
+        |> andThen [
+          label "main"
+        ]
+      )
+    end;
+
+    test "main: render(region:pick) { render(value:view) { main } }" begin fun () ->
+      expectWorkflowTyped W.(
+        render ~label:"main" Q.(void |> nav "region" |> screen "pick")
+        |> andThen [
+          render Q.(here |> nav "value" |> screen "view")
+          |> andThen [
+            label "main"
+          ]
+        ]
+      )
+    end;
+
+    test "main: render(region:pick) { main { render(value:view) }" begin fun () ->
+      expectWorkflowTyped W.(
+        render ~label:"main" Q.(void |> nav "region" |> screen "pick")
+        |> andThen [
+          label "main"
+          |> andThen [
+            render Q.(here |> nav "value" |> screen "view")
+          ]
         ]
       )
     end;

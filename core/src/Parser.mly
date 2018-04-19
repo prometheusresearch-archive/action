@@ -10,6 +10,8 @@
 %token FIRST
 %token RENDER
 %token NULL
+%token LET
+%token GOTO
 %token DOT
 %token COMMA
 %token COLON
@@ -24,6 +26,7 @@
 %token <string> STRING
 %token <float> NUMBER
 %token <bool> BOOL
+%token EQ
 %token LT
 %token EOF
 
@@ -55,8 +58,10 @@ program:
 
 workflow:
   | RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render q }
+  | LET; label = ID; EQ; RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render ~label q }
   | w = workflow; LEFT_BRACE; RIGHT_BRACE { w }
   | w = workflow; LEFT_BRACE; ws = workflowList; RIGHT_BRACE { W.andThen ws w }
+  | GOTO; label = ID { W.label label }
 
 workflowList:
   | w = workflow { [w] }

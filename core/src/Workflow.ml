@@ -1,66 +1,72 @@
 module Result = Common.Result
-
-(**
- * Monadic structure on top queries which represent transition between screens.
- *)
-module Syntax (Q : sig type t end) = struct
-
-  type q = Q.t
-  type t =
-    (** Render concrete query to a screen *)
-    | Render of q
-    (** Define how to transition from one screen to another screen *)
-    | Next of (t * t list)
-
-end
+module StringMap = Common.StringMap
 
 module Untyped = struct
-  include Syntax(Query.Untyped)
+  type t =
+    | Root
+    | Render of render
+    | AndThen of (t * t list)
+    | Label of string
+
+  and render = {
+    query : Query.Untyped.t;
+    label : string option;
+  }
 
   module Syntax = struct
-    let render q = Render q
-    let andThen path w = Next (w, path)
+    let root = Root
+    let render ?label query = Render {query; label}
+    let andThen path node = AndThen (node, path)
+    let label name = Label name
   end
 end
 
 module Typed = struct
-  include Syntax(struct
-
-    type t = Query.Untyped.t
-
-  end)
+  type t =
+    | Root
+    | Render of Untyped.render
+    | AndThen of t * t list
+    | Label of string
 end
 
 module Typer = struct
 
-  type error = [ `WorkflowTypeError of string | `QueryTypeError of string ]
+  type error = [ `WorkflowTypeError of string | QueryTyper.error ]
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
   let workflowTypeError err = Run.error (`WorkflowTypeError err)
 
-  let liftResult = function
-    | Result.Ok v -> Run.return v
-    | Result.Error err -> Run.error (`WorkflowTypeError err)
-
   let typeWorkflow ~univ w =
     let open Run.Syntax in
-    let rec aux ~parent w =
+    let rec aux ~scope ~parent w =
       match w with
-      | Untyped.Render q ->
-        let%bind tq = QueryTyper.growQuery ~univ ~base:parent q in
-        return (Typed.Render q, tq)
-      | Untyped.Next (first, next) ->
-        let%bind first, parent = aux ~parent first in
+      | Untyped.Root -> return (Typed.Root, Query.Typed.void, StringMap.empty)
+      | Untyped.Label name ->
+        begin match StringMap.get scope name with
+        | Some tq -> return (Typed.Label name, tq, scope)
+        | None -> workflowTypeError {j|referencing unknown workflow "$name"|j}
+        end
+      | Untyped.Render {query; label} ->
+        let render = Typed.Render {query; label} in
+        let%bind tq = QueryTyper.growQuery ~univ ~base:parent query in
+        let scope = match label with
+        | Some label -> StringMap.set scope label tq
+        | None -> scope
+        in
+        return (render, tq, scope)
+      | Untyped.AndThen (first, next) ->
+        let%bind first, parent, scope = aux ~scope ~parent first in
         let%bind next, _ =
           let f (next, parent) w =
-            let%bind w, _ = aux ~parent w in
+            let%bind w, _, _ = aux ~scope ~parent w in
             return (w::next, parent)
           in
           Run.List.foldLeft ~f ~init:([], parent) next
         in
-        return (Typed.Next (first, List.rev next), parent)
+        return (Typed.AndThen (first, List.rev next), parent, scope)
     in
-    let%bind tw, _ = aux ~parent:Query.Typed.void w in
+    let scope = StringMap.empty in
+    let%bind tw, _, _ = aux ~scope ~parent:Query.Typed.void w in
     return tw
 
 end

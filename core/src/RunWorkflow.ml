@@ -1,4 +1,6 @@
+module Map = Common.StringMap
 module Result = Common.Result
+module W = Workflow.Typed
 
 module Make (Db : Abstract.DATABASE) = struct
 
@@ -7,10 +9,11 @@ module Make (Db : Abstract.DATABASE) = struct
   and frame = {
     db : Db.t;
     query : Query.Typed.t;
-    workflow : Workflow.Typed.t;
+    workflow : W.t;
     position: position;
     prev: t option;
     args : Query.Untyped.args;
+    scope : t Map.t;
   }
 
   and position =
@@ -34,8 +37,13 @@ module Make (Db : Abstract.DATABASE) = struct
   let uiQuery (frame, _) =
     let open Run.Syntax in
     match frame.workflow with
-    | Workflow.Typed.Render q ->
-      let%bind q = QueryTyper.growQuery ~univ:(Db.univ frame.db) ~base:frame.query q in
+    | W.Render {query; _} ->
+      let%bind q =
+        QueryTyper.growQuery
+          ~univ:(Db.univ frame.db)
+          ~base:frame.query
+          query
+      in
       return q
     | _ -> runWorkflowError "no query"
 
@@ -58,6 +66,7 @@ module Make (Db : Abstract.DATABASE) = struct
     ?ui
     ?(args=Common.StringMap.empty)
     ?(query=Query.Typed.void)
+    ~scope
     ~position
     ~db
     workflow
@@ -69,18 +78,31 @@ module Make (Db : Abstract.DATABASE) = struct
       position;
       prev;
       args;
+      scope;
     } in frame, ui
 
   let findRender startState =
     let open Run.Syntax in
 
-    let rec aux (frame, _ as state) =
+    let rec aux (frame, ui as state) =
       let {workflow; db; query; _} = frame in
       match workflow with
-      | Workflow.Typed.Next (first, _next) ->
-        let state = make ?prev:frame.prev ~position:(First state) ~query ~db first in
+      | W.Root -> return None
+      | W.Label name ->
+        begin match Map.get frame.scope name with
+        | Some state -> aux state
+        | None -> runWorkflowError {j|unknown binding "$name"|j}
+        end
+      | W.AndThen (first, _next) ->
+        let state = make ?prev:frame.prev ~scope:frame.scope ~position:(First state) ~query ~db first in
         aux state
-      | Workflow.Typed.Render _ ->
+      | W.Render {label; _} ->
+        let state = match label with
+        | Some label ->
+          let scope = Map.set frame.scope label state in
+          {frame with scope}, ui
+        | None -> state
+        in
         let%bind q = uiQuery state in
         let%bind ui = Db.query ~db:frame.db q in
         begin match Value.classify ui with
@@ -113,23 +135,37 @@ module Make (Db : Abstract.DATABASE) = struct
 
   let boot ~db workflow =
     let open Run.Syntax in
-    let state = make ~position:Root ~db workflow in
+    let state = make ~position:Root ~db ~scope:Map.empty workflow in
     let%bind state, ui = render state in
     return (state, ui)
 
-  let next (_, _ as currentState) =
+  let next (frame, _ as currentState) =
     let open Run.Syntax in
 
-    let rec aux query (frame, _ as state) =
+    let rec aux ~scope query (frame, _ as state) =
       let {workflow; position; db;} = frame in
       match workflow, position with
-      | Workflow.Typed.Render _, First parent -> aux query parent
-      | Workflow.Typed.Render _, Next _  -> return []
-      | Workflow.Typed.Render _, Root -> return []
-      | Workflow.Typed.Next (_first, []), First parent -> aux query parent
-      | Workflow.Typed.Next (_first, next), _ ->
+      | W.Root, Root -> return []
+      | W.Root, First parent -> aux ~scope query parent
+      | W.Root, Next _ -> return []
+      | W.Label label, _ ->
+        let%bind state = match Map.get scope label with
+        | Some state -> return state
+        | None -> runWorkflowError {j|unreachable label "$label"|j}
+        in aux ~scope query state
+      | W.Render {Workflow.Untyped. label;_}, First parent ->
+        let scope = match label with
+        | Some label -> Map.set scope label state
+        | None -> scope
+        in
+        aux ~scope query parent
+      | W.Render _, Next _  -> return []
+      | W.Render _, Root -> return []
+      | W.AndThen (_first, []), First parent ->
+        aux ~scope query parent
+      | W.AndThen (_first, next), _ ->
         let f w =
-          let state = make ~prev:currentState ~query ~position:(Next state) ~db w in
+          let state = make ~prev:currentState ~query ~scope:scope ~position:(Next state) ~db w in
           findRender state
         in
         let%bind next = Run.List.map ~f next in
@@ -137,7 +173,13 @@ module Make (Db : Abstract.DATABASE) = struct
     in
 
     let%bind q = uiQuery currentState in
-    let%bind r = aux q currentState in
+    Js.log2 "NEXT" (Map.toArray frame.scope);
+    let%bind r =
+      aux
+        ~scope:frame.scope
+        q
+        currentState
+    in
     return r
 
   let step state =
@@ -150,7 +192,7 @@ module Make (Db : Abstract.DATABASE) = struct
   let setArgs ~args (frame, ui) =
     let open Run.Syntax in
     let%bind frame = match frame.workflow with
-    | Workflow.Typed.Render (ctyp, Query.Untyped.Screen (p, c)) ->
+    | W.Render {query = ctyp, Query.Untyped.Screen (p, c); label} ->
       let univ = Db.univ frame.db in
       let%bind screen = liftResult (Universe.lookupScreenResult c.screenName univ) in
       let%bind args = QueryTyper.checkArgsPartial ~argTyps:screen.args args in
@@ -158,7 +200,7 @@ module Make (Db : Abstract.DATABASE) = struct
         c with Query.Untyped.
         screenArgs = Query.Untyped.updateArgs ~update:args c.screenArgs
       } in
-      let workflow = Workflow.Typed.Render (ctyp, Query.Untyped.Screen (p, c)) in
+      let workflow = W.Render {query = ctyp, Query.Untyped.Screen (p, c); label} in
       return { frame with args; workflow; }
     | _ -> runWorkflowError {j|Arguments can only be updated at the workflow node with a rendered screen|j}
     in

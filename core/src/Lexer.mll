@@ -30,6 +30,8 @@ rule read = parse
   | "pick"     { PICK }
   | "view"     { VIEW }
   | "edit"     { EDIT }
+  | "let"      { LET }
+  | "goto"     { GOTO }
   | "barChart" { BAR_CHART }
   | "count"    { COUNT }
   | "first"    { FIRST }
@@ -38,6 +40,7 @@ rule read = parse
   | "null"     { NULL }
   | "update"   { UPDATE }
   | "create"   { CREATE }
+  | "="        { EQ }
   | "true"     { BOOL true }
   | "false"    { BOOL false }
   | '['        { LEFT_BRACKET }
