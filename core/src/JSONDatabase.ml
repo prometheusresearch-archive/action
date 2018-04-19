@@ -8,23 +8,65 @@ module ComparisonOp = Query.ComparisonOp
 module LogicalOp = Query.LogicalOp
 module StringMap = Common.StringMap
 
+module Universe = struct
+  module Type = Query.Type
+  module Result = Common.Result
+  module Map = Common.StringMap
+
+  type t = {
+    fields : Type.field list;
+    entities : Type.entity Map.t;
+    screens : Screen.t Map.t;
+  }
+
+  let empty = {
+    fields = [];
+    entities = Map.empty;
+    screens = Map.empty;
+  }
+
+  let hasOne ?args name typ univ =
+    let field = Type.Syntax.hasOne ?args name typ in
+    { univ with fields = field::univ.fields }
+
+  let hasOpt ?args name typ univ =
+    let field = Type.Syntax.hasOpt ?args name typ in
+    { univ with fields = field::univ.fields }
+
+  let hasMany ?args name typ univ =
+    let field = Type.Syntax.hasMany ?args name typ in
+    { univ with fields = field::univ.fields }
+
+  let hasScreen name screen univ =
+    { univ with screens = Map.set univ.screens name screen; }
+
+  let fields univ = univ.fields
+
+  let getScreen name univ =
+    Map.get univ.screens name
+end
+
+module QueryTyper = QueryTyper.Make(Universe)
+
 type t = {
   value : Value.t;
   univ : Universe.t;
 }
 
-type error = [ `DatabaseError of string | QueryTyper.error ]
+type error = [ `DatabaseError of string | `QueryTypeError of string ]
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
-
-let liftResult = function
-  | Result.Ok v -> Run.return v
-  | Result.Error err -> Run.error (`DatabaseError err)
 
 let liftOption ~err = function
   | Some v -> Run.return v
   | None -> Run.error (`DatabaseError err)
 
 let executionError err = Run.error (`DatabaseError err)
+
+let getScreen name univ =
+  let open Run.Syntax in
+  match Universe.getScreen name univ with
+  | Some screen -> return screen
+  | None -> executionError {j|Unknown screen "$name"|j}
 
 module Ref = struct
   type t = {
@@ -338,10 +380,10 @@ let query ?value ~db q =
         | Value.Null -> return Value.null
         | _ ->
           let univ = univ db in
-          let%bind screen = liftResult (Universe.lookupScreenResult screenName univ) in
+
+          let%bind screen = getScreen screenName univ in
           let ui =
             Value.UI.make
-              ~univ
               ~screen
               ~name:screenName
               ~args:screenArgs

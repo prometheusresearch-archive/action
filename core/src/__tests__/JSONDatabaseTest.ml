@@ -5,6 +5,8 @@ open! Expect.Operators
 module Q = Query.Untyped.Syntax
 module M = Query.Mutation.Syntax
 
+module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
+
 let liftResult = function
   | Js.Result.Ok v -> Run.return v
   | Js.Result.Error err -> Run.error (`DatabaseError err)
@@ -29,7 +31,7 @@ let univ =
     ])
   )
   in
-  Core.Universe.(
+  JSONDatabase.Universe.(
     empty
     |> hasMany "region" (Lazy.force region)
     |> hasMany "nation" (Lazy.force nation)
@@ -83,7 +85,7 @@ let expectDbToMatchSnapshot db =
 
 let runQuery ~db q =
   let open Run.Syntax in
-  let%bind q = Core.QueryTyper.typeQuery ~univ q in
+  let%bind q = QueryTyper.typeQuery ~univ q in
   let%bind r = JSONDatabase.query ~db q in
   return r
 

@@ -7,6 +7,8 @@ module Result = Common.Result
 module Q = Query.Untyped.Syntax
 module M = Query.Mutation.Syntax
 module W = Workflow.Untyped.Syntax
+module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
+module WorkflowTyper = WorkflowTyper.Make(JSONDatabase.Universe)
 
 let univ = JsApi.univ
 let db = JsApi.db
@@ -58,7 +60,7 @@ let expectQueryOk query =
 let expectWorkflowTyped workflow =
   let result =
     let open Run.Syntax in
-    let%bind _ = Workflow.Typer.typeWorkflow ~univ workflow in
+    let%bind _ = WorkflowTyper.typeWorkflow ~univ workflow in
     return ()
   in
   expectOk (runToResult result)
@@ -70,13 +72,13 @@ let unwrapAssertionResult = function
 let runQueryAndExpect q v =
   unwrapAssertionResult (runToResult (
     let open Run.Syntax in
-    let%bind q = Core.QueryTyper.typeQuery ~univ q in
+    let%bind q = QueryTyper.typeQuery ~univ q in
     let%bind r = JSONDatabase.query ~db q in
     return (expect(r) |> toEqual(v))
   ))
 
 let typeWorkflow w =
-  runToResult (Workflow.Typer.typeWorkflow ~univ w)
+  runToResult (WorkflowTyper.typeWorkflow ~univ w)
 
 let () =
 

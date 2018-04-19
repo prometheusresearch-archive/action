@@ -21,8 +21,7 @@ module UI : sig
   type t
 
   val make :
-    univ : Universe.t
-    -> screen : Screen.t
+    screen : Screen.t
     -> name : string
     -> args : Query.Untyped.args
     -> typ : Type.t
@@ -42,7 +41,6 @@ module UI : sig
 
 end = struct
   type t = <
-    univ : Universe.t;
     screen : Screen.t;
     name : string;
     args : Query.Untyped.args;
@@ -52,8 +50,7 @@ end = struct
   > Js.t
 
   external make :
-    univ : Universe.t
-    -> screen : Screen.t
+    screen : Screen.t
     -> name : string
     -> args : Query.Untyped.args
     -> typ : Type.t
@@ -79,7 +76,6 @@ end = struct
   let setArgs ~args ui =
     let args = Query.Untyped.updateArgs ~update:args ui##args in
     make
-      ~univ:ui##univ
       ~screen:ui##screen
       ~name:ui##name
       ~args
