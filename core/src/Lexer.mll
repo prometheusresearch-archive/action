@@ -40,7 +40,6 @@ rule read = parse
   | "null"     { NULL }
   | "update"   { UPDATE }
   | "create"   { CREATE }
-  | "="        { EQ }
   | "true"     { BOOL true }
   | "false"    { BOOL false }
   | '['        { LEFT_BRACKET }
@@ -52,7 +51,14 @@ rule read = parse
   | ':'        { COLON }
   | '.'        { DOT }
   | ','        { COMMA }
-  | '<'        { LT }
+  | "="        { EQ }
+  | "!="       { NEQ }
+  | "<"        { LT }
+  | "<="       { LTE }
+  | ">"        { GT }
+  | ">="       { GTE }
+  | "&&"       { AND }
+  | "||"       { OR }
   | id         { ID (Lexing.lexeme lexbuf) }
   | name       {
                  let buf = Lexing.lexeme lexbuf in

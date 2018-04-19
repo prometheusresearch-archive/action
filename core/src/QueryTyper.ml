@@ -328,10 +328,10 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       in
       return Typed.(makeCtx (parentCard, Type.Record fields), Select (parent, selection))
 
-    | Untyped.LessThan (left, right) ->
+    | Untyped.ComparisonOp (op, left, right) ->
       let%bind left = aux ~ctx left in
       let%bind right = aux ~ctx right in
-      let syn = Typed.LessThan (left, right) in
+      let syn = Typed.ComparisonOp (op, left, right) in
       let%bind card =
         match Typed.card left, Typed.card right with
         | Card.One, Card.One -> return Card.One
@@ -339,7 +339,8 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
         | Card.One, Card.Opt
         | Card.Opt, Card.Opt -> return Card.Opt
         | _ ->
-          queryTypeError "'<' cardinality mismatch: expected one / opt"
+          let op = Query.ComparisonOp.show op in
+          queryTypeError {j|$op cardinality mismatch: expected ops or one|j}
       in
       let%bind () =
         match Typed.typ left, Typed.typ right with
@@ -349,7 +350,38 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
         | Type.Value Type.Null, Type.Value Type.Null ->
           return ()
         | _ ->
-          queryTypeError "'<' type mismatch: numbers expected"
+          let op = Query.ComparisonOp.show op in
+          queryTypeError {j|$op type mismatch: numbers expected|j}
+      in
+      (* TODO:
+        * Handler for Card.Many < Card.One etc
+        * *)
+      return (makeCtx (card, Type.Value Type.Bool), syn)
+
+    | Untyped.LogicalOp (op, left, right) ->
+      let%bind left = aux ~ctx left in
+      let%bind right = aux ~ctx right in
+      let syn = Typed.LogicalOp (op, left, right) in
+      let%bind card =
+        match Typed.card left, Typed.card right with
+        | Card.One, Card.One -> return Card.One
+        | Card.Opt, Card.One
+        | Card.One, Card.Opt
+        | Card.Opt, Card.Opt -> return Card.Opt
+        | _ ->
+          let op = Query.LogicalOp.show op in
+          queryTypeError {j|$op cardinality mismatch: expected ops or one|j}
+      in
+      let%bind () =
+        match Typed.typ left, Typed.typ right with
+        | Type.Value Type.Bool, Type.Value Type.Bool
+        | Type.Value Type.Bool, Type.Value Type.Null
+        | Type.Value Type.Null, Type.Value Type.Bool
+        | Type.Value Type.Null, Type.Value Type.Null ->
+          return ()
+        | _ ->
+          let op = Query.LogicalOp.show op in
+          queryTypeError {j|$op type mismatch: booleans expected|j}
       in
       (* TODO:
         * Handler for Card.Many < Card.One etc

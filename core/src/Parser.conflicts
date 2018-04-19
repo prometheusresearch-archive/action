@@ -1,7 +1,119 @@
 
-** Conflict (shift/reduce) in state 38.
-** Tokens involved: LT LEFT_BRACKET LEFT_BRACE DOT COLON
-** The following explanations concentrate on token LT.
+** Conflict (shift/reduce) in state 95.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query AND query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 95, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query AND query 
+          query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 95, looking ahead at LEFT_BRACKET, reducing production
+** query -> query AND query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query AND query . 
+
+** Conflict (shift/reduce) in state 93.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query EQ query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 93, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query EQ query 
+         query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 93, looking ahead at LEFT_BRACKET, reducing production
+** query -> query EQ query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query EQ query . 
+
+** Conflict (shift/reduce) in state 91.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query GT query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 91, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query GT query 
+         query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 91, looking ahead at LEFT_BRACKET, reducing production
+** query -> query GT query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query GT query . 
+
+** Conflict (shift/reduce) in state 89.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query GTE query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 89, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query GTE query 
+          query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 89, looking ahead at LEFT_BRACKET, reducing production
+** query -> query GTE query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query GTE query . 
+
+** Conflict (shift/reduce) in state 56.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
 query LT query 
@@ -14,20 +126,104 @@ program EOF
 query 
 (?)
 
-** In state 38, looking ahead at LT, shifting is permitted
+** In state 56, looking ahead at LEFT_BRACKET, shifting is permitted
 ** because of the following sub-derivation:
 
 query LT query 
-         query . LT query 
+         query . LEFT_BRACKET query RIGHT_BRACKET 
 
-** In state 38, looking ahead at LT, reducing production
+** In state 56, looking ahead at LEFT_BRACKET, reducing production
 ** query -> query LT query 
 ** is permitted because of the following sub-derivation:
 
-query LT query // lookahead token appears
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query LT query . 
 
-** Conflict (shift/reduce) in state 15.
+** Conflict (shift/reduce) in state 46.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query LTE query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 46, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query LTE query 
+          query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 46, looking ahead at LEFT_BRACKET, reducing production
+** query -> query LTE query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query LTE query . 
+
+** Conflict (shift/reduce) in state 41.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query NEQ query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 41, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query NEQ query 
+          query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 41, looking ahead at LEFT_BRACKET, reducing production
+** query -> query NEQ query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query NEQ query . 
+
+** Conflict (shift/reduce) in state 39.
+** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** The following explanations concentrate on token LEFT_BRACKET.
+** This state is reached from start after reading:
+
+query OR query 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+query 
+(?)
+
+** In state 39, looking ahead at LEFT_BRACKET, shifting is permitted
+** because of the following sub-derivation:
+
+query OR query 
+         query . LEFT_BRACKET query RIGHT_BRACKET 
+
+** In state 39, looking ahead at LEFT_BRACKET, reducing production
+** query -> query OR query 
+** is permitted because of the following sub-derivation:
+
+query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
+query OR query . 
+
+** Conflict (shift/reduce) in state 16.
 ** Token involved: COLON
 ** This state is reached from start after reading:
 
@@ -43,7 +239,7 @@ LEFT_BRACE selectFieldList RIGHT_BRACE
            selectField 
            (?)
 
-** In state 15, looking ahead at COLON, reducing production
+** In state 16, looking ahead at COLON, reducing production
 ** query -> ID 
 ** is permitted because of the following sub-derivation:
 
@@ -51,7 +247,7 @@ query
 query COLON COUNT // lookahead token appears
 ID . 
 
-** In state 15, looking ahead at COLON, shifting is permitted
+** In state 16, looking ahead at COLON, shifting is permitted
 ** because of the following sub-derivation:
 
 ID . COLON query 

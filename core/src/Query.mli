@@ -23,6 +23,26 @@ module Card : sig
   end
 end
 
+module ComparisonOp : sig
+  type t =
+    | LT
+    | GT
+    | LTE
+    | GTE
+    | EQ
+    | NEQ
+
+  val show : t -> string
+end
+
+module LogicalOp : sig
+  type t =
+    | AND
+    | OR
+
+  val show : t -> string
+end
+
 (**
  * Constant values tagged with types.
  *)
@@ -80,7 +100,8 @@ module Untyped : sig
     | Meta of t
     | Grow of (t * t)
     | GrowArgs of (t * args)
-    | LessThan of (t * t)
+    | ComparisonOp of (ComparisonOp.t * t * t)
+    | LogicalOp of (LogicalOp.t * t * t)
 
   and args = t Common.StringMap.t
 
@@ -128,6 +149,13 @@ module Untyped : sig
     val grow : t -> t -> t
     val growArgs : Arg.arg list -> t -> t
     val lessThan : t -> t -> t
+    val lessOrEqThan : t -> t -> t
+    val greaterThan : t -> t -> t
+    val greaterOrEqThan : t -> t -> t
+    val eq : t -> t -> t
+    val notEq : t -> t -> t
+    val and_ : t -> t -> t
+    val or_ : t -> t -> t
     val arg : string -> t -> Arg.arg
     val update : (string * t Mutation.op) list -> t -> t
     val create : (string * t Mutation.op) list -> t -> t
@@ -242,7 +270,8 @@ module Typed : sig
     | Meta of t
     | Grow of (t * t)
     | GrowArgs of (t * Untyped.args)
-    | LessThan of (t * t)
+    | ComparisonOp of (ComparisonOp.t * t * t)
+    | LogicalOp of (LogicalOp.t * t * t)
 
   and nav = { navName : string; }
 

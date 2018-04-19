@@ -27,8 +27,18 @@
 %token <float> NUMBER
 %token <bool> BOOL
 %token EQ
+%token NEQ
 %token LT
+%token LTE
+%token GT
+%token GTE
+%token AND
+%token OR
 %token EOF
+
+%right OR
+%right AND
+%left LT LTE GT GTE EQ NEQ
 
 %{
 
@@ -95,7 +105,15 @@ query:
   | v = BOOL { S.bool v }
   | NULL { S.null }
   | name = NAME { S.name name }
-  | left = query; LT; right = query { S.lessThan left right }
+  | LEFT_PAREN; q = query; RIGHT_PAREN { q }
+  | left = query; OR; right = query { S.or_ left right } %prec OR
+  | left = query; AND; right = query { S.and_ left right } %prec AND
+  | left = query; LT; right = query { S.lessThan left right } %prec LT
+  | left = query; GT; right = query { S.greaterThan left right } %prec GT
+  | left = query; LTE; right = query { S.lessOrEqThan left right } %prec LTE
+  | left = query; GTE; right = query { S.greaterOrEqThan left right } %prec GTE
+  | left = query; EQ; right = query { S.eq left right } %prec EQ
+  | left = query; NEQ; right = query { S.notEq left right } %prec NEQ
 
 nav:
   | name = ID { {name; args = []} }

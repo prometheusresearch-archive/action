@@ -1,8 +1,27 @@
 open! Jest
 open! Expect
 open! Expect.Operators
+module Q = Query.Untyped.Syntax
 
 let () =
+
+  let expectParseQueryAndEq s exp =
+    test s begin fun () ->
+      let filebuf = Lexing.from_string s in
+      try
+        let res = Parser.start Lexer.read filebuf in
+        match res with
+        | ParserResult.Query q ->
+          expect(q) |> toEqual(exp)
+        | ParserResult.Workflow _ ->
+          fail "expected query"
+      with
+      | Lexer.Error msg ->
+        fail msg
+      | Parser.Error ->
+        fail "Syntax error"
+    end
+  in
 
   let expectParseOk s =
     test s begin fun () ->
@@ -19,7 +38,8 @@ let () =
         fail msg
       | Parser.Error ->
         fail "Syntax error"
-    end in
+    end
+  in
 
   describe "Parsing" begin fun () ->
     expectParseOk "/";
@@ -65,8 +85,45 @@ let () =
       }
 
     |};
-    expectParseOk "1 < 2";
+
     expectParseOk "null";
+
+    expectParseOk "1 < 2";
+    expectParseOk "1 > 2";
+    expectParseOk "1 <= 2";
+    expectParseOk "1 >= 2";
+    expectParseOk "1 = 2";
+    expectParseOk "1 != 2";
+    expectParseOk "true && false";
+    expectParseOk "true || false";
+
+    expectParseQueryAndEq "true || false" Q.(
+      or_ (bool true) (bool false)
+    );
+
+    expectParseQueryAndEq "true && false" Q.(
+      and_ (bool true) (bool false)
+    );
+
+    expectParseQueryAndEq "true && false || true" Q.(
+      or_ (and_ (bool true) (bool false)) (bool true)
+    );
+
+    expectParseQueryAndEq "true && (false || true)" Q.(
+      and_ (bool true) (or_ (bool false) (bool true))
+    );
+
+    expectParseQueryAndEq "true || true && false" Q.(
+      or_ (bool true) (and_ (bool true) (bool false))
+    );
+
+    expectParseQueryAndEq "1 > 2 && false" Q.(
+      and_ (greaterThan (number 1.) (number 2.)) (bool false)
+    );
+
+    expectParseQueryAndEq "1 < 2 && false" Q.(
+      and_ (lessThan (number 1.) (number 2.)) (bool false)
+    );
 
     (** Mutations *)
 

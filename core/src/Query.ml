@@ -38,6 +38,34 @@ module Card = struct
   end
 end
 
+module ComparisonOp = struct
+  type t =
+    | LT
+    | GT
+    | LTE
+    | GTE
+    | EQ
+    | NEQ
+
+  let show = function
+    | LT -> "<"
+    | GT -> ">"
+    | LTE -> "<="
+    | GTE -> ">="
+    | EQ -> "="
+    | NEQ -> "!="
+end
+
+module LogicalOp = struct
+  type t =
+    | AND
+    | OR
+
+  let show = function
+    | AND -> "&&"
+    | OR -> "||"
+end
+
 (**
  * Helper module for argument like syntax.
  *
@@ -142,7 +170,8 @@ module Untyped = struct
     | Meta of t
     | Grow of (t * t)
     | GrowArgs of (t * args)
-    | LessThan of (t * t)
+    | ComparisonOp of (ComparisonOp.t * t * t)
+    | LogicalOp of (LogicalOp.t * t * t)
 
   and args = t StringMap.t
 
@@ -234,10 +263,16 @@ module Untyped = struct
       let parent = show parent in
       let id = show id in
       {j|$parent[$id]|j}
-    | LessThan (left, right) ->
+    | ComparisonOp (op, left, right) ->
+      let op = ComparisonOp.show op in
       let left = show left in
       let right = show right in
-      {j|$left < $right|j}
+      {j|$left $op $right|j}
+    | LogicalOp (op, left, right) ->
+      let op = LogicalOp.show op in
+      let left = show left in
+      let right = show right in
+      {j|$left $op $right|j}
 
   let updateArgs ~(update : args) (args : args) =
     let merge _name a u = match a, u with
@@ -309,7 +344,28 @@ module Untyped = struct
       (), GrowArgs (parent, args)
 
     let lessThan left right =
-      (), LessThan (left, right)
+      (), ComparisonOp (ComparisonOp.LT, left, right)
+
+    let lessOrEqThan left right =
+      (), ComparisonOp (ComparisonOp.LTE, left, right)
+
+    let greaterThan left right =
+      (), ComparisonOp (ComparisonOp.GT, left, right)
+
+    let greaterOrEqThan left right =
+      (), ComparisonOp (ComparisonOp.GTE, left, right)
+
+    let eq left right =
+      (), ComparisonOp (ComparisonOp.EQ, left, right)
+
+    let notEq left right =
+      (), ComparisonOp (ComparisonOp.NEQ, left, right)
+
+    let and_ left right =
+      (), LogicalOp (LogicalOp.AND, left, right)
+
+    let or_ left right =
+      (), LogicalOp (LogicalOp.OR, left, right)
 
     let arg = Arg.make
 
@@ -514,7 +570,8 @@ module Typed = struct
     | Meta of t
     | Grow of (t * t)
     | GrowArgs of (t * Untyped.args)
-    | LessThan of (t * t)
+    | ComparisonOp of (ComparisonOp.t * t * t)
+    | LogicalOp of (LogicalOp.t * t * t)
 
   and nav = { navName : string; }
 
@@ -557,8 +614,10 @@ module Typed = struct
     | _, Meta parent -> (), Untyped.Meta (stripTypes parent)
     | _, Grow (parent, next) -> (), Untyped.Grow (stripTypes parent, stripTypes next)
     | _, GrowArgs (parent, args) -> (), Untyped.GrowArgs (stripTypes parent, args)
-    | _, LessThan (left, right) ->
-      (), Untyped.LessThan (stripTypes left, stripTypes right)
+    | _, ComparisonOp (op, left, right) ->
+      (), Untyped.ComparisonOp (op, stripTypes left, stripTypes right)
+    | _, LogicalOp (op, left, right) ->
+      (), Untyped.LogicalOp (op, stripTypes left, stripTypes right)
 
   let show q =
     Untyped.show (stripTypes q)

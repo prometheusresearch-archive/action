@@ -344,6 +344,12 @@ let () =
       ) (Value.bool false);
     end;
 
+    test "1 < 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan (number 1.) (number 1.)
+      ) (Value.bool false);
+    end;
+
     test "1 < null -> null" begin fun () ->
       runQueryAndExpect Q.(
         lessThan (number 1.) null
@@ -361,8 +367,184 @@ let () =
         lessThan null null
       ) Value.null;
     end;
+  end;
 
+  describe "> / greaterThan" begin fun () ->
+    test "1 > 2 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 1.) (number 2.)
+      ) (Value.bool false);
+    end;
 
+    test "2 > 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 2.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 > 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 1.) (number 1.)
+      ) (Value.bool false);
+    end;
+
+    test "1 > null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null > 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null > null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan null null
+      ) Value.null;
+    end;
+  end;
+
+  describe "<= / lessOrEqThan" begin fun () ->
+    test "1 <= 2 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 1.) (number 2.)
+      ) (Value.bool true);
+    end;
+
+    test "2 <= 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 2.) (number 1.)
+      ) (Value.bool false);
+    end;
+
+    test "1 <= 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 1.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 <= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null <= 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null <= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan null null
+      ) Value.null;
+    end;
+  end;
+
+  describe ">= / greaterOrEq" begin fun () ->
+    test "1 >= 2 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 1.) (number 2.)
+      ) (Value.bool false);
+    end;
+
+    test "2 >= 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 2.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 >= 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 1.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 >= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null >= 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null >= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan null null
+      ) Value.null;
+    end;
+  end;
+
+  describe "= / eq" begin fun () ->
+    test "1 = 2 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        eq (number 1.) (number 2.)
+      ) (Value.bool false);
+    end;
+
+    test "1 = 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        eq (number 1.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 = null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        eq (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null = 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        eq null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null = null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        eq null null
+      ) Value.null;
+    end;
+  end;
+
+  describe "!= / notEq" begin fun () ->
+    test "1 != 2 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq (number 1.) (number 2.)
+      ) (Value.bool true);
+    end;
+
+    test "1 != 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq (number 1.) (number 1.)
+      ) (Value.bool false);
+    end;
+
+    test "1 != null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null != 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null != null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq null null
+      ) Value.null;
+    end;
   end;
 
   describe "Workflow" begin fun () ->

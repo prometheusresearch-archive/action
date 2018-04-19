@@ -4,6 +4,8 @@ module Card = Query.Card
 module Type = Query.Type
 module Const = Query.Const
 module Typed = Query.Typed
+module ComparisonOp = Query.ComparisonOp
+module LogicalOp = Query.LogicalOp
 module StringMap = Common.StringMap
 
 type t = {
@@ -426,19 +428,50 @@ let query ?value ~db q =
       let mut = Mutation.make execute in
       return (Value.mutation mut)
 
-    | _, Query.Typed.LessThan (left, right) ->
+    | _, Query.Typed.ComparisonOp (op, left, right) ->
       let%bind left = aux ~value ~cache left in
       let%bind right = aux ~value ~cache right in
+      let evalOp =
+        match op with
+        | Query.ComparisonOp.LT -> (<)
+        | Query.ComparisonOp.GT -> (>)
+        | Query.ComparisonOp.LTE -> (<=)
+        | Query.ComparisonOp.GTE -> (>=)
+        | Query.ComparisonOp.EQ -> (=)
+        | Query.ComparisonOp.NEQ -> (!=)
+      in
       begin
         match Value.classify left, Value.classify right with
         | Value.Number left, Value.Number right ->
-          return (Value.bool (left < right))
+          return (Value.bool (evalOp left right))
         | Value.Null, Value.Number _
         | Value.Number _, Value.Null
         | Value.Null, Value.Null ->
           return Value.null
         | _ ->
-          executionError "'<' type mismatch ..."
+          let op = Query.ComparisonOp.show op in
+          executionError {j|$op type mismatch: numbers expected|j}
+      end
+
+    | _, Query.Typed.LogicalOp (op, left, right) ->
+      let%bind left = aux ~value ~cache left in
+      let%bind right = aux ~value ~cache right in
+      let evalOp =
+        match op with
+        | Query.LogicalOp.AND -> (&&)
+        | Query.LogicalOp.OR -> (||)
+      in
+      begin
+        match Value.classify left, Value.classify right with
+        | Value.Bool left, Value.Bool right ->
+          return (Value.bool (evalOp left right))
+        | Value.Null, Value.Bool _
+        | Value.Bool _, Value.Null
+        | Value.Null, Value.Null ->
+          return Value.null
+        | _ ->
+          let op = Query.LogicalOp.show op in
+          executionError {j|$op type mismatch: booleans expected|j}
       end
 
     in
