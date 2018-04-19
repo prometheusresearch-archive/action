@@ -2,7 +2,7 @@
  * A computation which modifies the database.
  *)
 
-type  error = [`DatabaseError of string | QueryTyper.error ]
+type  error = [`DatabaseError of string | `QueryTypeError of string ]
 
 type ('v, 'err) t constraint [> error] = 'err
 

@@ -1,4 +1,4 @@
-type error = [`DatabaseError of string | QueryTyper.error ]
+type error = [`DatabaseError of string | `QueryTypeError of string ]
 
 type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
 
