@@ -100,6 +100,8 @@ query:
   | parent = query; DOT; name = ID { S.nav name parent }
   | parent = query; COLON; s = screen { S.screen ~args:s.args s.name parent }
   | parent = query; COLON; mut = mutation { mut parent }
+  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
+  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
   | parent = query; LEFT_BRACKET; id = query RIGHT_BRACKET { S.locate id parent }
