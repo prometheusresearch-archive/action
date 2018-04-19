@@ -26,6 +26,12 @@ module Make (Universe : Abstract.UNIVERSE) = struct
     | Some screen -> return screen
     | None -> queryTypeError {j|Unknown screen "$name"|j}
 
+  let getEntity name univ =
+    let open Run.Syntax in
+    match Universe.getEntity name univ with
+    | Some screen -> return screen
+    | None -> queryTypeError {j|Unknown entity "$name"|j}
+
   let rec extractField ~univ fieldName (typ : Type.t) =
     let open Run.Syntax in
     let findInFieldList fields =
@@ -39,7 +45,9 @@ module Make (Universe : Abstract.UNIVERSE) = struct
     | Type.Void -> let fields = Universe.fields univ in findInFieldList fields
     | Type.Screen { screenOut = _, typ; _ } ->
       extractField ~univ fieldName typ
-    | Type.Entity {entityName = _; entityFields} -> findInFieldList (entityFields typ)
+    | Type.Entity {entityName} ->
+      let%bind entity = getEntity entityName univ in
+      findInFieldList (entity.Universe.entityFields typ)
     | Type.Record fields -> findInFieldList fields
     | Type.Value Type.Null ->
       return {

@@ -201,7 +201,6 @@ module Type : sig
 
   and entity = {
     entityName : string;
-    entityFields : t -> field list;
   }
 
   and field = {
@@ -236,7 +235,7 @@ module Type : sig
       val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
     end
 
-    val entity : string -> (t -> field list) -> t
+    val entity : string -> t
     val has :
       ?card:Card.t ->
       ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field

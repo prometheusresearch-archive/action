@@ -52,6 +52,31 @@
 
 include Abstract.DATABASE
 
+val initialUniverse : Universe.t
+
+val hasOne :
+  ?args : Query.Type.Syntax.arg list
+  -> string
+  -> (Query.Type.t -> Query.Type.field list)
+  -> Universe.t
+  -> Universe.t
+
+val hasOpt :
+  ?args : Query.Type.Syntax.arg list
+  -> string
+  -> (Query.Type.t -> Query.Type.field list)
+  -> Universe.t
+  -> Universe.t
+
+val hasMany :
+  ?args : Query.Type.Syntax.arg list
+  -> string
+  -> (Query.Type.t -> Query.Type.field list)
+  -> Universe.t
+  -> Universe.t
+
+val hasScreen : string -> Screen.t -> Universe.t -> Universe.t
+
 (**
  * Construct database out of a JSON value.
  *)

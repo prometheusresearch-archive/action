@@ -176,37 +176,35 @@ let barChartScreen =
 
 let univ =
 
-  let rec customer = lazy Query.Type.Syntax.(entity "customer" (fun _ -> [
+  let customer = Query.Type.Syntax.(fun _ -> [
     hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
     hasOne "phone" string;
     hasOne "acctbal" string;
-  ]))
+  ]) in
 
-  and nation = lazy Query.Type.Syntax.(entity "nation" (fun _ -> [
+  let nation = Query.Type.Syntax.(fun _ -> [
     hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
-    hasMany "customer" (Lazy.force customer);
-    hasOne "region" (Lazy.force region);
-  ]))
+    hasMany "customer" (entity "customer");
+    hasOne "region" (entity "region");
+  ]) in
 
-  and region = lazy Query.Type.Syntax.(entity "region" (fun _ -> [
+  let region = Query.Type.Syntax.(fun _ -> [
     hasOne "id" string;
     hasOne "name" string;
     hasOne "comment" string;
-    hasMany "nation" (Lazy.force nation);
-  ]))
+    hasMany "nation" (entity "nation");
+  ]) in
 
-  in
+  JSONDatabase.(
+    initialUniverse
 
-  JSONDatabase.Universe.(
-    empty
-
-    |> hasMany "region" (Lazy.force region)
-    |> hasMany "nation" (Lazy.force nation)
-    |> hasMany "customer" (Lazy.force customer)
+    |> hasMany "region" region
+    |> hasMany "nation" nation
+    |> hasMany "customer" customer
 
     |> hasScreen "pick" pickScreen
     |> hasScreen "view" viewScreen

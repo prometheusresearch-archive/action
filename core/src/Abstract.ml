@@ -11,47 +11,15 @@ module type UNIVERSE = sig
 
   type t
 
-  (** An entity type *)
-  (* module Entity : sig *)
-  (*   type t *)
+  type entity = {
+    entityName : string;
+    entityFields : Query.Type.t -> Query.Type.field list;
+  }
 
-  (*   val name : t -> string *)
-  (*   val fields : t -> Query.Type.field list *)
-  (*   val show : t -> string *)
-  (* end *)
-
-  (**
-    * An empty universe.
-    *)
-  val empty : t
-
-  val hasOne :
-    ?args : Query.Type.Syntax.arg list
-    -> string
-    -> Query.Type.t
-    -> t
-    -> t
-
-  val hasOpt :
-    ?args : Query.Type.Syntax.arg list
-    -> string
-    -> Query.Type.t
-    -> t
-    -> t
-
-  val hasMany :
-    ?args : Query.Type.Syntax.arg list
-    -> string
-    -> Query.Type.t
-    -> t
-    -> t
-
-  val hasScreen : string -> Screen.t -> t -> t
-
-  (** Return a list of fields available in the universe *)
   val fields : t -> Query.Type.field list
 
   val getScreen : string -> t -> Screen.t option
+  val getEntity : string -> t -> entity option
 
 end
 

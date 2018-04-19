@@ -431,7 +431,6 @@ module Type = struct
 
   and entity = {
     entityName : string;
-    entityFields : t -> field list;
   }
 
   and field = {
@@ -520,7 +519,7 @@ module Type = struct
         ArgSyntax.make name arg
     end
 
-    let entity name fields = Entity {entityName = name; entityFields = fields}
+    let entity name = Entity {entityName = name}
 
     let has ?(card=Card.One) ?(args=[]) name typ =
       let fieldArgs = Arg.ArgSyntax.toMap args in
