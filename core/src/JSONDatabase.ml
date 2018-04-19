@@ -33,44 +33,46 @@ module Universe = struct
     Map.get univ.entities name
 end
 
-let initialUniverse = Universe.{
-  fields = [];
-  entities = Map.empty;
-  screens = Map.empty;
-}
-
-let hasOne ?args entityName entityFields univ =
-  let typ = Query.Type.Entity {entityName} in
-  let field = Type.Syntax.hasOne ?args entityName typ in
-  let entity = Universe.{entityName; entityFields} in
-  Universe.{
-    univ with
-    fields = field::univ.fields;
-    entities = Map.set univ.entities entityName entity;
+module Config = struct
+  let init = Universe.{
+    fields = [];
+    entities = Map.empty;
+    screens = Map.empty;
   }
 
-let hasOpt ?args entityName entityFields univ =
-  let typ = Query.Type.Entity {entityName} in
-  let field = Type.Syntax.hasOpt ?args entityName typ in
-  let entity = Universe.{entityName; entityFields} in
-  Universe.{
-    univ with
-    fields = field::univ.fields;
-    entities = Map.set univ.entities entityName entity;
-  }
+  let hasOne ?args entityName entityFields univ =
+    let typ = Query.Type.Entity {entityName} in
+    let field = Type.Syntax.hasOne ?args entityName typ in
+    let entity = Universe.{entityName; entityFields} in
+    Universe.{
+      univ with
+      fields = field::univ.fields;
+      entities = Map.set univ.entities entityName entity;
+    }
 
-let hasMany ?args entityName entityFields univ =
-  let typ = Query.Type.Entity {entityName} in
-  let field = Type.Syntax.hasMany ?args entityName typ in
-  let entity = Universe.{entityName; entityFields} in
-  Universe.{
-    univ with
-    fields = field::univ.fields;
-    entities = Map.set univ.entities entityName entity;
-  }
+  let hasOpt ?args entityName entityFields univ =
+    let typ = Query.Type.Entity {entityName} in
+    let field = Type.Syntax.hasOpt ?args entityName typ in
+    let entity = Universe.{entityName; entityFields} in
+    Universe.{
+      univ with
+      fields = field::univ.fields;
+      entities = Map.set univ.entities entityName entity;
+    }
 
-let hasScreen name screen univ =
-  Universe.{ univ with screens = Map.set univ.screens name screen; }
+  let hasMany ?args entityName entityFields univ =
+    let typ = Query.Type.Entity {entityName} in
+    let field = Type.Syntax.hasMany ?args entityName typ in
+    let entity = Universe.{entityName; entityFields} in
+    Universe.{
+      univ with
+      fields = field::univ.fields;
+      entities = Map.set univ.entities entityName entity;
+    }
+
+  let hasScreen name screen univ =
+    Universe.{ univ with screens = Map.set univ.screens name screen; }
+end
 
 module QueryTyper = QueryTyper.Make(Universe)
 
