@@ -84,6 +84,15 @@ let () =
     expectParseOk "individual:filter(false)";
     expectParseOk "individual.nation:filter(true)";
 
+    expectParseOk {|
+      {
+        title: title,
+        data: dataForUI,
+        metadata: dataForUI:meta,
+        id: value.id,
+      }
+    |};
+
     expectParseOk "render(individual:pick)";
     expectParseOk "let name = render(individual:pick)";
     expectParseOk "render(individual:pick) { render(here:view) }";
