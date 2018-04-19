@@ -7,7 +7,7 @@
     "@glennsl/bs-jest": "^0.4.2",
     "@opam/merlin": "*",
     "@opam/menhir": "*",
-    "bs-platform": "^2.2.0",
+    "bs-platform": "^3.0.0",
     "ocaml": "~4.2.0"
   },
   "author": "Andrey Popp <8mayday@gmail.com> (http://andreypopp.com/)",
