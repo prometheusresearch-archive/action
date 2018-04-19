@@ -171,7 +171,12 @@ module Untyped : sig
   end
 end
 
+(**
+ * Query type representation.
+ *)
 module Type : sig
+
+  (** Type. *)
   type t =
     | Void
     | Screen of screen
@@ -179,9 +184,13 @@ module Type : sig
     | Record of field list
     | Value of value
 
+  (** Type with cardinality info. *)
   and ctyp = Card.t * t
 
-  and screen = { screenName : string; screenOut : ctyp; }
+  and screen = {
+    screenName : string;
+    screenOut : ctyp;
+  }
 
   and value =
     | String
@@ -190,9 +199,16 @@ module Type : sig
     | Null
     | Abstract
 
-  and entity = { entityName : string; entityFields : t -> field list; }
+  and entity = {
+    entityName : string;
+    entityFields : t -> field list;
+  }
 
-  and field = { fieldName : string; fieldArgs : args; fieldCtyp : ctyp; }
+  and field = {
+    fieldName : string;
+    fieldArgs : args;
+    fieldCtyp : ctyp;
+  }
 
   and arg = { argCtyp : ctyp; argDefault : Untyped.t option; }
 
