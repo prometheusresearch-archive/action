@@ -15,36 +15,62 @@ module Universe = struct
 
   type t = {
     fields : Type.field list;
-    entities : Type.entity Map.t;
+    entities : entity Map.t;
     screens : Screen.t Map.t;
   }
 
-  let empty = {
-    fields = [];
-    entities = Map.empty;
-    screens = Map.empty;
+  and entity = {
+    entityName : string;
+    entityFields : Type.t -> Type.field list;
   }
-
-  let hasOne ?args name typ univ =
-    let field = Type.Syntax.hasOne ?args name typ in
-    { univ with fields = field::univ.fields }
-
-  let hasOpt ?args name typ univ =
-    let field = Type.Syntax.hasOpt ?args name typ in
-    { univ with fields = field::univ.fields }
-
-  let hasMany ?args name typ univ =
-    let field = Type.Syntax.hasMany ?args name typ in
-    { univ with fields = field::univ.fields }
-
-  let hasScreen name screen univ =
-    { univ with screens = Map.set univ.screens name screen; }
 
   let fields univ = univ.fields
 
   let getScreen name univ =
     Map.get univ.screens name
+
+  let getEntity name univ =
+    Map.get univ.entities name
 end
+
+let initialUniverse = Universe.{
+  fields = [];
+  entities = Map.empty;
+  screens = Map.empty;
+}
+
+let hasOne ?args entityName entityFields univ =
+  let typ = Query.Type.Entity {entityName} in
+  let field = Type.Syntax.hasOne ?args entityName typ in
+  let entity = Universe.{entityName; entityFields} in
+  Universe.{
+    univ with
+    fields = field::univ.fields;
+    entities = Map.set univ.entities entityName entity;
+  }
+
+let hasOpt ?args entityName entityFields univ =
+  let typ = Query.Type.Entity {entityName} in
+  let field = Type.Syntax.hasOpt ?args entityName typ in
+  let entity = Universe.{entityName; entityFields} in
+  Universe.{
+    univ with
+    fields = field::univ.fields;
+    entities = Map.set univ.entities entityName entity;
+  }
+
+let hasMany ?args entityName entityFields univ =
+  let typ = Query.Type.Entity {entityName} in
+  let field = Type.Syntax.hasMany ?args entityName typ in
+  let entity = Universe.{entityName; entityFields} in
+  Universe.{
+    univ with
+    fields = field::univ.fields;
+    entities = Map.set univ.entities entityName entity;
+  }
+
+let hasScreen name screen univ =
+  Universe.{ univ with screens = Map.set univ.screens name screen; }
 
 module QueryTyper = QueryTyper.Make(Universe)
 
@@ -65,6 +91,12 @@ let executionError err = Run.error (`DatabaseError err)
 let getScreen name univ =
   let open Run.Syntax in
   match Universe.getScreen name univ with
+  | Some screen -> return screen
+  | None -> executionError {j|Unknown screen "$name"|j}
+
+let getEntity name univ =
+  let open Run.Syntax in
+  match Universe.getEntity name univ with
   | Some screen -> return screen
   | None -> executionError {j|Unknown screen "$name"|j}
 
@@ -153,11 +185,125 @@ let generateEntityId ~db ~name =
     let length = Array.length (Js.Dict.keys coll) in
     return {j|$name.$length|j}
 
+let ofCtyp ~univ ctyp =
+  let open Run.Syntax in
+
+  let registry = Common.MutStringMap.make () in
+
+  let rec addEntityRepr entityName entityFields =
+
+    let add () =
+
+      let rec repr = lazy (
+        Common.MutStringMap.set registry entityName repr;
+
+        let%bind fields =
+          let f fields {Type. fieldName; fieldCtyp} =
+            let%bind fieldRepr = ctypRepr fieldCtyp in
+            Js.Dict.set fields fieldName fieldRepr;
+            return fields
+          in
+          Run.List.foldLeft ~f ~init:(Js.Dict.empty ()) entityFields
+        in
+
+        return Value.(obj Js.Dict.(
+          let dict = empty () in
+          set dict "name" (string entityName);
+          set dict "fields" (obj fields);
+          dict
+        ))
+      ) in
+      let _ = Lazy.force repr in ()
+    in
+
+    match Common.MutStringMap.get registry entityName with
+    | None -> add ()
+    | Some _ -> ()
+
+  and cardRepr card =
+    match card with
+    | Query.Card.One -> Value.string "one"
+    | Query.Card.Opt -> Value.string "opt"
+    | Query.Card.Many -> Value.string "many"
+
+  and typRepr typ =
+    let simpleType name =
+      Value.(obj Js.Dict.(
+        let dict = empty () in
+        set dict "type" (string name);
+        dict
+      ))
+    in
+    match typ with
+    | Type.Void -> return (simpleType "void")
+    | Type.Screen _ -> return (simpleType "screen")
+    | Type.Entity {entityName} ->
+      let%bind entity = getEntity entityName univ in
+      addEntityRepr entityName (entity.entityFields typ);
+      return (Value.obj Js.Dict.(
+        let dict = empty () in
+        set dict "type" (Value.string "entity");
+        set dict "name" (Value.string entityName);
+        dict
+      ))
+
+    | Type.Record fields ->
+      let%bind fields =
+        let f fields {Type. fieldName;fieldCtyp} =
+          let%bind repr = ctypRepr fieldCtyp in
+          Js.Dict.set fields fieldName repr;
+          return fields
+        in
+        Run.List.foldLeft ~f ~init:(Js.Dict.empty ()) fields
+      in
+      let repr = Value.obj Js.Dict.(
+        let dict = empty () in
+        set dict "type" (Value.string "record");
+        set dict "fields" (Value.obj fields);
+        dict
+      ) in
+      return repr
+    | Type.Value Type.String -> return (simpleType "string")
+    | Type.Value Type.Number -> return (simpleType "number")
+    | Type.Value Type.Bool -> return (simpleType "bool")
+    | Type.Value Type.Null -> return (simpleType "null")
+    | Type.Value Type.Abstract -> return (simpleType "abstract")
+
+  and ctypRepr (card, typ) =
+    let%bind typRepr = typRepr typ in
+    let cardRepr = cardRepr card in
+    let ctypRepr = Value.obj Js.Dict.(
+      empty ()
+      |> (fun o -> set o "card" cardRepr; o)
+      |> (fun o -> set o "type" typRepr; o)
+    ) in
+    return ctypRepr
+
+  in
+
+  let%bind repr = ctypRepr ctyp in
+
+  let%bind registry =
+    let f dict (k, v) =
+      let%bind v = Lazy.force v in
+      Js.Dict.set dict k v;
+      return dict
+    in
+    let registry = Common.MutStringMap.toList registry in
+    Run.List.foldLeft ~f ~init:(Js.Dict.empty ()) registry
+  in
+
+  return (Value.obj Js.Dict.(
+    empty ()
+    |> (fun o -> set o "type" repr; o)
+    |> (fun o -> set o "registry" (Value.obj registry); o)
+  ))
+
 (*
  * Format value by removing all not explicitly mentioned references according to
  * the type info and query result.
  *)
-let formatValue ~ctyp value =
+let formatValue ~univ ~ctyp value =
 
   let open Run.Syntax in
 
@@ -204,11 +350,13 @@ let formatValue ~ctyp value =
 
   and format ~ctyp value =
     match ctyp, Value.classify value with
-    | (Card.One, (Type.Entity {entityFields; _} as typ)), Value.Object value
-    | (Card.Opt, (Type.Entity {entityFields; _} as typ)), Value.Object value ->
-      filterOutRefsAndRecurse ~fields:(entityFields typ) value
-    | (Card.Many, (Type.Entity {entityFields; _} as typ)), Value.Array items ->
-      recurseIntoArrayWith ~recurse:filterOutRefsAndRecurse ~fields:(entityFields typ) items
+    | (Card.One, (Type.Entity {entityName} as typ)), Value.Object value
+    | (Card.Opt, (Type.Entity {entityName} as typ)), Value.Object value ->
+      let%bind entity = getEntity entityName univ in
+      filterOutRefsAndRecurse ~fields:(entity.entityFields typ) value
+    | (Card.Many, (Type.Entity {entityName} as typ)), Value.Array items ->
+      let%bind entity = getEntity entityName univ in
+      recurseIntoArrayWith ~recurse:filterOutRefsAndRecurse ~fields:(entity.entityFields typ) items
 
     | (Card.One, Type.Record fields), Value.Object obj
     | (Card.Opt, Type.Record fields), Value.Object obj ->
@@ -485,7 +633,7 @@ let query ?value ~db q =
       end
 
     | _, Query.Typed.Meta ({ctyp;_}, _) ->
-      return (Value.ofCtyp ctyp)
+      ofCtyp ~univ:(univ db) ctyp
 
     | _, Query.Typed.Grow (parent, next) ->
       let%bind value = aux ~value ~cache parent in
@@ -695,7 +843,7 @@ let query ?value ~db q =
 
   let%bind value =
     let {Query.Typed. ctyp;_}, _ = q in
-    formatValue ~ctyp value
+    formatValue ~univ:(univ db) ~ctyp value
   in
 
   return value

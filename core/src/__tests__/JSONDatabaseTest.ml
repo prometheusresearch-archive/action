@@ -16,25 +16,22 @@ let liftOption ~err = function
   | None -> Run.error (`DatabaseError err)
 
 let univ =
-  let rec nation = lazy Query.Type.Syntax.(
-    entity "nation" (fun _ -> [
-      hasOne "id" string;
-      hasOne "name" string;
-      hasOne "region" (Lazy.force region);
-    ])
-  )
-  and region = lazy Query.Type.Syntax.(
-    entity "region" (fun _ -> [
-      hasOne "id" string;
-      hasOne "name" string;
-      hasMany "nation" (Lazy.force nation);
-    ])
-  )
-  in
-  JSONDatabase.Universe.(
-    empty
-    |> hasMany "region" (Lazy.force region)
-    |> hasMany "nation" (Lazy.force nation)
+  let nation = Query.Type.Syntax.(fun _ -> [
+    hasOne "id" string;
+    hasOne "name" string;
+    hasOne "region" (entity "region");
+  ]) in
+
+  let region = Query.Type.Syntax.(fun _ -> [
+    hasOne "id" string;
+    hasOne "name" string;
+    hasMany "nation" (entity "nation");
+  ]) in
+
+  JSONDatabase.(
+    initialUniverse
+    |> hasMany "region" region
+    |> hasMany "nation" nation
     |> hasScreen "pick" JsApi.pickScreen
     |> hasScreen "view" JsApi.viewScreen
   )
