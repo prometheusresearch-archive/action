@@ -221,6 +221,33 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
         First parent
       )
 
+    | Untyped.Filter (parent, pred) ->
+      let%bind {ctyp = parentCard, parentTyp;_} as parentCtx, parentSyn as parent = aux ~ctx parent in
+      let%bind {ctyp = predCard, predTyp;_}, _ as pred =
+        let ctx =
+          let parent = {parentCtx with ctyp = Card.One, parentTyp}, parentSyn in
+          let bindings = ["here", Typed.TypedBinding parent] in
+          let scope = Scope.add bindings scope in
+          makeCtx ~scope (Card.One, parentTyp)
+        in
+        aux ~ctx pred
+      in
+      begin match predCard, predTyp, parentCard with
+      | Card.Opt, Type.Value Type.Bool, Card.Many
+      | Card.One, Type.Value Type.Bool, Card.Many ->
+        return (makeCtx (Card.Many, parentTyp), Typed.Filter (parent, pred))
+      | Card.Opt, Type.Value Type.Bool, Card.One
+      | Card.Opt, Type.Value Type.Bool, Card.Opt
+      | Card.One, Type.Value Type.Bool, Card.One
+      | Card.One, Type.Value Type.Bool, Card.Opt ->
+        return (makeCtx (Card.Opt, parentTyp), Typed.Filter (parent, pred))
+      | Card.Many, _, _ ->
+        queryTypeError "filter predicate cardinality should be of one / opt"
+      | Card.Opt, _, _
+      | Card.One, _, _ ->
+        queryTypeError "filter predicate type should bool"
+      end
+
     | Untyped.Screen (parent, { screenName; screenArgs; }) ->
       let%bind parentCtx, _ as parent = aux ~ctx parent in
       let%bind screen = liftResult (Universe.lookupScreenResult screenName univ) in
@@ -340,7 +367,7 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
         | Card.Opt, Card.Opt -> return Card.Opt
         | _ ->
           let op = Query.ComparisonOp.show op in
-          queryTypeError {j|$op cardinality mismatch: expected ops or one|j}
+          queryTypeError {j|$op cardinality mismatch: expected opt or one|j}
       in
       let%bind () =
         match Typed.typ left, Typed.typ right with
@@ -355,6 +382,36 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       in
       (* TODO:
         * Handler for Card.Many < Card.One etc
+        * *)
+      return (makeCtx (card, Type.Value Type.Bool), syn)
+
+    | Untyped.EqOp (op, left, right) ->
+      let%bind left = aux ~ctx left in
+      let%bind right = aux ~ctx right in
+      let syn = Typed.EqOp (op, left, right) in
+      let%bind card =
+        match Typed.card left, Typed.card right with
+        | Card.One, Card.One -> return Card.One
+        | Card.Opt, Card.One
+        | Card.One, Card.Opt
+        | Card.Opt, Card.Opt -> return Card.Opt
+        | _ ->
+          let op = Query.EqOp.show op in
+          queryTypeError {j|$op cardinality mismatch: expected opt or one|j}
+      in
+      let%bind () =
+        match Typed.typ left, Typed.typ right with
+        | Type.Value _, Type.Value Type.Null
+        | Type.Value Type.Null, _ ->
+          return ()
+        | Type.Value a, Type.Value b when a = b ->
+          return ()
+        | _ ->
+          let op = Query.EqOp.show op in
+          queryTypeError {j|$op type mismatch: numbers expected|j}
+      in
+      (* TODO:
+        * Handler for Card.Many = Card.One etc
         * *)
       return (makeCtx (card, Type.Value Type.Bool), syn)
 

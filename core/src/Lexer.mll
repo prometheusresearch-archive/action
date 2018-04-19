@@ -33,9 +33,6 @@ rule read = parse
   | "let"      { LET }
   | "goto"     { GOTO }
   | "barChart" { BAR_CHART }
-  | "count"    { COUNT }
-  | "first"    { FIRST }
-  | "meta"     { META }
   | "render"   { RENDER }
   | "null"     { NULL }
   | "update"   { UPDATE }

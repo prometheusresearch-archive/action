@@ -435,6 +435,81 @@ let () =
       |})
     end;
 
+    test "region.filter(id = 'ASIA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> filter (eq (here |> nav "id") (string "ASIA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "id": "ASIA",
+            "name": "Asia"
+          }
+        ]
+      |})
+    end;
+
+    test "region.filter(nation:count = 2).nation" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> filter (eq (here |> nav "nation" |> count) (number 2.))
+        |> nav "nation"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "id": "RUSSIA",
+            "name": "Russia"
+          },
+          {
+            "id": "CHINA",
+            "name": "China"
+          }
+        ]
+      |})
+    end;
+
+    test "region.filter(id = 'ATLANTIDA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> filter (eq (here |> nav "id") (string "ATLANTIDA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        []
+      |})
+    end;
+
+    test "region['ASIA']:filter(id = 'ASIA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> locate (string "ASIA")
+        |> filter (eq (here |> nav "id") (string "ASIA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        {
+          "id": "ASIA",
+          "name": "Asia"
+        }
+      |})
+    end;
+
+    test "region['AMERICA']:filter(id = 'ASIA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> locate (string "AMERICA")
+        |> filter (eq (here |> nav "id") (string "ASIA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        null
+      |})
+    end;
+
     test "region:pick.data" begin fun () ->
       let q = Q.(
         void

@@ -23,14 +23,20 @@ module Card : sig
   end
 end
 
+module EqOp : sig
+  type t =
+    | EQ
+    | NEQ
+
+  val show : t -> string
+end
+
 module ComparisonOp : sig
   type t =
     | LT
     | GT
     | LTE
     | GTE
-    | EQ
-    | NEQ
 
   val show : t -> string
 end
@@ -90,6 +96,7 @@ module Untyped : sig
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
+    | Filter of (t * t)
     | Count of t
     | Screen of (t * screen)
     | Mutation of (t * mutation)
@@ -101,6 +108,7 @@ module Untyped : sig
     | Grow of (t * t)
     | GrowArgs of (t * args)
     | ComparisonOp of (ComparisonOp.t * t * t)
+    | EqOp of (EqOp.t * t * t)
     | LogicalOp of (LogicalOp.t * t * t)
 
   and args = t Common.StringMap.t
@@ -138,6 +146,7 @@ module Untyped : sig
     val screen : ?args:Arg.arg list -> string -> t -> t
     val count : t -> t
     val first : t -> t
+    val filter : t -> t -> t
     val string : string -> t
     val number : float -> t
     val bool : bool -> t
@@ -260,6 +269,7 @@ module Typed : sig
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
+    | Filter of (t * t)
     | Count of t
     | Screen of (t * screen)
     | Mutation of (t * mutation)
@@ -271,6 +281,7 @@ module Typed : sig
     | Grow of (t * t)
     | GrowArgs of (t * Untyped.args)
     | ComparisonOp of (ComparisonOp.t * t * t)
+    | EqOp of (EqOp.t * t * t)
     | LogicalOp of (LogicalOp.t * t * t)
 
   and nav = { navName : string; }

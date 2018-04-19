@@ -5,9 +5,6 @@
 %token BAR_CHART
 %token UPDATE
 %token CREATE
-%token COUNT
-%token META
-%token FIRST
 %token RENDER
 %token NULL
 %token LET
@@ -52,6 +49,17 @@
     args : Query.Untyped.Syntax.Arg.arg list;
   }
 
+  let mkGlobalCombinator0 here = function
+    | "meta" -> Some (S.meta here)
+    | "count" -> Some (S.count here)
+    | "first" -> Some (S.first here)
+    | _ -> None
+
+  let mkGlobalCombinator1 here arg = function
+    | "grow" -> Some (S.grow arg here)
+    | "filter" -> Some (S.filter arg here)
+    | _ -> None
+
 %}
 
 %start start
@@ -81,25 +89,19 @@ workflowList:
 query:
   | VOID { S.void }
   | name = ID { S.nav name S.here }
+  | query = queryCombinator1 { query }
+  | query = queryCombinator0 { query }
   | COLON; nav = screen { S.screen ~args:nav.args nav.name S.here }
   | COLON; mut = mutation { mut S.here }
   | VOID; name = ID { S.nav name S.void }
   | VOID; COLON; s = screen { S.screen ~args:s.args s.name S.void }
   | VOID; COLON; mut = mutation { mut S.void }
-  | COLON; COUNT { S.count S.here }
-  | parent = query; COLON; COUNT { S.count parent }
-  | COLON; META { S.meta S.here }
-  | parent = query; COLON; META { S.meta parent }
-  | COLON; FIRST { S.first S.here }
-  | parent = query; COLON; FIRST { S.first parent }
   | parent = query; DOT; name = ID { S.nav name parent }
   | parent = query; COLON; s = screen { S.screen ~args:s.args s.name parent }
   | parent = query; COLON; mut = mutation { mut parent }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
   | parent = query; LEFT_BRACKET; id = query RIGHT_BRACKET { S.locate id parent }
-  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
-  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
   | v = STRING { S.string v }
   | v = NUMBER { S.number v }
   | v = BOOL { S.bool v }
@@ -114,6 +116,40 @@ query:
   | left = query; GTE; right = query { S.greaterOrEqThan left right } %prec GTE
   | left = query; EQ; right = query { S.eq left right } %prec EQ
   | left = query; NEQ; right = query { S.notEq left right } %prec NEQ
+
+queryCombinator0:
+  | parent = query; COLON; name = ID; LEFT_PAREN; RIGHT_PAREN {
+      match mkGlobalCombinator0 parent name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | parent = query; COLON; name = ID {
+      match mkGlobalCombinator0 parent name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | COLON; name = ID; LEFT_PAREN; RIGHT_PAREN {
+      match mkGlobalCombinator0 S.here name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | COLON; name = ID {
+      match mkGlobalCombinator0 S.here name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+
+queryCombinator1:
+  | parent = query; COLON; name = ID; LEFT_PAREN; arg1 = query; RIGHT_PAREN {
+      match mkGlobalCombinator1 parent arg1 name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | COLON; name = ID; LEFT_PAREN; arg1 = query; RIGHT_PAREN {
+      match mkGlobalCombinator1 S.here arg1 name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
 
 nav:
   | name = ID { {name; args = []} }

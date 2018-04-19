@@ -38,22 +38,28 @@ module Card = struct
   end
 end
 
+module EqOp = struct
+  type t =
+    | EQ
+    | NEQ
+
+  let show = function
+    | EQ -> "="
+    | NEQ -> "!="
+end
+
 module ComparisonOp = struct
   type t =
     | LT
     | GT
     | LTE
     | GTE
-    | EQ
-    | NEQ
 
   let show = function
     | LT -> "<"
     | GT -> ">"
     | LTE -> "<="
     | GTE -> ">="
-    | EQ -> "="
-    | NEQ -> "!="
 end
 
 module LogicalOp = struct
@@ -160,6 +166,7 @@ module Untyped = struct
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
+    | Filter of (t * t)
     | Count of t
     | Screen of (t * screen)
     | Mutation of (t * mutation)
@@ -171,6 +178,7 @@ module Untyped = struct
     | Grow of (t * t)
     | GrowArgs of (t * args)
     | ComparisonOp of (ComparisonOp.t * t * t)
+    | EqOp of (EqOp.t * t * t)
     | LogicalOp of (LogicalOp.t * t * t)
 
   and args = t StringMap.t
@@ -245,6 +253,10 @@ module Untyped = struct
     | First parent ->
       let parent = show parent in
       {j|$parent:first|j}
+    | Filter (parent, pred) ->
+      let parent = show parent in
+      let pred = show pred in
+      {j|$parent:filter($pred)|j}
     | Screen (parent, { screenName; screenArgs; }) ->
       let parent = show parent in
       let screenArgs = showArgs screenArgs in
@@ -265,6 +277,11 @@ module Untyped = struct
       {j|$parent[$id]|j}
     | ComparisonOp (op, left, right) ->
       let op = ComparisonOp.show op in
+      let left = show left in
+      let right = show right in
+      {j|$left $op $right|j}
+    | EqOp (op, left, right) ->
+      let op = EqOp.show op in
       let left = show left in
       let right = show right in
       {j|$left $op $right|j}
@@ -311,6 +328,9 @@ module Untyped = struct
     let first parent =
       (), First parent
 
+    let filter pred parent =
+      (), Filter (parent, pred)
+
     let string v =
       (), Const (String v)
 
@@ -356,10 +376,10 @@ module Untyped = struct
       (), ComparisonOp (ComparisonOp.GTE, left, right)
 
     let eq left right =
-      (), ComparisonOp (ComparisonOp.EQ, left, right)
+      (), EqOp (EqOp.EQ, left, right)
 
     let notEq left right =
-      (), ComparisonOp (ComparisonOp.NEQ, left, right)
+      (), EqOp (EqOp.NEQ, left, right)
 
     let and_ left right =
       (), LogicalOp (LogicalOp.AND, left, right)
@@ -560,6 +580,7 @@ module Typed = struct
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
+    | Filter of (t * t)
     | Count of t
     | Screen of (t * screen)
     | Mutation of (t * mutation)
@@ -571,6 +592,7 @@ module Typed = struct
     | Grow of (t * t)
     | GrowArgs of (t * Untyped.args)
     | ComparisonOp of (ComparisonOp.t * t * t)
+    | EqOp of (EqOp.t * t * t)
     | LogicalOp of (LogicalOp.t * t * t)
 
   and nav = { navName : string; }
@@ -602,6 +624,8 @@ module Typed = struct
     | _, Navigate (parent, { navName }) ->
       (), Untyped.Navigate (stripTypes parent, {Untyped. navName })
     | _, First parent -> (), Untyped.First (stripTypes parent)
+    | _, Filter (parent, pred) ->
+      (), Untyped.Filter (stripTypes parent, stripTypes pred)
     | _, Count parent -> (), Untyped.Count (stripTypes parent)
     | _, Screen (parent, { screenName; screenArgs; }) ->
       (), Untyped.Screen (stripTypes parent, {Untyped. screenName; screenArgs; })
@@ -616,6 +640,8 @@ module Typed = struct
     | _, GrowArgs (parent, args) -> (), Untyped.GrowArgs (stripTypes parent, args)
     | _, ComparisonOp (op, left, right) ->
       (), Untyped.ComparisonOp (op, stripTypes left, stripTypes right)
+    | _, EqOp (op, left, right) ->
+      (), Untyped.EqOp (op, stripTypes left, stripTypes right)
     | _, LogicalOp (op, left, right) ->
       (), Untyped.LogicalOp (op, stripTypes left, stripTypes right)
 

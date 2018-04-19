@@ -42,6 +42,8 @@ let () =
   in
 
   describe "Parsing" begin fun () ->
+
+    (** Trivia *)
     expectParseOk "/";
     expectParseOk "/ ";
     expectParseOk " /";
@@ -69,6 +71,19 @@ let () =
     expectParseOk "individual:meta";
     expectParseOk "individual.nation:meta";
 
+    expectParseOk ":count";
+    expectParseOk "individual:count";
+    expectParseOk "individual.nation:count";
+
+    expectParseOk ":grow(true)";
+    expectParseOk ":grow(true)";
+    expectParseOk "individual:grow(false)";
+    expectParseOk "individual.nation:grow(true)";
+
+    expectParseOk ":filter(true)";
+    expectParseOk "individual:filter(false)";
+    expectParseOk "individual.nation:filter(true)";
+
     expectParseOk "render(individual:pick)";
     expectParseOk "let name = render(individual:pick)";
     expectParseOk "render(individual:pick) { render(here:view) }";
@@ -87,6 +102,8 @@ let () =
     |};
 
     expectParseOk "null";
+
+    (** Operators *)
 
     expectParseOk "1 < 2";
     expectParseOk "1 > 2";

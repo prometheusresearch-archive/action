@@ -279,6 +279,36 @@ let query ?value ~db q =
       | _ -> return value
       end
 
+    | _, Query.Typed.Filter (query, pred) ->
+      let%bind value = aux ~value ~cache query in
+      begin match Value.classify value with
+      | Value.Null ->
+        return value
+      | Value.Array items ->
+        if Array.length items > 0
+        then
+          let f item =
+            let%bind r = aux ~value:item ~cache pred in
+            match Value.classify r with
+            | Value.Bool r -> return r
+            | _ -> executionError "expected boolean from predicate"
+          in
+          let%bind items = Run.Array.filter ~f items in
+          return (Value.array items)
+        else return (Value.array [||])
+      | _ ->
+        let%bind r =
+          let%bind r = aux ~value ~cache pred in
+          match Value.classify r with
+          | Value.Bool r -> return r
+          | _ -> executionError "expected boolean from predicate"
+        in
+        return (
+          if r
+          then value
+          else Value.null)
+      end
+
     | Type.Screen _ as typ, Query.Typed.Screen (query, { screenName; screenArgs; }) ->
 
       let make value =
@@ -437,8 +467,6 @@ let query ?value ~db q =
         | Query.ComparisonOp.GT -> (>)
         | Query.ComparisonOp.LTE -> (<=)
         | Query.ComparisonOp.GTE -> (>=)
-        | Query.ComparisonOp.EQ -> (=)
-        | Query.ComparisonOp.NEQ -> (!=)
       in
       begin
         match Value.classify left, Value.classify right with
@@ -451,6 +479,30 @@ let query ?value ~db q =
         | _ ->
           let op = Query.ComparisonOp.show op in
           executionError {j|$op type mismatch: numbers expected|j}
+      end
+
+    | _, Query.Typed.EqOp (op, left, right) ->
+      let%bind left = aux ~value ~cache left in
+      let%bind right = aux ~value ~cache right in
+      let evalOp =
+        match op with
+        | Query.EqOp.EQ -> (=)
+        | Query.EqOp.NEQ -> (!=)
+      in
+      begin
+        match Value.classify left, Value.classify right with
+        | Value.Null, _
+        | _, Value.Null ->
+          return Value.null
+        | Value.Number left, Value.Number right ->
+          return (Value.bool (evalOp left right))
+        | Value.Bool left, Value.Bool right ->
+          return (Value.bool (evalOp left right))
+        | Value.String left, Value.String right ->
+          return (Value.bool (evalOp left right))
+        | _ ->
+          let op = Query.EqOp.show op in
+          executionError {j|$op type mismatch|j}
       end
 
     | _, Query.Typed.LogicalOp (op, left, right) ->
