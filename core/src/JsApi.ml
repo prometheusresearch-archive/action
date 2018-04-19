@@ -273,7 +273,8 @@ let parseQuery q =
   | Lexer.Error msg ->
     error (`ParseError msg)
   | Parser.Error ->
-    error (`ParseError "syntax error")
+    let msg = {j|syntax error while parsing $q|j} in
+    error (`ParseError msg)
 
 
 let query state q =
