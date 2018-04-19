@@ -199,8 +199,8 @@ let univ =
     hasMany "nation" (entity "nation");
   ]) in
 
-  JSONDatabase.(
-    initialUniverse
+  JSONDatabase.Config.(
+    init
 
     |> hasMany "region" region
     |> hasMany "nation" nation
