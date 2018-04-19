@@ -499,19 +499,19 @@ let () =
     test "1 = null -> null" begin fun () ->
       runQueryAndExpect Q.(
         eq (number 1.) null
-      ) Value.null;
+      ) (Value.bool false);
     end;
 
     test "null = 1 -> null" begin fun () ->
       runQueryAndExpect Q.(
         eq null (number 1.)
-      ) Value.null;
+      ) (Value.bool false);
     end;
 
     test "null = null -> null" begin fun () ->
       runQueryAndExpect Q.(
         eq null null
-      ) Value.null;
+      ) (Value.bool true);
     end;
   end;
 
@@ -528,22 +528,22 @@ let () =
       ) (Value.bool false);
     end;
 
-    test "1 != null -> null" begin fun () ->
+    test "1 != null -> true" begin fun () ->
       runQueryAndExpect Q.(
         notEq (number 1.) null
-      ) Value.null;
+      ) (Value.bool true);
     end;
 
-    test "null != 1 -> null" begin fun () ->
+    test "null != 1 -> true" begin fun () ->
       runQueryAndExpect Q.(
         notEq null (number 1.)
-      ) Value.null;
+      ) (Value.bool true);
     end;
 
-    test "null != null -> null" begin fun () ->
+    test "null != null -> false" begin fun () ->
       runQueryAndExpect Q.(
         notEq null null
-      ) Value.null;
+      ) (Value.bool false);
     end;
   end;
 
