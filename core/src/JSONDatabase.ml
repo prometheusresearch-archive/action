@@ -206,6 +206,27 @@ let query ?value ~db q =
       return (Value.array value)
     | _ -> executionError "invalid db structure: expected an entity collection"
 
+  and expandUI ~cache ui =
+    let parentQuery = Value.UI.parentQuery ui in
+    let screen = Value.UI.screen ui in
+    let args = Value.UI.args ui in
+    let bindings =
+      let bindings =
+        let f (name, value) = (name, Query.Typed.UntypedBinding value) in
+        args |. StringMap.toList |. Belt.List.map f
+      in
+      ("parent", Query.Typed.TypedBinding parentQuery)::bindings
+    in
+    let%bind query = QueryTyper.growQuery
+      ~univ:(univ db)
+      ~bindings
+      ~base:parentQuery
+      screen.Screen.grow
+    in
+    let queryValue = Value.UI.value ui in
+    let%bind value = aux ~value:queryValue ~cache query in
+    return value
+
   and aux ~(value : Value.t) ~cache ({Query.Typed. ctyp = _card, typ; scope}, syn as q) =
 
     (** Precompute all typed bindings values as typed binding values has
@@ -367,9 +388,7 @@ let query ?value ~db q =
       | _, Value.Null ->
         return Value.null
       | _, Value.UI ui ->
-        let%bind outQuery = Value.UI.outQuery ui in
-        let queryValue = Value.UI.value ui in
-        let%bind value = aux ~value:queryValue ~cache outQuery in
+        let%bind value = expandUI ~cache ui in
         navigate navName value
       | _ -> executionError {|Cannot navigate away from this value|}
       end
@@ -391,9 +410,7 @@ let query ?value ~db q =
       begin match Value.classify value with
       | Value.Object _ -> selectFrom value
       | Value.UI ui ->
-        let%bind outQuery = Value.UI.outQuery ui in
-        let queryValue = Value.UI.value ui in
-        let%bind value = aux ~value:queryValue ~cache outQuery in
+        let%bind value = expandUI ~cache ui in
         selectFrom value
       | Value.Array items ->
         let%bind items = Run.Array.map ~f:selectFrom items in

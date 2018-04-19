@@ -33,11 +33,10 @@ module UI : sig
   val test : 'a -> bool
 
   val name : t -> string
+  val screen : t -> Screen.t
   val args : t -> Query.Untyped.args
   val setArgs : args : Query.Untyped.args -> t -> t
   val parentQuery : t -> Query.Typed.t
-  val outQuery : t -> (Query.Typed.t, [> QueryTyper.error ]) QueryTyper.comp
-  val screenQuery : t -> (Query.Typed.t, [> QueryTyper.error ]) QueryTyper.comp
   val value : t -> value
   val typ : t -> Type.t
 
@@ -71,33 +70,8 @@ end = struct
 
   let name ui = ui##name
   let args ui = ui##args
+  let screen ui = ui##screen
   let parentQuery ui = ui##parentQuery
-
-  let screenQuery (ui : t) =
-    let open Run.Syntax in
-    let univ = ui##univ in
-    let baseQuery = ui##parentQuery in
-    let screenName = ui##name in
-    let args = Query.Untyped.Syntax.Arg.ofMap ui##args in
-    let screenQuery = Query.Untyped.Syntax.(screen ~args screenName here) in
-    let%bind screenQuery = QueryTyper.growQuery ~univ ~base:baseQuery screenQuery in
-    return screenQuery
-
-  let outQuery ui =
-    let open Run.Syntax in
-    let univ = ui##univ in
-    let baseQuery = ui##parentQuery in
-    let screen = ui##screen in
-    let args = ui##args in
-    let bindings =
-      let bindings =
-        let f (name, value) = (name, Query.Typed.UntypedBinding value) in
-        args |. StringMap.toList |. Belt.List.map f
-      in
-      ("parent", Query.Typed.TypedBinding baseQuery)::bindings
-    in
-    let%bind outQuery = QueryTyper.growQuery ~univ ~bindings ~base:baseQuery screen.Screen.grow in
-    return outQuery
 
   let value ui = ui##value
   let typ ui = ui##typ
