@@ -1,6 +1,6 @@
 
 ** Conflict (shift/reduce) in state 75.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -28,7 +28,7 @@ query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query AND query . 
 
 ** Conflict (shift/reduce) in state 73.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -56,7 +56,7 @@ query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query EQ query . 
 
 ** Conflict (shift/reduce) in state 71.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -84,7 +84,7 @@ query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query GT query . 
 
 ** Conflict (shift/reduce) in state 69.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -112,7 +112,7 @@ query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query GTE query . 
 
 ** Conflict (shift/reduce) in state 51.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -169,7 +169,7 @@ ID .
 ID . COLON query 
 
 ** Conflict (shift/reduce) in state 44.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -197,7 +197,7 @@ query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query LTE query . 
 
 ** Conflict (shift/reduce) in state 39.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 
@@ -225,7 +225,7 @@ query LEFT_BRACKET query RIGHT_BRACKET // lookahead token appears
 query NEQ query . 
 
 ** Conflict (shift/reduce) in state 37.
-** Tokens involved: LEFT_BRACKET LEFT_BRACE DOT COLON
+** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
 ** This state is reached from start after reading:
 

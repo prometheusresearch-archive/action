@@ -36,6 +36,7 @@
 %right OR
 %right AND
 %left LT LTE GT GTE EQ NEQ
+%right DOT COLON
 
 %{
 
@@ -150,11 +151,6 @@ queryCombinator1:
       | Some q -> q
       | None -> $syntaxerror
     }
-
-nav:
-  | name = ID { {name; args = []} }
-  | name = ID; LEFT_PAREN; RIGHT_PAREN { {name; args = StringMap.empty} }
-  | name = ID; LEFT_PAREN; args = argList; RIGHT_PAREN { {name; args = Some args} }
 
 mutation:
   | UPDATE; LEFT_BRACE; RIGHT_BRACE { (fun query -> S.update [] query)  }
