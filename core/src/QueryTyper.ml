@@ -401,14 +401,14 @@ and typeQueryImpl ?(ctx={Typed. ctyp = Type.void; scope = Scope.empty}) ~univ qu
       in
       let%bind () =
         match Typed.typ left, Typed.typ right with
-        | Type.Value _, Type.Value Type.Null
+        | _, Type.Value Type.Null
         | Type.Value Type.Null, _ ->
           return ()
         | Type.Value a, Type.Value b when a = b ->
           return ()
         | _ ->
           let op = Query.EqOp.show op in
-          queryTypeError {j|$op type mismatch: numbers expected|j}
+          queryTypeError {j|$op type mismatch|j}
       in
       (* TODO:
         * Handler for Card.Many = Card.One etc

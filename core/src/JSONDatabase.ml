@@ -291,6 +291,7 @@ let query ?value ~db q =
             let%bind r = aux ~value:item ~cache pred in
             match Value.classify r with
             | Value.Bool r -> return r
+            | Value.Null -> return false
             | _ -> executionError "expected boolean from predicate"
           in
           let%bind items = Run.Array.filter ~f items in
@@ -484,16 +485,18 @@ let query ?value ~db q =
     | _, Query.Typed.EqOp (op, left, right) ->
       let%bind left = aux ~value ~cache left in
       let%bind right = aux ~value ~cache right in
-      let evalOp =
+      let isEq, evalOp =
         match op with
-        | Query.EqOp.EQ -> (=)
-        | Query.EqOp.NEQ -> (!=)
+        | Query.EqOp.EQ -> true, (=)
+        | Query.EqOp.NEQ -> false, (!=)
       in
       begin
         match Value.classify left, Value.classify right with
+        | Value.Null, Value.Null ->
+          return (Value.bool (evalOp Js.null Js.null))
         | Value.Null, _
         | _, Value.Null ->
-          return Value.null
+          return (Value.bool (not isEq))
         | Value.Number left, Value.Number right ->
           return (Value.bool (evalOp left right))
         | Value.Bool left, Value.Bool right ->
