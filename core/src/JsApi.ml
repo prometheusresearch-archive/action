@@ -8,6 +8,8 @@ module S = Screen.Syntax
 module Result = Common.Result
 
 module WorkflowInterpreter = RunWorkflow.Make(JSONDatabase)
+module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
+module WorkflowTyper = WorkflowTyper.Make(JSONDatabase.Universe)
 
 let formatContext ctx =
   let line = function
@@ -199,7 +201,7 @@ let univ =
 
   in
 
-  Universe.(
+  JSONDatabase.Universe.(
     empty
 
     |> hasMany "region" (Lazy.force region)
@@ -309,7 +311,7 @@ let parse s =
       let state =
         runToResult (
           let open Run.Syntax in
-          let%bind w = Workflow.Typer.typeWorkflow ~univ w in
+          let%bind w = WorkflowTyper.typeWorkflow ~univ w in
           WorkflowInterpreter.boot ~db w
         )
       in

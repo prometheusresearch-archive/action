@@ -34,7 +34,7 @@ val query : state -> string -> Value.t
 val mutate : mutation : mutation -> value : Value.t -> unit
 
 val db : JSONDatabase.t
-val univ : Core.Universe.t
+val univ : JSONDatabase.Universe.t
 
 val showQuery : Query.Typed.t -> string
 

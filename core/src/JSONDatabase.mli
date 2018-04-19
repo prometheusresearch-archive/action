@@ -55,11 +55,11 @@ include Abstract.DATABASE
 (**
  * Construct database out of a JSON value.
  *)
-val ofJson : univ : Core.Universe.t -> Js.Json.t -> t
+val ofJson : univ : Universe.t -> Js.Json.t -> t
 
 (**
  * Construct database out of a string value.
  *
  * This throws an exception on an invalid JSON value.
  *)
-val ofStringExn : univ : Core.Universe.t -> string -> t
+val ofStringExn : univ : Universe.t -> string -> t

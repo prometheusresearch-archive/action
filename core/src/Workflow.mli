@@ -52,12 +52,3 @@ module Typed : sig
     | Label of string
 
 end
-
-module Typer : sig
-
-  type error = [ `WorkflowTypeError of string | QueryTyper.error ]
-
-  type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
-
-  val typeWorkflow : univ : Universe.t -> Untyped.t -> (Typed.t, 'err) comp
-end

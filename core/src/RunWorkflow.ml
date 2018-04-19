@@ -4,6 +4,8 @@ module W = Workflow.Typed
 
 module Make (Db : Abstract.DATABASE) = struct
 
+  module QueryTyper = QueryTyper.Make(Db.Universe)
+
   type t = frame * Value.UI.t option
 
   and frame = {
@@ -30,9 +32,11 @@ module Make (Db : Abstract.DATABASE) = struct
 
   let runWorkflowError err = Run.error (`RunWorkflowError err)
 
-  let liftResult = function
-    | Result.Ok v -> Run.return v
-    | Result.Error err -> Run.error (`RunWorkflowError err)
+  let getScreen name univ =
+    let open Run.Syntax in
+    match Db.Universe.getScreen name univ with
+    | Some screen -> return screen
+    | None -> runWorkflowError {j|Unknown screen "$name"|j}
 
   let uiQuery (frame, _) =
     let open Run.Syntax in
@@ -194,7 +198,7 @@ module Make (Db : Abstract.DATABASE) = struct
     let%bind frame = match frame.workflow with
     | W.Render {query = ctyp, Query.Untyped.Screen (p, c); label} ->
       let univ = Db.univ frame.db in
-      let%bind screen = liftResult (Universe.lookupScreenResult c.screenName univ) in
+      let%bind screen = getScreen c.screenName univ in
       let%bind args = QueryTyper.checkArgsPartial ~argTyps:screen.args args in
       let c = {
         c with Query.Untyped.

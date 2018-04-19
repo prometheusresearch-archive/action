@@ -1,7 +1,6 @@
 module.exports.UIRepr = UI;
 
-function UI(univ, screen, name, args, typ, value, parentQuery) {
-  this.univ = univ;
+function UI(screen, name, args, typ, value, parentQuery) {
   this.screen = screen;
   this.name = name;
   this.args = args;
