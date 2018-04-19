@@ -1,15 +1,17 @@
 module Type = Query.Type
+module Result = Common.Result
+module Map = Common.StringMap
 
 type t = {
   fields : Type.field list;
-  entities : Type.entity Common.StringMap.t;
-  screens : Screen.t Common.StringMap.t;
+  entities : Type.entity Map.t;
+  screens : Screen.t Map.t;
 }
 
 let empty = {
   fields = [];
-  entities = Common.StringMap.empty;
-  screens = Common.StringMap.empty;
+  entities = Map.empty;
+  screens = Map.empty;
 }
 
 let hasOne ?args name typ univ =
@@ -25,22 +27,22 @@ let hasMany ?args name typ univ =
   { univ with fields = field::univ.fields }
 
 let hasScreen name screen univ =
-  { univ with screens = Common.StringMap.set univ.screens name screen; }
+  { univ with screens = Map.set univ.screens name screen; }
 
 let fields univ = univ.fields
 
 let lookupEntity name univ =
-  Common.StringMap.get univ.entities name
+  Map.get univ.entities name
 
 let lookupScreen name univ =
-  Common.StringMap.get univ.screens name
+  Map.get univ.screens name
 
 let lookupScreenResult name univ =
-  Common.Result.ofOption
+  Result.ofOption
     ~err:{j|no such screen "$name"|j}
     (lookupScreen name univ)
 
 let lookupEntityResult name univ =
-  Common.Result.ofOption
+  Result.ofOption
     ~err:{j|no such entity "$name"|j}
     (lookupEntity name univ)

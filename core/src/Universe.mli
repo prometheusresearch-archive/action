@@ -11,7 +11,9 @@ type t
 val empty : t
 
 val hasOne : ?args : Query.Type.Syntax.arg list -> string -> Query.Type.t -> t -> t
+
 val hasOpt : ?args : Query.Type.Syntax.arg list -> string -> Query.Type.t -> t -> t
+
 val hasMany : ?args : Query.Type.Syntax.arg list -> string -> Query.Type.t -> t -> t
 
 val hasScreen : string -> Screen.t -> t -> t
