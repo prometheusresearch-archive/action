@@ -65,6 +65,15 @@ end
 
 module Array = struct
 
+  let iter ~f v =
+    let module Let_syntax = Syntax.Let_syntax in
+    let f res item =
+      let%bind () = res in
+      let%bind () = f item in
+      return ()
+    in
+    Belt.Array.reduce v (return ()) f
+
   let map ~f v =
     let module Let_syntax = Syntax.Let_syntax in
     let f res item =
@@ -87,6 +96,14 @@ module Array = struct
         return res
     in
     Belt.Array.reduce v (return [||]) f
+
+  let foldLeft ~f ~init v =
+    let module Let_syntax = Syntax.Let_syntax in
+    let f res item =
+      let%bind res = res in
+      f res item
+    in
+    Belt.Array.reduce v (return init) f
 end
 
 module StringMap = struct

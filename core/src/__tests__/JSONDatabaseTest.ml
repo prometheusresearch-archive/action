@@ -16,24 +16,25 @@ let liftOption ~err = function
   | None -> Run.error (`DatabaseError err)
 
 let univ =
-  let nation = Query.Type.Syntax.(fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "region" (entity "region");
-  ]) in
-
-  let region = Query.Type.Syntax.(fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasMany "nation" (entity "nation");
-  ]) in
 
   JSONDatabase.Config.(
+    let nation = fun _ -> [
+      hasOne "id" string;
+      hasOne "name" string;
+      hasLink ~linkTo:("region", "id") "region" (entity "region");
+    ] in
+
+    let region = fun _ -> [
+      hasOne "id" string;
+      hasOne "name" string;
+      hasManyBackLink ~linkTo:("nation", "region") "nation" (entity "nation");
+    ] in
+
     init
-    |> hasMany "region" region
-    |> hasMany "nation" nation
-    |> hasScreen "pick" JsApi.pickScreen
-    |> hasScreen "view" JsApi.viewScreen
+    |> defineEntity "region" region
+    |> defineEntity "nation" nation
+    |> defineScreen "pick" JsApi.pickScreen
+    |> defineScreen "view" JsApi.viewScreen
     |> finish
   )
 
@@ -43,18 +44,11 @@ let getDb () =
       "region": {
         "AMERICA": {
           "id": "AMERICA",
-          "name": "America",
-          "nation": [
-            {"$ref": {"entity": "nation", "id": "US"}}
-          ]
+          "name": "America"
         },
         "ASIA": {
           "id": "ASIA",
-          "name": "Asia",
-          "nation": [
-            {"$ref": {"entity": "nation", "id": "RUSSIA"}},
-            {"$ref": {"entity": "nation", "id": "CHINA"}}
-          ]
+          "name": "Asia"
         }
       },
 
@@ -180,7 +174,7 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
           {"nation": [{"label": "United States of America"}]},
-          {"nation": [{"label": "Russia"}, {"label": "China"}]}
+          {"nation": [{"label": "China"}, {"label": "Russia"}]}
         ]
       |})
     end;
@@ -244,8 +238,8 @@ let () =
       ) in
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
-          {"id": "RUSSIA", "name": "Russia"},
-          {"id": "CHINA", "name": "China"}
+          {"id": "CHINA", "name": "China"},
+          {"id": "RUSSIA", "name": "Russia"}
         ]
       |})
     end;
@@ -260,8 +254,8 @@ let () =
       ) in
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
-          "Russia",
-          "China"
+          "China",
+          "Russia"
         ]
       |})
     end;
@@ -321,8 +315,8 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asiaNations": [
-            {"id": "RUSSIA", "name": "Russia"},
-            {"id": "CHINA", "name": "China"}
+            {"id": "CHINA", "name": "China"},
+            {"id": "RUSSIA", "name": "Russia"}
           ]
         }
       |})
@@ -344,8 +338,8 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asiaNationNames": [
-            "Russia",
-            "China"
+            "China",
+            "Russia"
           ]
         }
       |})
@@ -372,8 +366,8 @@ let () =
         {
           "data": {
             "nations": [
-              {"id": "RUSSIA", "name": "Russia"},
-              {"id": "CHINA", "name": "China"}
+              {"id": "CHINA", "name": "China"},
+              {"id": "RUSSIA", "name": "Russia"}
             ]
           }
         }
@@ -402,8 +396,8 @@ let () =
         {
           "data": {
             "nationNames": [
-              "Russia",
-              "China"
+              "China",
+              "Russia"
             ]
           }
         }
@@ -461,12 +455,12 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
           {
-            "id": "RUSSIA",
-            "name": "Russia"
-          },
-          {
             "id": "CHINA",
             "name": "China"
+          },
+          {
+            "id": "RUSSIA",
+            "name": "Russia"
           }
         ]
       |})

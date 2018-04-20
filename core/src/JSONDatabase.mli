@@ -74,33 +74,34 @@ module Config : sig
 
   (** Configuration *)
   type t
+  type entityField
 
   (** An initial, empty configuration *)
   val init : t
 
-  (** Define a singleton entity *)
-  val hasOne :
-    ?args : Query.Type.Syntax.arg list
-    -> string
-    -> (Query.Type.t -> Query.Type.field list)
-    -> t -> t
-
-  (** Define an optional singleton entity *)
-  val hasOpt :
-    ?args : Query.Type.Syntax.arg list
-    -> string
-    -> (Query.Type.t -> Query.Type.field list)
-    -> t -> t
-
   (** Define a collection of entities *)
-  val hasMany :
+  val defineEntity :
     ?args : Query.Type.Syntax.arg list
     -> string
-    -> (Query.Type.t -> Query.Type.field list)
+    -> (Query.Type.t -> entityField list)
     -> t -> t
+
+  (** Define entity fields *)
+  val hasOne : string -> Query.Type.t -> entityField
+  val hasOpt : string -> Query.Type.t -> entityField
+  val hasMany : string -> Query.Type.t -> entityField
+
+  (** Define entity relationships *)
+  val hasLink : linkTo : string * string -> string -> Query.Type.t -> entityField
+  val hasOptLink : linkTo : string * string -> string -> Query.Type.t -> entityField
+  val hasManyBackLink : linkTo : string * string -> string -> Query.Type.t -> entityField
+
+  (** Re-export needed convenience for defining types *)
+  include module type of Query.Type.Syntax.Value
+  val entity : string -> Query.Type.t
 
   (** Define a screen *)
-  val hasScreen :
+  val defineScreen :
     string
     -> Screen.t
     -> t -> t

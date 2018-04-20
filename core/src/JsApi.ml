@@ -176,40 +176,42 @@ let barChartScreen =
 
 let univ =
 
-  let customer = Query.Type.Syntax.(fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "comment" string;
-    hasOne "phone" string;
-    hasOne "acctbal" string;
-  ]) in
-
-  let nation = Query.Type.Syntax.(fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "comment" string;
-    hasMany "customer" (entity "customer");
-    hasOne "region" (entity "region");
-  ]) in
-
-  let region = Query.Type.Syntax.(fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "comment" string;
-    hasMany "nation" (entity "nation");
-  ]) in
 
   JSONDatabase.Config.(
+
+    let customer = fun _ -> [
+      hasOne "id" string;
+      hasOne "name" string;
+      hasOne "comment" string;
+      hasOne "phone" string;
+      hasOne "acctbal" string;
+    ] in
+
+    let nation = fun _ -> [
+      hasOne "id" string;
+      hasOne "name" string;
+      hasOne "comment" string;
+      hasMany "customer" (entity "customer");
+      hasOne "region" (entity "region");
+    ] in
+
+    let region = fun _ -> [
+      hasOne "id" string;
+      hasOne "name" string;
+      hasOne "comment" string;
+      hasMany "nation" (entity "nation");
+    ] in
+
     init
 
-    |> hasMany "region" region
-    |> hasMany "nation" nation
-    |> hasMany "customer" customer
+    |> defineEntity "region" region
+    |> defineEntity "nation" nation
+    |> defineEntity "customer" customer
 
-    |> hasScreen "pick" pickScreen
-    |> hasScreen "view" viewScreen
-    |> hasScreen "edit" editScreen
-    |> hasScreen "barChart" barChartScreen
+    |> defineScreen "pick" pickScreen
+    |> defineScreen "view" viewScreen
+    |> defineScreen "edit" editScreen
+    |> defineScreen "barChart" barChartScreen
 
     |> finish
   )
