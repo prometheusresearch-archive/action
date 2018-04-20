@@ -687,6 +687,9 @@ let query ?value ~db q =
         in
         return (Value.array result)
 
+      | false, Type.Entity _, Value.Null ->
+        return Value.null
+
       | false, Type.Entity _, _ ->
         executionError "invalid db structure: expected an object as entity"
 
