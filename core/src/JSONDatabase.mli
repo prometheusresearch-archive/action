@@ -53,33 +53,61 @@
 include Abstract.DATABASE
 
 (**
- * Configuration for the database.
+ * Database configuration API.
+ *
+ * This allows to specify database schema and produce a universe.
+ *
+ * The example usage would be:
+ *
+ *   let univ = Config.(
+ *     init
+ *     |> hasMany "user" ...
+ *     |> hasMany "site" ...
+ *     ...
+ *     |> hasScreen "view" ...
+ *     |> hasScreen "pick" ...
+ *     |> finish
+ *   ) in ...
+ *
  *)
 module Config : sig
-  val init : Universe.t
 
+  (** Configuration *)
+  type t
+
+  (** An initial, empty configuration *)
+  val init : t
+
+  (** Define a singleton entity *)
   val hasOne :
     ?args : Query.Type.Syntax.arg list
     -> string
     -> (Query.Type.t -> Query.Type.field list)
-    -> Universe.t
-    -> Universe.t
+    -> t -> t
 
+  (** Define an optional singleton entity *)
   val hasOpt :
     ?args : Query.Type.Syntax.arg list
     -> string
     -> (Query.Type.t -> Query.Type.field list)
-    -> Universe.t
-    -> Universe.t
+    -> t -> t
 
+  (** Define a collection of entities *)
   val hasMany :
     ?args : Query.Type.Syntax.arg list
     -> string
     -> (Query.Type.t -> Query.Type.field list)
-    -> Universe.t
-    -> Universe.t
+    -> t -> t
 
-  val hasScreen : string -> Screen.t -> Universe.t -> Universe.t
+  (** Define a screen *)
+  val hasScreen :
+    string
+    -> Screen.t
+    -> t -> t
+
+  (** Finish configuration and produce a universe *)
+  val finish : t -> Universe.t
+
 end
 
 (**
