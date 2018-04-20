@@ -3,23 +3,31 @@
  *)
 
 (**
- * Universe describes a set of entities and screens available.
- *
- * The configuration portion of the type system.
+ * Universe provides an API to query for database schema and configured screens.
  *)
 module type UNIVERSE = sig
 
+  (** Universe *)
   type t
 
-  type entity = {
-    entityName : string;
-    entityFields : Query.Type.t -> Query.Type.field list;
-  }
+  (** Entities are named objects in a universe *)
+  module Entity : sig
 
+    type t
+
+    val name : t -> string
+    val fields : t -> Query.Type.field list
+
+  end
+
+  (** A list of fields available in a universe *)
   val fields : t -> Query.Type.field list
 
+  (** Lookup entity by name *)
+  val getEntity : string -> t -> Entity.t option
+
+  (** Lookup screen by name *)
   val getScreen : string -> t -> Screen.t option
-  val getEntity : string -> t -> entity option
 
 end
 

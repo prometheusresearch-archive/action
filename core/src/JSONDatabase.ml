@@ -13,15 +13,22 @@ module Universe = struct
   module Result = Common.Result
   module Map = Common.StringMap
 
+  module Entity = struct
+
+    type t = {
+      name : string;
+      fields : Type.t -> Type.field list;
+    }
+
+    let name v = v.name
+    let fields v = v.fields (Type.Entity {entityName = v.name})
+
+  end
+
   type t = {
     fields : Type.field list;
-    entities : entity Map.t;
+    entities : Entity.t Map.t;
     screens : Screen.t Map.t;
-  }
-
-  and entity = {
-    entityName : string;
-    entityFields : Type.t -> Type.field list;
   }
 
   let fields univ = univ.fields
@@ -43,34 +50,34 @@ module Config = struct
     screens = Map.empty;
   }
 
-  let hasOne ?args entityName entityFields univ =
-    let typ = Query.Type.Entity {entityName} in
-    let field = Type.Syntax.hasOne ?args entityName typ in
-    let entity = Universe.{entityName; entityFields} in
+  let hasOne ?args name fields univ =
+    let typ = Query.Type.Entity {entityName = name} in
+    let field = Type.Syntax.hasOne ?args name typ in
+    let entity = {Universe.Entity. name; fields} in
     Universe.{
       univ with
       fields = field::univ.fields;
-      entities = Map.set univ.entities entityName entity;
+      entities = Map.set univ.entities name entity;
     }
 
-  let hasOpt ?args entityName entityFields univ =
-    let typ = Query.Type.Entity {entityName} in
-    let field = Type.Syntax.hasOpt ?args entityName typ in
-    let entity = Universe.{entityName; entityFields} in
+  let hasOpt ?args name fields univ =
+    let typ = Query.Type.Entity {entityName = name} in
+    let field = Type.Syntax.hasOpt ?args name typ in
+    let entity = {Universe.Entity. name; fields} in
     Universe.{
       univ with
       fields = field::univ.fields;
-      entities = Map.set univ.entities entityName entity;
+      entities = Map.set univ.entities name entity;
     }
 
-  let hasMany ?args entityName entityFields univ =
-    let typ = Query.Type.Entity {entityName} in
-    let field = Type.Syntax.hasMany ?args entityName typ in
-    let entity = Universe.{entityName; entityFields} in
+  let hasMany ?args name fields univ =
+    let typ = Query.Type.Entity {entityName = name} in
+    let field = Type.Syntax.hasMany ?args name typ in
+    let entity = {Universe.Entity. name; fields} in
     Universe.{
       univ with
       fields = field::univ.fields;
-      entities = Map.set univ.entities entityName entity;
+      entities = Map.set univ.entities name entity;
     }
 
   let hasScreen name screen univ =
@@ -246,7 +253,7 @@ let ofCtyp ~univ ctyp =
     | Type.Screen _ -> return (simpleType "screen")
     | Type.Entity {entityName} ->
       let%bind entity = getEntity entityName univ in
-      addEntityRepr entityName (entity.entityFields typ);
+      addEntityRepr entityName (Universe.Entity.fields entity);
       return (Value.obj Js.Dict.(
         let dict = empty () in
         set dict "type" (Value.string "entity");
@@ -357,13 +364,13 @@ let formatValue ~univ ~ctyp value =
 
   and format ~ctyp value =
     match ctyp, Value.classify value with
-    | (Card.One, (Type.Entity {entityName} as typ)), Value.Object value
-    | (Card.Opt, (Type.Entity {entityName} as typ)), Value.Object value ->
+    | (Card.One, (Type.Entity {entityName})), Value.Object value
+    | (Card.Opt, (Type.Entity {entityName})), Value.Object value ->
       let%bind entity = getEntity entityName univ in
-      filterOutRefsAndRecurse ~fields:(entity.entityFields typ) value
-    | (Card.Many, (Type.Entity {entityName} as typ)), Value.Array items ->
+      filterOutRefsAndRecurse ~fields:(Universe.Entity.fields entity) value
+    | (Card.Many, (Type.Entity {entityName})), Value.Array items ->
       let%bind entity = getEntity entityName univ in
-      recurseIntoArrayWith ~recurse:filterOutRefsAndRecurse ~fields:(entity.entityFields typ) items
+      recurseIntoArrayWith ~recurse:filterOutRefsAndRecurse ~fields:(Universe.Entity.fields entity) items
 
     | (Card.One, Type.Record fields), Value.Object obj
     | (Card.Opt, Type.Record fields), Value.Object obj ->

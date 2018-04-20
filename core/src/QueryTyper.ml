@@ -43,7 +43,7 @@ module Make (Universe : Abstract.UNIVERSE) = struct
       extractField ~univ fieldName typ
     | Type.Entity {entityName} ->
       let%bind entity = getEntity entityName univ in
-      findInFieldList (entity.Universe.entityFields typ)
+      findInFieldList (Universe.Entity.fields entity)
     | Type.Record fields -> findInFieldList fields
     | Type.Value Type.Null ->
       return {
