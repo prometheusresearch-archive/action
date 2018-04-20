@@ -245,11 +245,17 @@ module Type : sig
     val one : 'a -> Card.t * 'a
     val opt : 'a -> Card.t * 'a
     val many : 'a -> Card.t * 'a
-    module Value : sig val string : t val number : t val bool : t end
-    val string : t
-    val number : t
-    val bool : t
+
+    module Value : sig
+      val string : t
+      val number : t
+      val bool : t
+    end
+
+    include module type of Value
+
     module ArgSyntax = Arg.ArgSyntax
+
     type arg = ArgSyntax.t
     val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
 

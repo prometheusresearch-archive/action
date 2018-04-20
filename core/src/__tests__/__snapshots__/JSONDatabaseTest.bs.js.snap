@@ -38,32 +38,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "Asia",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
     "region.2": Object {
       "name": "NEWREGION",
@@ -110,32 +88,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "Asia",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
     "region.2": Object {
       "name": "HEY",
@@ -182,32 +138,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "Asia",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
     "region.2": Object {
       "name": "Russia",
@@ -263,32 +197,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "Asia",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
     "region.2": Object {
       "name": "NEWREGION",
@@ -335,32 +247,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "Asia",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
     "region.2": Object {
       "name": "NEWREGION",
@@ -407,32 +297,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "UPDATED",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
   },
 }
@@ -476,32 +344,10 @@ Object {
     "AMERICA": Object {
       "id": "AMERICA",
       "name": "America",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "US",
-          },
-        },
-      ],
     },
     "ASIA": Object {
       "id": "ASIA",
       "name": "UPDATED",
-      "nation": Array [
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "RUSSIA",
-          },
-        },
-        Object {
-          "$ref": Object {
-            "entity": "nation",
-            "id": "CHINA",
-          },
-        },
-      ],
     },
   },
 }

@@ -145,4 +145,3 @@ let get ~name value =
   match classify value with
   | Object value -> Js.Dict.get value name
   | _ -> None
-

@@ -17,11 +17,30 @@ module Universe = struct
 
     type t = {
       name : string;
-      fields : Type.t -> Type.field list;
+      fields : Type.t -> field list;
+    }
+
+    and field = Type.field * fieldMeta
+
+    and fieldMeta =
+      | Field
+      | Link of link
+      | BackLink of link
+
+    and link = {
+      linkEntity : string;
+      linkField : string
     }
 
     let name v = v.name
-    let fields v = v.fields (Type.Entity {entityName = v.name})
+
+    let fields v =
+      let fields = v.fields (Type.Entity {entityName = v.name}) in
+      Belt.List.map fields (fun (field, _) -> field)
+
+    let getFieldWithMeta name v =
+      let fields = v.fields (Type.Entity {entityName = v.name}) in
+      Belt.List.getBy fields (fun ({Type. fieldName;_}, _) -> fieldName = name)
 
   end
 
@@ -44,33 +63,15 @@ module Config = struct
 
   type t = Universe.t
 
+  type entityField = Universe.Entity.field
+
   let init = Universe.{
     fields = [];
     entities = Map.empty;
     screens = Map.empty;
   }
 
-  let hasOne ?args name fields univ =
-    let typ = Query.Type.Entity {entityName = name} in
-    let field = Type.Syntax.hasOne ?args name typ in
-    let entity = {Universe.Entity. name; fields} in
-    Universe.{
-      univ with
-      fields = field::univ.fields;
-      entities = Map.set univ.entities name entity;
-    }
-
-  let hasOpt ?args name fields univ =
-    let typ = Query.Type.Entity {entityName = name} in
-    let field = Type.Syntax.hasOpt ?args name typ in
-    let entity = {Universe.Entity. name; fields} in
-    Universe.{
-      univ with
-      fields = field::univ.fields;
-      entities = Map.set univ.entities name entity;
-    }
-
-  let hasMany ?args name fields univ =
+  let defineEntity ?args name fields univ =
     let typ = Query.Type.Entity {entityName = name} in
     let field = Type.Syntax.hasMany ?args name typ in
     let entity = {Universe.Entity. name; fields} in
@@ -80,8 +81,35 @@ module Config = struct
       entities = Map.set univ.entities name entity;
     }
 
-  let hasScreen name screen univ =
-    Universe.{ univ with screens = Map.set univ.screens name screen; }
+  let defineEntityField createField name typ =
+    let field = createField name typ in
+    field, Universe.Entity.Field
+
+  let hasOne = defineEntityField Type.Syntax.hasOne
+  let hasOpt = defineEntityField Type.Syntax.hasOpt
+  let hasMany = defineEntityField Type.Syntax.hasMany
+
+  let defineEntityLink ~linkTo createField name typ =
+    let field = createField name typ in
+    let linkEntity, linkField = linkTo in
+    field, Universe.Entity.Link {linkEntity; linkField}
+
+  let hasLink = defineEntityLink Type.Syntax.hasOne
+  let hasOptLink = defineEntityLink Type.Syntax.hasOpt
+
+  let hasManyBackLink ~linkTo name typ =
+    let field = Type.Syntax.hasMany name typ in
+    let linkEntity, linkField = linkTo in
+    field, Universe.Entity.BackLink {linkEntity; linkField}
+
+  include Query.Type.Syntax.Value
+  let entity = Query.Type.Syntax.entity
+
+  let defineScreen name screen univ =
+    Universe.{
+      univ with
+      screens = Map.set univ.screens name screen;
+    }
 
   let finish cfg = cfg
 end
@@ -410,6 +438,64 @@ let query ?value ~db q =
       return (Value.array value)
     | _ -> executionError "invalid db structure: expected an entity collection"
 
+  and navigateFromEntity entity name value =
+    match Universe.Entity.getFieldWithMeta name entity with
+    | Some (_field, Universe.Entity.Field) ->
+      begin match Js.Dict.get value name with
+      | Some value -> return value
+      | None -> return Value.null
+      end
+    | Some (_field, Universe.Entity.Link _) ->
+      let%bind field =
+        liftOption
+          ~err:{j|missing key "$name"|j}
+          (Js.Dict.get value name)
+      in
+      maybeExpandRef field
+    | Some (_field, Universe.Entity.BackLink {linkEntity; linkField}) ->
+      let%bind linkEntity =
+        liftOption
+          ~err:{j|invalid linked entity "$linkEntity"|j}
+          (Value.get ~name:linkEntity db.value)
+      in
+      let%bind linkEntity =
+        liftOption
+          ~err:{j|invalid entity collect "$linkEntity"|j}
+          (Value.decodeObj linkEntity)
+      in
+      let linkEntity = Js.Dict.values linkEntity in
+      let result = [||] in
+      let collect backValue =
+        let%bind refField =
+          liftOption
+            ~err:{j|missing linked field "$linkEntity.$linkField"|j}
+            (Value.get ~name:linkField backValue)
+        in
+        let%bind id =
+          liftOption
+            ~err:{j|missing id field|j}
+            (Js.Dict.get value "id")
+        in
+        let%bind id =
+          liftOption
+            ~err:{j|invalud id field|j}
+            (Value.decodeString id)
+        in
+        match Ref.ofValue refField with
+        | Some {Ref. name; id = backId} when name = entity.name ->
+          if backId = id
+          then
+            let _ = Js.Array.push backValue result in return ()
+          else return ()
+        | Some _ -> executionError {j|expected "$linkEntity.$linkField" to be a valid ref|j}
+        | None -> executionError {j|expected "$linkEntity.$linkField" to be a ref|j}
+      in
+      let%bind () = Run.Array.iter ~f:collect linkEntity in
+      return (Value.array result)
+    | None ->
+      executionError {j|unknown entity field "$name"|j}
+
+
   and expandUI ~cache ui =
     let parentQuery = Value.UI.parentQuery ui in
     let screen = Value.UI.screen ui in
@@ -568,18 +654,44 @@ let query ?value ~db q =
       executionError "invalid type for screen"
 
     | _, Query.Typed.Navigate (query, { navName; }) ->
+
+      let {Typed. ctyp = _, typ; _}, _ = query in
+
       let%bind value = aux ~value ~cache query in
       let%bind value = maybeExpandRef value in
 
-      begin match isRoot value, Value.classify value with
+      begin match isRoot value, typ, Value.classify value with
 
-      | true, Value.Object _ ->
+      | true, _, Value.Object _ ->
         navigateFromRoot navName value
-      | true, _ ->
+      | true, _, _ ->
         executionError "invalid db structure: expected an object as the root"
 
-      | _, Value.Object _ -> navigate navName value
-      | _, Value.Array items  ->
+      | false, Type.Entity {entityName}, Value.Object value ->
+        let%bind entity = getEntity entityName (univ db) in
+        navigateFromEntity entity navName value
+
+      | false, Type.Entity {entityName}, Value.Array values ->
+        let%bind entity = getEntity entityName (univ db) in
+        let%bind result =
+          let collect result value =
+            let%bind value = liftOption ~err:"expected object" (Value.decodeObj value) in
+            let%bind value = navigateFromEntity entity navName value in
+            return (
+              match Value.classify value with
+              | Value.Array value -> Belt.Array.concat result value
+              | _ -> ignore (Js.Array.push value result); result
+            )
+          in
+          Run.Array.foldLeft ~f:collect ~init:[||] values
+        in
+        return (Value.array result)
+
+      | false, Type.Entity _, _ ->
+        executionError "invalid db structure: expected an object as entity"
+
+      | false, _, Value.Object _ -> navigate navName value
+      | false, _, Value.Array items  ->
         let%bind items = Run.Array.map ~f:(navigate navName) items in
         let items =
           let f res item =
@@ -589,12 +701,12 @@ let query ?value ~db q =
           in
           Belt.Array.reduce items (Belt.Array.makeUninitializedUnsafe 0) f in
         return (Value.array items)
-      | _, Value.Null ->
+      | false, _, Value.Null ->
         return Value.null
-      | _, Value.UI ui ->
+      | false, _, Value.UI ui ->
         let%bind value = expandUI ~cache ui in
         navigate navName value
-      | _ -> executionError {|Cannot navigate away from this value|}
+      | false, _, _ -> executionError {|Cannot navigate away from this value|}
       end
 
     | Type.Record _, Query.Typed.Select (query, selection) ->
