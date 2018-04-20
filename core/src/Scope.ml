@@ -49,7 +49,7 @@ let add bindings {stack; values} =
   in
   {stack = top::stack; values}
 
-let rec bindings {values; _} =
+let bindings {values; _} =
   let f (uniqName, (name, value)) = uniqName, name, value in
   values |. StringMap.toList |. Belt.List.map f
 

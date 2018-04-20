@@ -16,10 +16,6 @@ module Make (Universe : Abstract.UNIVERSE) = struct
   let queryTypeError err =
     Run.error (`QueryTypeError err)
 
-  let liftResult = function
-    | Result.Ok v -> Run.return v
-    | Result.Error err -> queryTypeError err
-
   let getScreen name univ =
     let open Run.Syntax in
     match Universe.getScreen name univ with
