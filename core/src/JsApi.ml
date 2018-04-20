@@ -192,14 +192,14 @@ let univ =
       hasOne "name" string;
       hasOne "comment" string;
       hasMany "customer" (entity "customer");
-      hasOne "region" (entity "region");
+      hasLink ~via:("region", "id") "region" (entity "region");
     ] in
 
     let region = fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
       hasOne "comment" string;
-      hasMany "nation" (entity "nation");
+      hasManyBackLink ~via:("nation", "region") "nation" (entity "nation");
     ] in
 
     init

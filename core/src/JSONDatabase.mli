@@ -92,9 +92,9 @@ module Config : sig
   val hasMany : string -> Query.Type.t -> entityField
 
   (** Define entity relationships *)
-  val hasLink : linkTo : string * string -> string -> Query.Type.t -> entityField
-  val hasOptLink : linkTo : string * string -> string -> Query.Type.t -> entityField
-  val hasManyBackLink : linkTo : string * string -> string -> Query.Type.t -> entityField
+  val hasLink : via : string * string -> string -> Query.Type.t -> entityField
+  val hasOptLink : via : string * string -> string -> Query.Type.t -> entityField
+  val hasManyBackLink : via : string * string -> string -> Query.Type.t -> entityField
 
   (** Re-export needed convenience for defining types *)
   include module type of Query.Type.Syntax.Value

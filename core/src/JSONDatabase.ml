@@ -89,17 +89,17 @@ module Config = struct
   let hasOpt = defineEntityField Type.Syntax.hasOpt
   let hasMany = defineEntityField Type.Syntax.hasMany
 
-  let defineEntityLink ~linkTo createField name typ =
+  let defineEntityLink ~via createField name typ =
     let field = createField name typ in
-    let linkEntity, linkField = linkTo in
+    let linkEntity, linkField = via in
     field, Universe.Entity.Link {linkEntity; linkField}
 
   let hasLink = defineEntityLink Type.Syntax.hasOne
   let hasOptLink = defineEntityLink Type.Syntax.hasOpt
 
-  let hasManyBackLink ~linkTo name typ =
+  let hasManyBackLink ~via name typ =
     let field = Type.Syntax.hasMany name typ in
-    let linkEntity, linkField = linkTo in
+    let linkEntity, linkField = via in
     field, Universe.Entity.BackLink {linkEntity; linkField}
 
   include Query.Type.Syntax.Value
