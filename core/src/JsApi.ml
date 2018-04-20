@@ -210,6 +210,8 @@ let univ =
     |> hasScreen "view" viewScreen
     |> hasScreen "edit" editScreen
     |> hasScreen "barChart" barChartScreen
+
+    |> finish
   )
 
 external data : Js.Json.t = "data" [@@bs.module "./data.js"]

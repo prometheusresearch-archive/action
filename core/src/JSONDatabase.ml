@@ -34,6 +34,9 @@ module Universe = struct
 end
 
 module Config = struct
+
+  type t = Universe.t
+
   let init = Universe.{
     fields = [];
     entities = Map.empty;
@@ -72,6 +75,8 @@ module Config = struct
 
   let hasScreen name screen univ =
     Universe.{ univ with screens = Map.set univ.screens name screen; }
+
+  let finish cfg = cfg
 end
 
 module QueryTyper = QueryTyper.Make(Universe)

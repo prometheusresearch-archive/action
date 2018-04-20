@@ -34,6 +34,7 @@ let univ =
     |> hasMany "nation" nation
     |> hasScreen "pick" JsApi.pickScreen
     |> hasScreen "view" JsApi.viewScreen
+    |> finish
   )
 
 let getDb () =
