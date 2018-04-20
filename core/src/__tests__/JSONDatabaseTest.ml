@@ -21,13 +21,13 @@ let univ =
     let nation = fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
-      hasLink ~linkTo:("region", "id") "region" (entity "region");
+      hasLink ~via:("region", "id") "region" (entity "region");
     ] in
 
     let region = fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
-      hasManyBackLink ~linkTo:("nation", "region") "nation" (entity "nation");
+      hasManyBackLink ~via:("nation", "region") "nation" (entity "nation");
     ] in
 
     init
