@@ -605,17 +605,17 @@ main =
 ```
 main =
   | viewTodo -> value; processTodo
-  | viewTodoSkipped -> value
+  | viewTodoSkipped -> value; main
 
 processTodo =
   | fulfillMeasureEntryStart; enterMeasure
   | enterMeasure
   | reconcileMeasure; main
-  | useExistingMeasure; measureWizard
+  | useExistingMeasure; (measureWizard | processTodo)
   | fulfillSample
-  | useExistingSample; sampleWizard
+  | useExistingSample; (sampleWizard | processTodo)
   | fulfillConsent
-  | useExistingConsent; consentWizard
+  | useExistingConsent; (consentWizard | processTodo)
   | measureWizard
   | sampleWizard
   | consentWizard
@@ -630,9 +630,15 @@ processTodo =
   | skipTodo; viewTodoSkipped
   | viewTodoDelete; dropTodo
 
-sampleWizard = ...
-consentWizard = ...
-measureWizard = ...
+processTodo =
+  ...
+  | value:filter(measure.isReconciled) -> measureEntryStart
+
+sampleWizard = render ..
+
+consentWizard = render ..
+
+measureWizard = render ...
 
 viewTodo = render :view
 
@@ -641,5 +647,4 @@ enterMeasure = ...
 viewTodoSkipped =
   render :view;
   render :edit(spec: :update {status: "new"});
-  main
 ```
