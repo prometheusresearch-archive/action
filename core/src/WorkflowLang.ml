@@ -6,14 +6,6 @@ module Map = Belt.Map.String
 module Set = Belt.Set.String
 module List = Belt.List
 
-module type MONOID = sig
-  type t
-
-  val empty : t
-  val append : t -> t -> t
-  val show : t -> string
-end
-
 (**
  * An workflow over some monoidal domain.
  *
@@ -23,11 +15,11 @@ end
  * - Value (from a monoidal domain)
  * - Label (which points to another node in the workflow)
  * - Navigate (preprend a value before another node)
- * - Sequence (sequential composition of multiple nodes)
- * - Choice (parallel composition of multiple nodes)
+ * - Seq (sequential composition of multiple nodes)
+ * - Par (parallel composition of multiple nodes)
  *
  *)
-module Make (M : MONOID) = struct
+module Make (M : Abstract.MONOID) = struct
 
   type t = node Map.t
 
@@ -37,23 +29,8 @@ module Make (M : MONOID) = struct
     | Value of M.t
     | Label of string
     | NavigateAnd of M.t * node
-    | Sequence of node list
-    | Choice of node list
-
-  let rec showNode w =
-    match w with
-    | Value v -> let v = M.show v in {j|Value $v|j}
-    | Label name -> {j|Label $name|j}
-    | NavigateAnd (v, node) ->
-      let v = M.show v in
-      let node = showNode node in
-      {j|NavigateAnd ($v, $node)|j}
-    | Sequence nodes ->
-      let nodes = nodes |. List.map showNode |> String.concat "; " in
-      {j|Sequence [$nodes]|j}
-    | Choice nodes ->
-      let nodes = nodes |. List.map showNode |> String.concat "; " in
-      {j|Choice [$nodes]|j}
+    | Seq of node list
+    | Par of node list
 
   module Syntax = struct
 
@@ -65,8 +42,8 @@ module Make (M : MONOID) = struct
     let value v = Value v
     let label name = Label name
     let navigateAnd v node = NavigateAnd (v, node)
-    let seq nodes = Sequence nodes
-    let choice nodes = Choice nodes
+    let seq nodes = Seq nodes
+    let par nodes = Par nodes
   end
 
   (**
@@ -81,13 +58,6 @@ module Make (M : MONOID) = struct
       | InNavigateAnd of t * M.t
       | InSequence of t * node list * node list
       | InChoice of t * node list * node list
-
-    (** Construct root location given node *)
-    val root : node -> t
-
-    (** Get parent from the loc's context *)
-    val parent : ctx -> t option
-
   end = struct
 
     type t = node * ctx
@@ -97,15 +67,6 @@ module Make (M : MONOID) = struct
       | InNavigateAnd of t * M.t
       | InSequence of t * node list * node list
       | InChoice of t * node list * node list
-
-    let root node =
-      node, Root
-
-    let parent = function
-      | Root -> None
-      | InNavigateAnd (parent, _)
-      | InSequence (parent, _, _)
-      | InChoice (parent, _, _) -> Some parent
 
   end
 
@@ -148,7 +109,7 @@ module Make (M : MONOID) = struct
           workflow;
           label;
           value;
-          loc = Loc.root node, [];
+          loc = (node, Loc.Root), [];
         }
       | None ->
         error {j|unknown label $label|j}
@@ -183,7 +144,7 @@ module Make (M : MONOID) = struct
               match Map.get workflow nextLabel with
               | Some node ->
                 let locs = loc::locs in
-                let loc = Loc.root node in
+                let loc = node, Loc.Root in
                 aux value nextLabel visited acc (loc, locs)
               | None ->
                 error {j|no such label $nextLabel|j}
@@ -192,12 +153,12 @@ module Make (M : MONOID) = struct
             let value = M.append value query in
             let loc = node, Loc.InNavigateAnd (loc, query) in
             aux value label visited acc (loc, locs)
-          | Sequence [] ->
+          | Seq [] ->
             begin match climbToNextInSequence (loc, locs) with
             | Some loc -> aux value label visited acc loc
             | None -> return acc
             end
-          | Sequence nodes ->
+          | Seq nodes ->
             let rec f acc left = function
               | node::right ->
                 let loc = node, Loc.InSequence (loc, left, right) in
@@ -209,7 +170,7 @@ module Make (M : MONOID) = struct
             in
             f acc [] nodes
 
-          | Choice nodes ->
+          | Par nodes ->
             let rec f acc left = function
               | node::right ->
                 let loc = node, Loc.InChoice (loc, left, right) in
@@ -231,8 +192,8 @@ module Make (M : MONOID) = struct
         | (Value _, _), _ -> climbToNextInSequence loc
         | (Label _, _), _
         | (NavigateAnd _, _), _
-        | (Sequence _, _), _
-        | (Choice _, _), _ -> Some loc
+        | (Seq _, _), _
+        | (Par _, _), _ -> Some loc
       in
 
       match loc with
@@ -240,7 +201,5 @@ module Make (M : MONOID) = struct
       | None -> return []
 
   end
-
-  let get name workflow = Map.get workflow name
 
 end

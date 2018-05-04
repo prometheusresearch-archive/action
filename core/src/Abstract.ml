@@ -2,6 +2,15 @@
  * This module contains abstract interface declarations for the action.
  *)
 
+module type MONOID = sig
+  type t
+
+  val empty : t
+  val append : t -> t -> t
+  val show : t -> string
+end
+
+
 (**
  * Universe provides an API to query for database schema and configured screens.
  *)

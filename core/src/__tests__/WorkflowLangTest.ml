@@ -9,7 +9,6 @@ module W = WorkflowLang.Make(struct
 end)
 
 module S = W.Syntax
-module L = W.Loc
 module P = W.Pos
 
 let testRun ?(only=false) name f =
@@ -152,7 +151,7 @@ let () =
 
       let workflow = S.(
         empty
-        |> define "main" (seq [choice [value "a1"; value "a2"]; value "b"])
+        |> define "main" (seq [par [value "a1"; value "a2"]; value "b"])
       ) in
 
       testRun "# ..." begin fun () ->
@@ -194,7 +193,7 @@ let () =
       let workflow = S.(
         empty
         |> define "main" (seq [
-          choice [value "a1"; choice [value "a2"; value "a3"]];
+          par [value "a1"; par [value "a2"; value "a3"]];
           value "b"
         ])
       ) in
@@ -274,7 +273,7 @@ let () =
       let workflow = S.(
         empty
         |> define "main" (seq [
-          choice [
+          par [
             label "then";
             value "b";
           ]
@@ -313,13 +312,13 @@ let () =
       let workflow = S.(
         empty
         |> define "main" (seq [
-          choice [
+          par [
             label "then";
             value "b";
           ]
         ])
         |> define "then" (seq [
-          choice [
+          par [
             value "a";
             label "main";
           ]
@@ -474,14 +473,14 @@ let () =
       let workflow = S.(
         empty
         |> define "main" (seq [
-          choice [
+          par [
             value "a";
             label "then";
             value "d";
           ]
         ])
         |> define "then" (seq [
-          choice [
+          par [
             value "b";
             value "c";
           ]
@@ -507,7 +506,7 @@ let () =
       let workflow = S.(
         empty
         |> define "main" (seq [
-          choice [
+          par [
             value "a";
             label "then";
             value "d";
