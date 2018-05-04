@@ -38,6 +38,7 @@ module Make (M : Abstract.MONOID) : sig
    *    |> define "then" (
    *         par [...]
    *       )
+   *  )
    *
    *)
   module Syntax : sig
