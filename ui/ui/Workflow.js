@@ -9,7 +9,7 @@ import * as W from 'core';
 import type {Result, RenderableState, State} from 'core';
 import {Pick} from './Pick.js';
 import {View} from './View.js';
-import {Edit} from './Edit.js';
+import {Form} from './Form.js';
 import {BarChart} from './BarChart.js';
 import * as cfg from 'components/config';
 import {SideNav, SideNavButton, divider} from 'components/SideNav';
@@ -82,8 +82,8 @@ export class Workflow extends React.Component<P, S> {
         );
       } else if (name === 'view') {
         screen = <View state={node} args={args} onState={this.onState} />;
-      } else if (name === 'edit') {
-        screen = <Edit state={node} args={args} onState={this.onState} />;
+      } else if (name === 'form') {
+        screen = <Form state={node} args={args} onState={this.onState} />;
       } else if (name === 'barChart') {
         screen = <BarChart state={node} args={args} onState={this.onState} />;
       } else {

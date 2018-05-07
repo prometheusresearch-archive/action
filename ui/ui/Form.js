@@ -23,7 +23,7 @@ type S = {
   value: Object,
 };
 
-export class Edit extends React.Component<P, S> {
+export class Form extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
     let {data} = this.fetch();
@@ -47,7 +47,7 @@ export class Edit extends React.Component<P, S> {
     return {title, data, type, mutation};
   }
 
-  onChange = (key: string, update: any) => {
+  onChange = (key: string, update: string | number) => {
     const value = {...this.state.value, [key]: update};
     this.setState({value});
   };

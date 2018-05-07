@@ -31,7 +31,23 @@ const initialState = {
 export class Console extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
-    this.state = this.getStateFromQuery(outdent``);
+    this.state = this.getStateFromQuery(outdent`
+      render(region:pick(title: "Regions")) {
+
+        render(value:filter(name != "AFRICA"):edit(
+          title: "Edit",
+          spec: :update {
+            name: $value.name,
+            comment: $value.comment,
+          }
+        )),
+
+        render(value:view(
+          title: "View"
+        ))
+
+      }
+    `);
   }
 
   getStateFromQuery = (value: string) => {

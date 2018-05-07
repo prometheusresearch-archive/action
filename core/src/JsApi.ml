@@ -130,11 +130,11 @@ let viewScreen =
     )
   )
 
-let editScreen =
+let formScreen =
   Screen.Syntax.(screen
     ~inputCard:Query.Card.One
     ~args:[
-      arg "title" ~default:(Q.string "Edit") (one string);
+      arg "title" ~default:(Q.string "Form") (one string);
       arg "spec" (one string);
       arg "value" ~default:(Q.null) (one string);
     ]
@@ -210,7 +210,7 @@ let univ =
 
     |> defineScreen "pick" pickScreen
     |> defineScreen "view" viewScreen
-    |> defineScreen "edit" editScreen
+    |> defineScreen "form" formScreen
     |> defineScreen "barChart" barChartScreen
 
     |> finish
