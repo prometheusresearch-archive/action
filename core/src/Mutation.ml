@@ -10,8 +10,8 @@ type ('v, 'err) t = <
 external make : ('v -> (unit, 'err) comp) -> ('v, 'err) t =
   "MutationRepr" [@@bs.new] [@@bs.module "./MutationRepr"]
 
-let execute (mut : ('v, 'err) t) value =
-  let execute = mut##execute in
+let execute ~mutation value =
+  let execute = mutation##execute in
   execute value
 
 let test_ : 'a -> bool = [%bs.raw {|

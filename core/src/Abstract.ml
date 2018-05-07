@@ -109,6 +109,15 @@ module type RUN_WORKFLOW = functor (DB : DATABASE) -> sig
 
   val setArgs : args : Query.Untyped.args -> t -> (t, 'err) comp
 
+  (**
+   * Execute mutation and return a new workflow state.
+   *)
+  val executeMutation :
+    mutation : ('v, 'err) Mutation.t
+    -> value : 'v
+    -> t
+    -> (t, 'err) comp
+
   val step : t -> (t, 'err) comp
 
   val show : t -> string

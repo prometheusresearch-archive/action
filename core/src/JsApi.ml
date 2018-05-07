@@ -291,12 +291,12 @@ let query state q =
     return q
   )
 
-let mutate ~mutation ~value =
+let mutate ~mutation ~value state =
   let mut = Obj.magic mutation in
   (
     let open Run.Syntax in
-    let%bind _ = Mutation.execute mut value in
-    return ()
+    let%bind state = WorkflowInterpreter.executeMutation ~mutation:mut ~value state in
+    return state
   ) |> runToResult |> unwrapResult
 
 let parse s =

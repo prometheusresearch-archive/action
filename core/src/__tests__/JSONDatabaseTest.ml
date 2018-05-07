@@ -632,7 +632,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
     end;
@@ -655,7 +655,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -679,7 +679,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -704,7 +704,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -726,7 +726,7 @@ let () =
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
         let value = Value.null in
-        let%bind () = Mutation.execute mut value in
+        let%bind () = Mutation.execute ~mutation:mut value in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -750,7 +750,7 @@ let () =
         let value = createFormValue {|
           {"name": "HEY"}
         |} in
-        let%bind () = Mutation.execute mut value in
+        let%bind () = Mutation.execute ~mutation:mut value in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -774,7 +774,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 

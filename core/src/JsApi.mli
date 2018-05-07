@@ -31,7 +31,7 @@ val next : state -> state array
 val query : state -> string -> Value.t
 
 (** Mutate database state *)
-val mutate : mutation : mutation -> value : Value.t -> unit
+val mutate : mutation : mutation -> value : Value.t -> state -> state
 
 val db : JSONDatabase.t
 val univ : JSONDatabase.Universe.t

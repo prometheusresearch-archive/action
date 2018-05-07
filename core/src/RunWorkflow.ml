@@ -210,5 +210,10 @@ module Make (Db : Abstract.DATABASE) = struct
     in
     return (frame, ui)
 
+  let executeMutation ~mutation ~value state =
+    let open Run.Syntax in
+    let%bind () = Mutation.execute ~mutation value in
+    return state
+
 end
 
