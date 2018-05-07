@@ -41,6 +41,7 @@ export class FormField extends React.Component<P> {
 
   onLabelPress = () => {
     if (this._inputRef.current != null) {
+      // $FlowFixMe: ...
       this._inputRef.current.focus();
     }
   };
