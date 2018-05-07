@@ -15,6 +15,7 @@ import {OutlineButton} from 'components/OutlineButton';
 
 type P = {
   state: State,
+  onState: State => void,
 };
 
 type S = {
@@ -53,7 +54,8 @@ export class Edit extends React.Component<P, S> {
 
   onSubmit = mutation => {
     const value = this.state.value;
-    W.mutate(mutation, value);
+    const state = W.mutate(mutation, value, this.props.state);
+    this.props.onState(state);
   };
 
   render() {

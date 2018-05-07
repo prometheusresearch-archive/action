@@ -77,13 +77,15 @@ export class Workflow extends React.Component<P, S> {
       const args = {};
       let screen = null;
       if (name === 'pick') {
-        screen = <Pick state={node} args={args} onPick={this.onPick} />;
+        screen = (
+          <Pick state={node} args={args} onPick={this.onPick} onState={this.onState} />
+        );
       } else if (name === 'view') {
-        screen = <View state={node} args={args} />;
+        screen = <View state={node} args={args} onState={this.onState} />;
       } else if (name === 'edit') {
-        screen = <Edit state={node} args={args} />;
+        screen = <Edit state={node} args={args} onState={this.onState} />;
       } else if (name === 'barChart') {
-        screen = <BarChart state={node} args={args} />;
+        screen = <BarChart state={node} args={args} onState={this.onState} />;
       } else {
         screen = (
           <ReactNative.View>
