@@ -118,24 +118,41 @@ module Make (Db : Abstract.DATABASE) = struct
 
     aux startState
 
+  let eval (frame, _ as state) =
+    let open Run.Syntax in
+    let%bind q = uiQuery state in
+    let%bind res = Db.query ~db:frame.db q in
+    match Value.classify res with
+    | Value.UI ui ->
+      let ui = Value.UI.setArgs ~args:frame.args ui in
+      return ((frame, Some ui), Some ui)
+    | Value.Null ->
+      return ((frame, None), None)
+    | _ -> runWorkflowError "expected UI, got data"
+
   let render state =
     let open Run.Syntax in
 
-    let render (frame, _ as state) =
-      let%bind q = uiQuery state in
-      let%bind res = Db.query ~db:frame.db q in
-      match Value.classify res with
-      | Value.UI ui ->
-        let ui = Value.UI.setArgs ~args:frame.args ui in
-        return ((frame, Some ui), Some ui)
-      | Value.Null ->
-        return ((frame, None), None)
-      | _ -> runWorkflowError "expected UI, got data"
+    match%bind findRender state with
+    | Some state -> eval state
+    | None -> return (state, None)
+
+  let rebuild state =
+    let open Run.Syntax in
+
+    let rec aux state =
+      match%bind eval state with
+      | _, None ->
+        let frame, _ = state in
+        begin match frame.prev with
+        | Some state -> aux state
+        | None -> return state
+        end
+      | _, Some _ -> return state
     in
 
-    match%bind findRender state with
-    | Some state -> render state
-    | None -> return (state, None)
+    aux state
+
 
   let boot ~db workflow =
     let open Run.Syntax in
@@ -213,6 +230,7 @@ module Make (Db : Abstract.DATABASE) = struct
   let executeMutation ~mutation ~value state =
     let open Run.Syntax in
     let%bind () = Mutation.execute ~mutation value in
+    let%bind state = rebuild state in
     return state
 
 end
