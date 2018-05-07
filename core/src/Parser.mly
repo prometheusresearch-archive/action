@@ -1,7 +1,7 @@
 %token VOID
 %token PICK
 %token VIEW
-%token EDIT
+%token FORM
 %token BAR_CHART
 %token UPDATE
 %token CREATE
@@ -177,9 +177,9 @@ screen:
   | VIEW { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; RIGHT_PAREN { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args} }
-  | EDIT { {name = "edit"; args = [] } }
-  | EDIT; LEFT_PAREN; RIGHT_PAREN { {name = "edit"; args = [] } }
-  | EDIT; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "edit"; args} }
+  | FORM { {name = "form"; args = [] } }
+  | FORM; LEFT_PAREN; RIGHT_PAREN { {name = "form"; args = [] } }
+  | FORM; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "form"; args} }
   | BAR_CHART { {name = "barChart"; args = [] } }
   | BAR_CHART; LEFT_PAREN; RIGHT_PAREN { {name = "barChart"; args = [] } }
   | BAR_CHART; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "barChart"; args} }
