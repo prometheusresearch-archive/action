@@ -4,8 +4,8 @@
 
 import * as React from 'react';
 import {View} from 'react-native-web';
-import * as W from 'core';
 import type {State} from 'core';
+import * as W from 'core';
 import {ScreenTitle} from './ScreenTitle.js';
 import * as cfg from 'components/config';
 import {DataCard} from 'components/DataCard';
@@ -62,27 +62,10 @@ export class Form extends React.Component<P, S> {
     let props = this.props;
     let {title, data, type, mutation} = this.fetch();
     const entityName = getEntityName(type, data);
-    const fields = [];
-    for (let key in this.state.value) {
-      fields.push(
-        <View key={key} style={{paddingBottom: cfg.padding.size2}}>
-          <FormField
-            label={capitalize(key)}
-            renderInput={props => (
-              <TextInput
-                {...props}
-                value={this.state.value[key]}
-                onChangeText={this.onChange.bind(null, key)}
-              />
-            )}
-          />
-        </View>,
-      );
-    }
     return (
       <View>
         <ScreenTitle>{title}</ScreenTitle>
-        {fields}
+        <UpdateForm value={this.state.value} onChange={this.onChange} />
         <View style={{flexDirection: 'row', paddingVertical: cfg.padding.size2}}>
           <View style={{paddingRight: cfg.padding.size2}}>
             <OutlineButton
@@ -99,6 +82,54 @@ export class Form extends React.Component<P, S> {
       </View>
     );
   }
+}
+
+function UpdateForm(props: {
+  value: {[name: string]: string},
+  onChange: (string, string) => void,
+}) {
+  const fields = [];
+  for (let key in props.value) {
+    fields.push(
+      <View key={key} style={{paddingBottom: cfg.padding.size2}}>
+        <FormField
+          label={capitalize(key)}
+          renderInput={inputProps => (
+            <TextInput
+              {...inputProps}
+              value={props.value[key]}
+              onChangeText={props.onChange.bind(null, key)}
+            />
+          )}
+        />
+      </View>,
+    );
+  }
+  return <View>{fields}</View>;
+}
+
+function CreateForm(props: {
+  value: {[name: string]: string},
+  onChange: (string, string) => void,
+}) {
+  const fields = [];
+  for (let key in props.value) {
+    fields.push(
+      <View key={key} style={{paddingBottom: cfg.padding.size2}}>
+        <FormField
+          label={capitalize(key)}
+          renderInput={inputProps => (
+            <TextInput
+              {...inputProps}
+              value={props.value[key]}
+              onChangeText={props.onChange.bind(null, key)}
+            />
+          )}
+        />
+      </View>,
+    );
+  }
+  return <View>{fields}</View>;
 }
 
 function getEntityName({type}, data) {

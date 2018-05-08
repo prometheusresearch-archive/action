@@ -784,7 +784,7 @@ let query ?value ~db q =
         let%bind _ = updateEntity ~value ~query:parent ~formValue ~cache ops in
         return ()
       in
-      let mut = Mutation.make execute in
+      let mut = Mutation.make execute `Update in
       return (Value.mutation mut)
 
     | _, Query.Typed.Mutation (parent, Query.Mutation.Create ops) ->
@@ -792,7 +792,7 @@ let query ?value ~db q =
         let%bind _ = createEntity ~value ~query:parent ~formValue ~cache ops in
         return ()
       in
-      let mut = Mutation.make execute in
+      let mut = Mutation.make execute `Create in
       return (Value.mutation mut)
 
     | _, Query.Typed.ComparisonOp (op, left, right) ->

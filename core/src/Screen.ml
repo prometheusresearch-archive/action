@@ -1,6 +1,6 @@
 type t = {
   args : Query.Type.arg Common.StringMap.t;
-  inputCard : Query.Card.t;
+  inputCard : Query.Card.t option;
   grow : Query.Untyped.t;
 }
 

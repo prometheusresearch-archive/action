@@ -11,6 +11,40 @@ module WorkflowInterpreter = RunWorkflow.Make(JSONDatabase)
 module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
 module WorkflowTyper = WorkflowTyper.Make(JSONDatabase.Universe)
 
+module MutationRepr = struct
+
+  type t
+
+  external make : 'a -> t = "%identity"
+
+  let fromMutation (mutation : Query.Typed.t Query.Mutation.t) =
+    let rec reprOps ops =
+      let reprOp dict key op =
+        let op =
+          match op with
+          | Query.Mutation.OpUpdate _ -> make [%bs.obj {type_ = "field"}]
+          | Query.Mutation.OpUpdateEntity ops ->
+            let ops = reprOps ops in
+            make [%bs.obj {type_ = "update"; ops}]
+          | Query.Mutation.OpCreateEntity ops ->
+            let ops = reprOps ops in
+            make [%bs.obj {type_ = "create"; ops}]
+        in
+        Js.Dict.set dict key op;
+        dict
+      in
+      Common.StringMap.reduce ops (Js.Dict.empty ()) reprOp
+    in
+    match mutation with
+    | Query.Mutation.Update ops ->
+      let ops = reprOps ops in
+      make [%bs.obj {type_ = "update"; ops;}]
+    | Query.Mutation.Create ops ->
+      let ops = reprOps ops in
+      make [%bs.obj {type_ = "create"; ops;}]
+
+end
+
 let formatContext ctx =
   let line = function
     | `DatabaseError err
@@ -85,7 +119,7 @@ let id state =
 let pickScreen =
 
   Screen.Syntax.(screen
-    ~inputCard:Query.Card.Many
+    ~inputCard:(Some Query.Card.Many)
     ~args:[
       arg "id" ~default:Q.null (one number);
       arg "title" ~default:(Q.string "Pick") (one string);
@@ -113,7 +147,7 @@ let pickScreen =
 
 let viewScreen =
   Screen.Syntax.(screen
-    ~inputCard:Query.Card.One
+    ~inputCard:(Some Query.Card.One)
     ~args:[
       arg "title" ~default:(Q.string "View") (one string);
     ]
@@ -132,7 +166,7 @@ let viewScreen =
 
 let formScreen =
   Screen.Syntax.(screen
-    ~inputCard:Query.Card.One
+    ~inputCard:None
     ~args:[
       arg "title" ~default:(Q.string "Form") (one string);
       arg "spec" (one string);
@@ -160,7 +194,7 @@ let formScreen =
 
 let barChartScreen =
   Screen.Syntax.(screen
-    ~inputCard:Query.Card.Many
+    ~inputCard:(Some Query.Card.Many)
     ~args:[
       arg "title" ~default:(Q.string "View") (one string);
     ]
@@ -298,6 +332,11 @@ let mutate ~mutation ~value state =
     let%bind state = WorkflowInterpreter.executeMutation ~mutation:mut ~value state in
     return state
   ) |> runToResult |> unwrapResult
+
+let mutationKind mutation =
+  match Mutation.kind mutation with
+  | `Update -> "update"
+  | `Create -> "create"
 
 let parse s =
   let module N = Js.Nullable in

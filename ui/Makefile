@@ -7,3 +7,6 @@ bootstrap:
 
 serve:
 	@$(NODE_MODULE_BIN)/next
+
+deploy:
+	@$(NODE_MODULE_BIN)/gh-pages -d out

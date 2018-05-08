@@ -271,16 +271,17 @@ module Make (Universe : Abstract.UNIVERSE) = struct
         let {Typed. ctyp = card, _typ; _} = parentCtx in
 
         begin match (screen.inputCard, card) with
-        | Card.One, Card.Many
-        | Card.Opt, Card.Many
-        | Card.Many, Card.One
-        | Card.Many, Card.Opt ->
+        | Some Card.One, Card.Many
+        | Some Card.Opt, Card.Many
+        | Some Card.Many, Card.One
+        | Some Card.Many, Card.Opt ->
           queryTypeError {j|screen "$screenName" cannot be constructed due to cardinality mismatch|j}
-        | Card.One, Card.Opt
-        | Card.One, Card.One
-        | Card.Opt, Card.Opt
-        | Card.Opt, Card.One
-        | Card.Many, Card.Many ->
+        | None, _
+        | Some Card.One, Card.Opt
+        | Some Card.One, Card.One
+        | Some Card.Opt, Card.Opt
+        | Some Card.Opt, Card.One
+        | Some Card.Many, Card.Many ->
 
           let%bind screenOut =
             Run.context (

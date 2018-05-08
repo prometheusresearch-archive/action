@@ -20,6 +20,12 @@ function isInternalReq(req) {
 }
 
 module.exports = {
+  exportPathMap: function(defaultPathMap) {
+    return {
+      '/': {page: '/'},
+      '/demo': {page: '/demo'},
+    };
+  },
   webpack: (config, {dev, isServer, defaultLoaders}) => {
     config.externals = config.externals.map(external => {
       if (typeof external !== 'function') {

@@ -32,6 +32,7 @@ val query : state -> string -> Value.t
 
 (** Mutate database state *)
 val mutate : mutation : mutation -> value : Value.t -> state -> state
+val mutationKind : mutation -> string
 
 val db : JSONDatabase.t
 val univ : JSONDatabase.Universe.t
