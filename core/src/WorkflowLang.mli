@@ -3,19 +3,19 @@
  *)
 
 (**
- * An workflow over some monoidal domain.
+ * A workflow.
  *
  * A workflow is a set of named grammatical constructs (we call them nodes),
  * each node can be one of
  *
- * - Value (from a monoidal domain)
- * - Label (which points to another node in the workflow)
- * - Navigate (preprend a value before another node)
- * - Sequence (sequential composition of multiple nodes)
- * - Choice (parallel composition of multiple nodes)
+ * - value (from a monoidal value)
+ * - label (which points to another node in the workflow)
+ * - navigate (preprend a value before another node)
+ * - sequence (sequential composition of multiple nodes)
+ * - choice (parallel composition of multiple nodes)
  *
  *)
-module Make (M : Abstract.MONOID) : sig
+module type Lang = sig
 
   (** Workflow *)
   type t
@@ -25,12 +25,14 @@ module Make (M : Abstract.MONOID) : sig
   (** A single node of the workflow *)
   and node
 
+  and value
+
   (**
    * Convenience for creating workflows programmatically.
    *
    * Example
    *
-   *  Workflow.Syntax(
+   *  Lang.Syntax(
    *    empty
    *    |> define "main" (
    *         seq [...; label "then"]
@@ -56,7 +58,7 @@ module Make (M : Abstract.MONOID) : sig
     (**
      * Construct a new workflow node out of value.
      *)
-    val value : M.t -> node
+    val value : value -> node
 
     (**
      * Construct a new workflow node which references another workflow node.
@@ -67,7 +69,7 @@ module Make (M : Abstract.MONOID) : sig
      * Construct a new workflow node which multiples an existent node on a
      * value.
      *)
-    val navigateAnd : M.t -> node -> node
+    val navigateAnd : value -> node -> node
 
     (**
      * A sequential composition of workflow nodes.
@@ -91,15 +93,18 @@ module Make (M : Abstract.MONOID) : sig
     (**
      * Construct a start position
      *)
-    val start : ?value : M.t -> label : string -> workflow -> (t, string) Run.t
+    val start : ?value : value -> label : string -> workflow -> (t, string) Run.t
 
     (**
      * Find all next positions which contain some value and accumulate value
      * during the search.
      *)
-    val next : t -> ((M.t * t) list, string) Run.t
+    val next : t -> ((value * t) list, string) Run.t
 
   end
-
 end
 
+(**
+ * Construct workflow out of monoidal structure.
+ *)
+module Make (M : Abstract.MONOID) : Lang with type value := M.t
