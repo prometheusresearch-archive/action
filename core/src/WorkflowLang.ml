@@ -120,6 +120,8 @@ module Make (M : Abstract.MONOID) = struct
     | Seq of node list
     | Par of node list
 
+  and value = M.t
+
   module Syntax = struct
 
     let empty = Map.empty
@@ -137,16 +139,7 @@ module Make (M : Abstract.MONOID) = struct
   (**
    * Location inside node structure.
    *)
-  module Loc : sig
-
-    type t = node * ctx
-
-    and ctx =
-      | Root
-      | InNavigateAnd of t * M.t
-      | InSequence of t * node list * node list
-      | InChoice of t * node list * node list
-  end = struct
+  module Loc = struct
 
     type t = node * ctx
 
@@ -161,23 +154,7 @@ module Make (M : Abstract.MONOID) = struct
   (**
    * Position inside workflow.
    *)
-  module Pos : sig
-
-    type t = {
-      (** Workflow *)
-      workflow: workflow;
-      (** Label inside the workflow *)
-      label: string;
-      (** Location inside node structure and a stack of prev locations *)
-      loc: Loc.t * Loc.t list;
-      (** Accumulated value *)
-      value : M.t;
-    }
-
-    val start : ?value : M.t -> label : string -> workflow -> (t, string) Run.t
-    val next : t -> ((M.t * t) list, string) Run.t
-
-  end = struct
+  module Pos = struct
 
     type t = {
       workflow: workflow;
