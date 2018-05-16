@@ -267,7 +267,7 @@ let () =
       );
     end;
 
-    test "here.region:first:edit(spec: :update {name: $value.name})" begin fun () ->
+    test "here.region:first:form(spec: :update {name: $value.name})" begin fun () ->
       expectQueryOk Q.(
         let spec =
           here
@@ -278,11 +278,11 @@ let () =
         void
         |> nav "region"
         |> first
-        |> screen ~args:[arg "spec" spec] "edit"
+        |> screen ~args:[arg "spec" spec] "form"
       );
     end;
 
-    test "here.region:first:edit(spec: :update {name: $value.name.nested})" begin fun () ->
+    test "here.region:first:form(spec: :update {name: $value.name.nested})" begin fun () ->
       expectQueryOk Q.(
         let spec =
           here
@@ -293,7 +293,7 @@ let () =
         void
         |> nav "region"
         |> first
-        |> screen ~args:[arg "spec" spec] "edit"
+        |> screen ~args:[arg "spec" spec] "form"
       );
     end;
   end;
