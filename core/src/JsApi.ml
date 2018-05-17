@@ -9,14 +9,17 @@ module Json = Js.Json
 type state = QueryWorkflow.state
 type workflow = QueryWorkflow.workflow
 type args = Json.t
-type ui = Value.UI.t
 type db = JSONDatabase.t
+type ui = Value.UI.t
+type value = Value.t
+type query = string
 
 let runExn comp = match Run.toResult comp with
   | Js.Result.Ok v -> v
   | Js.Result.Error (`WorkflowError err) -> Js.Exn.raiseError err
   | Js.Result.Error (`DatabaseError err) -> Js.Exn.raiseError err
   | Js.Result.Error (`QueryTypeError err) -> Js.Exn.raiseError err
+  | Js.Result.Error (`ParseError err) -> Js.Exn.raiseError err
 
 let run db workflow =
   runExn (QueryWorkflow.run ~db workflow)
@@ -50,3 +53,40 @@ let ui state =
 
 let next state =
   runExn (QueryWorkflow.next state)
+
+let breadcrumb state =
+  QueryWorkflow.breadcrumb state
+
+let parse s =
+  let open Run.Syntax in
+  let filebuf = Lexing.from_string s in
+  match Parser.start Lexer.read filebuf with
+  | value -> return value
+  | exception Lexer.Error msg ->
+    error (`ParseError msg)
+  | exception Parser.Error ->
+    let msg = {j|syntax error while parsing $s|j} in
+    error (`ParseError msg)
+
+let parseQueryResult s =
+  let open Run.Syntax in
+  match%bind parse s with
+  | ParserResult.Query q -> return q
+  | ParserResult.Workflow _ -> error (`ParseError "expected query")
+
+let parseWorkflowResult s =
+  let open Run.Syntax in
+  match%bind parse s with
+  | ParserResult.Query _ -> error (`ParseError "expected workflow")
+  | ParserResult.Workflow w -> return w
+
+let parseWorkflow s =
+  runExn (parseWorkflowResult s)
+
+let query query state =
+  runExn (
+    let open Run.Syntax in
+    let%bind query = parseQueryResult query in
+    let%bind value = QueryWorkflow.execute query state in
+    return value
+  )

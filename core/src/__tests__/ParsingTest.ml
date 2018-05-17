@@ -120,6 +120,10 @@ let () =
     ";
     expectParseWorkflow "
       main =
+        render individual:pick ;
+    ";
+    expectParseWorkflow "
+      main =
         render(individual:pick)
     ";
     expectParseWorkflow "
@@ -164,6 +168,16 @@ let () =
       then =
         render value:view;
         render value:form
+    ";
+
+    expectParseWorkflow "
+      main =
+        / -> render individual:pick
+    ";
+    expectParseWorkflow "
+      main =
+        / -> render individual:pick;
+        value -> render :view
     ";
 
 

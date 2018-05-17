@@ -1,4 +1,33 @@
 
+** Conflict (shift/reduce) in state 128.
+** Token involved: ID
+** This state is reached from start after reading:
+
+ID EQ workflowNode SEMI 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+workflow 
+(?)
+
+** In state 128, looking ahead at ID, shifting is permitted
+** because of the following sub-derivation:
+
+ID EQ workflowNode 
+      workflowNode SEMI workflowNode 
+                        query ARROW_RIGHT workflowNode 
+                        . ID 
+
+** In state 128, looking ahead at ID, reducing production
+** workflowNode -> workflowNode SEMI 
+** is permitted because of the following sub-derivation:
+
+ID EQ workflowNode workflow // lookahead token appears because workflow can begin with ID
+      workflowNode SEMI . 
+
 ** Conflict (shift/reduce) in state 119.
 ** Token involved: EQ
 ** This state is reached from start after reading:

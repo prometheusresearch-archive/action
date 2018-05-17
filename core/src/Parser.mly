@@ -37,6 +37,7 @@
 
 %right ALT
 %right SEMI
+%right ARROW_RIGHT
 %right OR
 %right AND
 %left LT LTE GT GTE EQ NEQ
@@ -88,9 +89,11 @@ workflowNode:
   | LEFT_PAREN; node = workflowNode; RIGHT_PAREN { node }
   | RENDER; q = query; { WS.value q }
   | GOTO; label = ID { WS.label label }
+  | q = query; ARROW_RIGHT; node = workflowNode { WS.navigateAnd q node }
   | ALT; left = workflowNode; ALT; right = workflowNode { WS.or_ left right } %prec ALT
   | left = workflowNode; ALT; right = workflowNode { WS.or_ left right } %prec ALT
   | left = workflowNode; SEMI; right = workflowNode { WS.and_ left right } %prec SEMI
+  | node = workflowNode; SEMI; { node }
 
 query:
   | VOID { S.void }
