@@ -16,7 +16,7 @@ let testRun ?(only=false) name f =
   test name begin fun () ->
     match Run.toResult (f ()) with
     | Common.Result.Ok assertion -> assertion
-    | Common.Result.Error err -> fail err
+    | Common.Result.Error (`WorkflowError err) -> fail err
   end
 
 let () =
@@ -34,7 +34,7 @@ let () =
       let%bind next = P.next pos in
       match List.find (fun (v, _) -> v == label) next with
       | (_, pos) -> return pos
-      | exception Not_found -> error {j|no such position: $label|j}
+      | exception Not_found -> W.workflowError {j|no such position: $label|j}
     in
 
     testRun "a" begin fun () ->

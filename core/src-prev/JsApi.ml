@@ -3,6 +3,7 @@
  *)
 
 module Q = Query.Untyped.Syntax
+module QW = QueryWorkflow
 module T = Query.Type.Syntax
 module S = Screen.Syntax
 module Result = Common.Result
@@ -51,6 +52,7 @@ let formatContext ctx =
     | `QueryTypeError err
     | `RunWorkflowError err
     | `WorkflowTypeError err
+    | `WorkflowError err
     | `ParseError err -> err
   in
   ctx |> List.rev |> List.map line |> String.concat "\n"
@@ -75,6 +77,10 @@ let runToResult v =
     let msg = {j|QueryTypeError: $err\nContext: $ctx|j} in
     Result.Error msg
   | Result.Error (`ParseError err, ctx) ->
+    let ctx = formatContext ctx in
+    let msg = {j|ParseError: $err\nContext: $ctx|j} in
+    Result.Error msg
+  | Result.Error (`WorkflowError err, ctx) ->
     let ctx = formatContext ctx in
     let msg = {j|ParseError: $err\nContext: $ctx|j} in
     Result.Error msg
@@ -352,14 +358,13 @@ let parse s =
       let state =
         runToResult (
           let open Run.Syntax in
-          let%bind w = WorkflowTyper.typeWorkflow ~univ w in
-          WorkflowInterpreter.boot ~db w
+          QW.Lang.Pos.start ~label:"main" w
         )
       in
       Run.return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
     in
     let makeUi ui =
-      let w = Workflow.Untyped.Syntax.render ui in
+      let w = QW.Lang.Syntax.value ui in
       makeWorkflow w
     in
     let open Run.Syntax in

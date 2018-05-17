@@ -7,7 +7,6 @@
 %token CREATE
 %token RENDER
 %token NULL
-%token LET
 %token GOTO
 %token DOT
 %token COMMA
@@ -32,7 +31,12 @@
 %token AND
 %token OR
 %token EOF
+%token ARROW_RIGHT
+%token ALT
+%token SEMI
 
+%right ALT
+%right SEMI
 %right OR
 %right AND
 %left LT LTE GT GTE EQ NEQ
@@ -41,6 +45,7 @@
 %{
 
   module S = Query.Untyped.Syntax
+  module WS = QueryWorkflow.Lang.Syntax
   module M = Query.Mutation.Syntax
   module W = Workflow.Untyped.Syntax
   module StringMap = Belt.Map.String
@@ -76,16 +81,16 @@ program:
   | w = workflow { ParserResult.Workflow w }
 
 workflow:
-  | RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render q }
-  | LET; label = ID; EQ; RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render ~label q }
-  | w = workflow; LEFT_BRACE; RIGHT_BRACE { w }
-  | w = workflow; LEFT_BRACE; ws = workflowList; RIGHT_BRACE { W.andThen ws w }
-  | GOTO; label = ID { W.label label }
+  | name = ID; EQ; node = workflowNode { WS.define name node WS.empty }
+  | name = ID; EQ; node = workflowNode; wc = workflow { WS.define name node wc }
 
-workflowList:
-  | w = workflow { [w] }
-  | w = workflow; COMMA { [w] }
-  | w = workflow; COMMA; ws = workflowList { w::ws }
+workflowNode:
+  | LEFT_PAREN; node = workflowNode; RIGHT_PAREN { node }
+  | RENDER; q = query; { WS.value q }
+  | GOTO; label = ID { WS.label label }
+  | ALT; left = workflowNode; ALT; right = workflowNode { WS.or_ left right } %prec ALT
+  | left = workflowNode; ALT; right = workflowNode { WS.or_ left right } %prec ALT
+  | left = workflowNode; SEMI; right = workflowNode { WS.and_ left right } %prec SEMI
 
 query:
   | VOID { S.void }

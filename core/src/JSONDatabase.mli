@@ -111,6 +111,8 @@ module Config : sig
 
 end
 
+module QueryTyper : QueryTyper.Typer with type universe := Universe.t
+
 (**
  * Construct database out of a JSON value.
  *)

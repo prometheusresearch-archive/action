@@ -1,4 +1,31 @@
 
+** Conflict (shift/reduce) in state 119.
+** Token involved: EQ
+** This state is reached from start after reading:
+
+ID 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+start 
+program EOF 
+(?)
+
+** In state 119, looking ahead at EQ, reducing production
+** query -> ID 
+** is permitted because of the following sub-derivation:
+
+query 
+query EQ query // lookahead token appears
+ID . 
+
+** In state 119, looking ahead at EQ, shifting is permitted
+** because of the following sub-derivation:
+
+workflow 
+ID . EQ workflowNode 
+
 ** Conflict (shift/reduce) in state 82.
 ** Tokens involved: LEFT_BRACKET LEFT_BRACE
 ** The following explanations concentrate on token LEFT_BRACKET.
@@ -253,7 +280,8 @@ ID .
 ID . COLON query 
 
 ** Conflict (shift/reduce) in state 1.
-** Token involved: COLON
+** Tokens involved: ID COLON
+** The following explanations concentrate on token COLON.
 ** This state is reached from start after reading:
 
 VOID 

@@ -6,12 +6,27 @@ module type Lang = sig
   (** Workflow *)
   type t
 
-  and workflow = t
+  type workflow = t
+
+  type 'e error = [> `WorkflowError of string] as 'e
 
   (** A single node of the workflow *)
-  and node
+  type node =
+    | Value of value
+    | Label of string
+    | NavigateAnd of value * node
+    | Seq of node list
+    | Par of node list
 
   and value
+
+  val fold :
+    f : ('a -> string -> node -> 'a)
+    -> init : 'a
+    -> workflow
+    -> 'a
+
+  val workflowError : string -> ('a, 'e error) Run.t
 
   (**
    * Convenience for creating workflows programmatically.
@@ -57,6 +72,9 @@ module type Lang = sig
      *)
     val navigateAnd : value -> node -> node
 
+    val and_ : node -> node -> node
+    val or_ : node -> node -> node
+
     (**
      * A sequential composition of workflow nodes.
      *)
@@ -76,16 +94,20 @@ module type Lang = sig
 
     type t
 
+    val value : t -> value
+
+    val prev : t -> t option
+
     (**
      * Construct a start position
      *)
-    val start : ?value : value -> label : string -> workflow -> (t, string) Run.t
+    val start : ?value : value -> label : string -> workflow -> (t, 'e error) Run.t
 
     (**
      * Find all next positions which contain some value and accumulate value
      * during the search.
      *)
-    val next : t -> ((value * t) list, string) Run.t
+    val next : t -> ((value * t) list, 'e error) Run.t
 
   end
 end
@@ -107,7 +129,12 @@ module List = Belt.List
  * - Par (parallel composition of multiple nodes)
  *
  *)
-module Make (M : Abstract.MONOID) = struct
+module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
+
+  type 'a error = [> `WorkflowError of string] as 'a
+
+  let workflowError msg =
+    Run.error (`WorkflowError msg)
 
   type t = node Map.t
 
@@ -134,6 +161,18 @@ module Make (M : Abstract.MONOID) = struct
     let navigateAnd v node = NavigateAnd (v, node)
     let seq nodes = Seq nodes
     let par nodes = Par nodes
+
+    let and_ a b =
+      match a, b with
+      | Seq a, b -> Seq (a @ [b])
+      | a, Seq b -> Seq (a::b)
+      | a, b -> Seq [a; b]
+
+    let or_ a b =
+      match a, b with
+      | Par a, b -> Par (a @ [b])
+      | a, Par b -> Par (a::b)
+      | a, b -> Par [a; b]
   end
 
   (**
@@ -161,7 +200,11 @@ module Make (M : Abstract.MONOID) = struct
       label: string;
       loc: Loc.t * Loc.t list;
       value : M.t;
+      prev : t option;
     }
+
+    let value {value;_} = value
+    let prev {prev;_} = prev
 
     (**
      * Start the workflow given the label and optional start value.
@@ -175,11 +218,12 @@ module Make (M : Abstract.MONOID) = struct
           label;
           value;
           loc = (node, Loc.Root), [];
+          prev = None;
         }
       | None ->
-        error {j|unknown label $label|j}
+        workflowError {j|unknown label $label|j}
 
-    let next {loc; workflow; value; label} =
+    let next ({loc; workflow; value; label} as pos) =
       let open Run.Syntax in
 
       let rec climbToNextInSequence ((curr, ctx), locs) =
@@ -199,7 +243,7 @@ module Make (M : Abstract.MONOID) = struct
           match curr with
           | Value locValue ->
             let value = M.append value locValue in
-            let pos = {label; workflow; value; loc = loc, locs} in
+            let pos = {label; workflow; value; loc = loc, locs; prev = Some pos} in
             return ((value, pos)::acc)
           | Label nextLabel ->
             if Set.has visited nextLabel then
@@ -212,7 +256,7 @@ module Make (M : Abstract.MONOID) = struct
                 let loc = node, Loc.Root in
                 aux value nextLabel visited acc (loc, locs)
               | None ->
-                error {j|no such label $nextLabel|j}
+                workflowError {j|no such label $nextLabel|j}
             end
           | NavigateAnd (query, node) ->
             let value = M.append value query in
@@ -266,5 +310,8 @@ module Make (M : Abstract.MONOID) = struct
       | None -> return []
 
   end
+
+  let fold ~f ~init workflow =
+    Map.reduce workflow init f
 
 end

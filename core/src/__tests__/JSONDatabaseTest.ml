@@ -33,8 +33,8 @@ let univ =
     init
     |> defineEntity "region" region
     |> defineEntity "nation" nation
-    |> defineScreen "pick" JsApi.pickScreen
-    |> defineScreen "view" JsApi.viewScreen
+    |> defineScreen "pick" Config.pickScreen
+    |> defineScreen "view" Config.viewScreen
     |> finish
   )
 

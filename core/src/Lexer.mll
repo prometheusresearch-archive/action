@@ -30,7 +30,6 @@ rule read = parse
   | "pick"     { PICK }
   | "view"     { VIEW }
   | "form"     { FORM }
-  | "let"      { LET }
   | "goto"     { GOTO }
   | "barChart" { BAR_CHART }
   | "render"   { RENDER }
@@ -56,6 +55,9 @@ rule read = parse
   | ">="       { GTE }
   | "&&"       { AND }
   | "||"       { OR }
+  | "|"        { ALT }
+  | ";"        { SEMI }
+  | "->"       { ARROW_RIGHT }
   | id         { ID (Lexing.lexeme lexbuf) }
   | name       {
                  let buf = Lexing.lexeme lexbuf in

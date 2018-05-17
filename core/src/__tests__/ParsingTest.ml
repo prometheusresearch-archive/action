@@ -41,6 +41,24 @@ let () =
     end
   in
 
+  let expectParseWorkflow s =
+    test s begin fun () ->
+      let filebuf = Lexing.from_string s in
+      try
+        let res = Parser.start Lexer.read filebuf in
+        match res with
+        | ParserResult.Query _ ->
+          fail "expected workflow"
+        | ParserResult.Workflow _ ->
+          pass
+      with
+      | Lexer.Error msg ->
+        fail msg
+      | Parser.Error ->
+        fail "Syntax error"
+    end
+  in
+
   describe "Parsing" begin fun () ->
 
     (** Trivia *)
@@ -92,25 +110,62 @@ let () =
         id: value.id,
       }
     |};
-
-    expectParseOk "render(individual:pick)";
-    expectParseOk "let name = render(individual:pick)";
-    expectParseOk "render(individual:pick) { render(here:view) }";
-    expectParseOk "let name = render(individual:pick) { render(here:view) }";
-    expectParseOk "render(individual:pick) { let name = render(here:view) }";
-    expectParseOk "render(individual:pick) { goto name }";
-    expectParseOk "goto name";
-    expectParseOk "render(individual:pick) { render(here:view), }";
-    expectParseOk {|
-
-      render(individual:pick) {
-        render(here:view),
-        render(site:view)
-      }
-
-    |};
-
     expectParseOk "null";
+
+    (** Workflows *)
+
+    expectParseWorkflow "
+      main =
+        render individual:pick
+    ";
+    expectParseWorkflow "
+      main =
+        render(individual:pick)
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ; render value:view
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick;
+        render value:view
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ; render value:view ; render value.study:view
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick | render study:pick
+    ";
+    expectParseWorkflow "
+      main =
+        | render individual:pick
+        | render study:pick
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick | render study:pick | render todo:pick
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ; (render value:view | render value:form)
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick | (render value:view ; render value:form)
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick;
+        goto then
+
+      then =
+        render value:view;
+        render value:form
+    ";
+
 
     (** Operators *)
 

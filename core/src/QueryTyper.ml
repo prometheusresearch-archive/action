@@ -8,7 +8,37 @@ module Result = Common.Result
 module Option = Common.Option
 module Mutation = Query.Mutation
 
-module Make (Universe : Abstract.UNIVERSE) = struct
+module type Typer = sig
+  type error = [ `QueryTypeError of string ]
+  type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t
+  type universe
+
+  val typeQuery :
+    ?ctx : Query.Typed.context
+    -> univ : universe
+    -> Query.Untyped.t
+    -> (Query.Typed.t, 'err) comp
+
+  val growQuery :
+    univ : universe
+    -> ?bindings : (string * Query.Typed.binding) list
+    -> base : Query.Typed.t
+    -> Query.Untyped.t
+    -> (Query.Typed.t, 'err) comp
+
+  val checkArgs :
+    argTyps : Query.Type.args
+    -> Query.Untyped.args
+    -> (Query.Untyped.args, 'err) comp
+
+  (** Same as checkArgs but doesn't set default values for missing args *)
+  val checkArgsPartial :
+    argTyps : Query.Type.args
+    -> Query.Untyped.args
+    -> (Query.Untyped.args, 'err) comp
+end
+
+module Make (Universe : Abstract.UNIVERSE) : Typer with type universe := Universe.t = struct
 
   type error = [ `QueryTypeError of string ]
   type ('v, 'err) comp = ('v, [> error ] as 'err) Run.t

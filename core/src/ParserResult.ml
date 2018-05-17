@@ -1,3 +1,3 @@
 type t =
-  | Workflow of Workflow.Untyped.t
+  | Workflow of QueryWorkflow.Lang.t
   | Query of Query.Untyped.t

@@ -10,8 +10,8 @@ module W = Workflow.Untyped.Syntax
 module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
 module WorkflowTyper = WorkflowTyper.Make(JSONDatabase.Universe)
 
-let univ = JsApi.univ
-let db = JsApi.db
+let univ = Config.univ
+let db = Config.db
 
 let errorMessage = function
   | `DatabaseError err
