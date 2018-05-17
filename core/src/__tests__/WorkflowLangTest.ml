@@ -25,15 +25,15 @@ let () =
     let collectNextValues pos =
       let open Run.Syntax in
       let%bind next = P.next pos in
-      let next = next |> List.map (fun (v, _) -> v) |> Array.of_list in
+      let next = next |> List.map (fun pos -> P.value pos) |> Array.of_list in
       return next
     in
 
     let goto ~label pos =
       let open Run.Syntax in
       let%bind next = P.next pos in
-      match List.find (fun (v, _) -> v == label) next with
-      | (_, pos) -> return pos
+      match List.find (fun pos -> (P.value pos) == label) next with
+      | pos -> return pos
       | exception Not_found -> W.workflowError {j|no such position: $label|j}
     in
 
@@ -43,7 +43,7 @@ let () =
         empty
         |> define "main" (value "a")
       ) in
-      let%bind pos = P.start ~label:"main" workflow in
+      let%bind pos = P.run ~label:"main" workflow in
       let%bind next = collectNextValues pos in
       return (expect next |> toEqual [|"empty -> a"|])
     end;
@@ -54,7 +54,7 @@ let () =
         empty
         |> define "main" (seq [value "a"])
       ) in
-      let%bind pos = P.start ~label:"main" workflow in
+      let%bind pos = P.run ~label:"main" workflow in
       let%bind next = collectNextValues pos in
       return (expect next |> toEqual [|"empty -> a"|])
     end;
@@ -67,14 +67,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a"|])
       end;
 
       testRun "a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a -> b"|])
@@ -82,7 +82,7 @@ let () =
 
       testRun "a -> b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind next = collectNextValues pos in
@@ -102,14 +102,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a"|])
       end;
 
       testRun "a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a -> b"|])
@@ -117,7 +117,7 @@ let () =
 
       testRun "a -> b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind next = collectNextValues pos in
@@ -126,7 +126,7 @@ let () =
 
       testRun "a -> b -> c # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind pos = goto ~label:"empty -> a -> b -> c" pos in
@@ -136,7 +136,7 @@ let () =
 
       testRun "a -> b -> c -> d # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind pos = goto ~label:"empty -> a -> b -> c" pos in
@@ -156,14 +156,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a1"; "empty -> a2"|])
       end;
 
       testRun "a1 # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a1" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a1 -> b"|])
@@ -171,7 +171,7 @@ let () =
 
       testRun "a2 # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a2" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a2 -> b"|])
@@ -179,7 +179,7 @@ let () =
 
       testRun "a2 -> b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a2" pos in
         let%bind pos = goto ~label:"empty -> a2 -> b" pos in
         let%bind next = collectNextValues pos in
@@ -200,14 +200,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a1"; "empty -> a2"; "empty -> a3"|])
       end;
 
       testRun "a1 # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a1" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a1 -> b"|])
@@ -215,7 +215,7 @@ let () =
 
       testRun "a2 # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a2" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a2 -> b"|])
@@ -223,7 +223,7 @@ let () =
 
       testRun "a3 # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a3" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a3 -> b"|])
@@ -231,7 +231,7 @@ let () =
 
       testRun "a2 -> b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a2" pos in
         let%bind pos = goto ~label:"empty -> a2 -> b" pos in
         let%bind next = collectNextValues pos in
@@ -254,14 +254,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a"|])
       end;
 
       testRun "a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])
@@ -285,14 +285,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a"; "empty -> b"|])
       end;
 
       testRun "a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])
@@ -300,7 +300,7 @@ let () =
 
       testRun "b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> b" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])
@@ -327,14 +327,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a"; "empty -> b"|])
       end;
 
       testRun "a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])
@@ -342,7 +342,7 @@ let () =
 
       testRun "b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> b" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])
@@ -369,14 +369,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a";|])
       end;
 
       testRun "a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a -> b";|])
@@ -384,7 +384,7 @@ let () =
 
       testRun "a -> b # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind next = collectNextValues pos in
@@ -393,7 +393,7 @@ let () =
 
       testRun "a -> b -> a # ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind pos = goto ~label:"empty -> a -> b -> a" pos in
@@ -423,14 +423,14 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a";|])
       end;
 
       testRun "# a ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> a -> b";|])
@@ -438,7 +438,7 @@ let () =
 
       testRun "# a -> b ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind next = collectNextValues pos in
@@ -447,7 +447,7 @@ let () =
 
       testRun "# a -> b -> c ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind pos = goto ~label:"empty -> a -> b -> c" pos in
@@ -457,7 +457,7 @@ let () =
 
       testRun "# a -> b -> c -> d ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind pos = goto ~label:"empty -> a -> b" pos in
         let%bind pos = goto ~label:"empty -> a -> b -> c" pos in
@@ -489,7 +489,7 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|
           "empty -> a";
@@ -522,7 +522,7 @@ let () =
 
       testRun "# ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|
           "empty -> a";
@@ -533,7 +533,7 @@ let () =
 
       testRun "# a ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> a" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])
@@ -541,7 +541,7 @@ let () =
 
       testRun "# b ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> b" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [|"empty -> b -> c"|])
@@ -549,7 +549,7 @@ let () =
 
       testRun "# b -> c ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> b" pos in
         let%bind pos = goto ~label:"empty -> b -> c" pos in
         let%bind next = collectNextValues pos in
@@ -558,7 +558,7 @@ let () =
 
       testRun "# d ..." begin fun () ->
         let open Run.Syntax in
-        let%bind pos = P.start ~label:"main" workflow in
+        let%bind pos = P.run ~label:"main" workflow in
         let%bind pos = goto ~label:"empty -> d" pos in
         let%bind next = collectNextValues pos in
         return (expect next |> toEqual [||])

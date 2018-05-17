@@ -98,16 +98,18 @@ module type Lang = sig
 
     val prev : t -> t option
 
+    val replaceValue : value -> t -> t
+
     (**
-     * Construct a start position
+     * Run workflow.
      *)
-    val start : ?value : value -> label : string -> workflow -> (t, 'e error) Run.t
+    val run : ?value : value -> label : string -> workflow -> (t, 'e error) Run.t
 
     (**
      * Find all next positions which contain some value and accumulate value
      * during the search.
      *)
-    val next : t -> ((value * t) list, 'e error) Run.t
+    val next : t -> (t list, 'e error) Run.t
 
   end
 end
@@ -206,10 +208,13 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
     let value {value;_} = value
     let prev {prev;_} = prev
 
+    let replaceValue value pos =
+      {pos with value}
+
     (**
      * Start the workflow given the label and optional start value.
      *)
-    let start ?(value=M.empty) ~label workflow =
+    let run ?(value=M.empty) ~label workflow =
       let open Run.Syntax in
       match Map.get workflow label with
       | Some node ->
@@ -244,7 +249,7 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
           | Value locValue ->
             let value = M.append value locValue in
             let pos = {label; workflow; value; loc = loc, locs; prev = Some pos} in
-            return ((value, pos)::acc)
+            return (pos::acc)
           | Label nextLabel ->
             if Set.has visited nextLabel then
               return acc
