@@ -1,5 +1,5 @@
 (**
- * Tests for JsApi
+ * Tests for QueryWorkflow
  *)
 
 open! Jest
@@ -18,7 +18,7 @@ let expectRuns comp =
 
 let () =
 
-  describe "JsApi" begin fun () ->
+  describe "QueryWorkflowTest" begin fun () ->
 
     let simpleWorkflow =
       let pickRegion =
