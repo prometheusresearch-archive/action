@@ -62,4 +62,18 @@ let () =
       )
     end;
 
+    test "simple: no available states after view" begin fun () ->
+      expectRuns (
+        let open Run.Syntax in
+        let%bind init = QueryWorkflow.run ~db:(Config.db) simpleWorkflow in
+        let initWithArgs =
+          let args = [Q.(arg "id" (string "ASIA"))] in
+          QueryWorkflow.replaceArgs args init
+        in
+        let%bind [state] = QueryWorkflow.next initWithArgs in
+        let%bind [] = QueryWorkflow.next state in
+        return ()
+      )
+    end;
+
   end
