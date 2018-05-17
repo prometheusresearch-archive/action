@@ -21,6 +21,8 @@ let runExn comp = match Run.toResult comp with
   | Js.Result.Error (`QueryTypeError err) -> Js.Exn.raiseError err
   | Js.Result.Error (`ParseError err) -> Js.Exn.raiseError err
 
+let db = Config.db
+
 let run db workflow =
   runExn (QueryWorkflow.run ~db workflow)
 

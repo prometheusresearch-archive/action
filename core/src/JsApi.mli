@@ -25,6 +25,8 @@ type query = string
 (** Args *)
 type args = Js.Json.t
 
+val db : db
+
 (** Run [workflow] given the [db] *)
 val run : db -> workflow -> state
 

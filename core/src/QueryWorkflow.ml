@@ -87,7 +87,7 @@ let execute q state =
   let univ = JSONDatabase.univ state.db in
   let%bind query =
     let posQuery = query state in
-    let query = Query.Untyped.Syntax.grow posQuery q in
+    let query = Query.Untyped.Syntax.grow q posQuery in
     let%bind query = JSONDatabase.QueryTyper.typeQuery ~univ query in
     return query
   in
