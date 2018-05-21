@@ -135,7 +135,7 @@ let next state =
 
 let around state =
   let open Run.Syntax in
-  let%bind around = 
+  let%bind around =
     match state.prev with
     | None ->
       let%bind pos = Lang.Pos.run ~label:"main" state.workflow in
@@ -150,3 +150,31 @@ let around state =
       next state
   in
   return (List.rev around)
+
+let rebuild state =
+  let open Run.Syntax in
+  let rec aux ~prev =
+    function
+    | [] -> return prev
+    | state::rest ->
+      let%bind next =
+        positionToState
+          ~workflow:state.workflow
+          ~db:state.db
+          ~prev
+          state.posWithArgs
+      in
+      begin match next with
+      | Some next -> aux ~prev:(Some next) rest
+      | None -> return prev
+      end
+  in
+  match%bind aux ~prev:None (breadcrumb state) with
+  | Some state -> return state
+  | None -> run ~db:state.db state.workflow
+
+let mutate ~mutation ~value state =
+  let open Run.Syntax in
+  let%bind () = Mutation.execute ~mutation value in
+  let%bind state = rebuild state in
+  return state

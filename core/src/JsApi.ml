@@ -57,6 +57,7 @@ let next state =
   state
   |> QueryWorkflow.next
   |> runExn
+  |> List.rev
   |> Array.of_list
 
 let around state =
@@ -103,5 +104,13 @@ let query query state =
     let%bind value = QueryWorkflow.execute query state in
     return value
   )
+
+let mutate mutation value state =
+  let c =
+    let open Run.Syntax in
+    let mutation = Obj.magic mutation in
+    let%bind state = QueryWorkflow.mutate ~mutation ~value state in
+    return state
+  in runExn c
 
 let id = QueryWorkflow.id

@@ -70,6 +70,11 @@ val ui : state -> ui
 val query : query -> state -> value
 
 (**
+ * Run [mutation] with the [value] and produce a new state
+ *)
+val mutate : value -> value -> state -> state
+
+(**
  * Parse [workflow] out of a string.
  *)
 val parseWorkflow : string -> workflow
