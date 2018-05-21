@@ -103,3 +103,7 @@ let query query state =
     let%bind value = QueryWorkflow.execute query state in
     return value
   )
+
+let id state =
+  let query  = QueryWorkflow.query state in
+  Query.Untyped.show query

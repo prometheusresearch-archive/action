@@ -22,5 +22,6 @@ declare export function around(State): State[];
 declare export function breadcrumb(State): State[];
 declare export function replaceArgs(Args, State): State;
 declare export function ui(State): UI;
+declare export function id(State): string;
 declare export function query(Query, State): Value;
 declare export function parseWorkflow(string): Workflow;

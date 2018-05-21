@@ -35,7 +35,7 @@ let runQuery ~db query =
   let%bind query = JSONDatabase.QueryTyper.typeQuery ~univ query in
   JSONDatabase.query ~db query
 
-let positionToState ~workflow ~db pos =
+let positionToState ~workflow ~db ~prev pos =
   let open Run.Syntax in
   let query = Lang.Pos.value pos in
   let%bind value = runQuery ~db query in
@@ -45,27 +45,27 @@ let positionToState ~workflow ~db pos =
       db;
       ui;
       pos; posWithArgs = pos;
-      prev = None
+      prev;
     })
   | Value.Null -> return None
   | _ -> Lang.workflowError "expected UI"
   end
 
-let rec firstOfPositions ~workflow ~db =
+let rec firstOfPositions ~workflow ~db ~prev =
   let open Run.Syntax in
   function
   | [] -> return None
   | pos::rest ->
-    begin match%bind positionToState ~workflow ~db pos with
+    begin match%bind positionToState ~workflow ~prev ~db pos with
     | Some state -> return (Some state)
-    | None -> firstOfPositions ~db ~workflow rest
+    | None -> firstOfPositions ~db ~workflow ~prev rest
     end
 
 let run ~db workflow =
   let open Run.Syntax in
   let%bind pos = Lang.Pos.run ~label:"main" workflow in
   let%bind next = Lang.Pos.next pos in
-  match%bind firstOfPositions ~db ~workflow next with
+  match%bind firstOfPositions ~db ~workflow ~prev:None next with
   | None -> Lang.workflowError "no available actions"
   | Some state -> return state
 
@@ -124,7 +124,7 @@ let next state =
   let open Run.Syntax in
   let%bind next = Lang.Pos.next state.posWithArgs in
   let f next pos =
-    match%bind positionToState ~workflow:state.workflow ~db:state.db pos with
+    match%bind positionToState ~prev:(Some state) ~workflow:state.workflow ~db:state.db pos with
     | Some state -> return (state::next)
     | None -> return next
   in
@@ -137,7 +137,7 @@ let around state =
     let%bind pos = Lang.Pos.run ~label:"main" state.workflow in
     let%bind next = Lang.Pos.next pos in
     let f next pos =
-      match%bind positionToState ~workflow:state.workflow ~db:state.db pos with
+      match%bind positionToState ~prev:None ~workflow:state.workflow ~db:state.db pos with
       | Some state -> return (state::next)
       | None -> return next
     in

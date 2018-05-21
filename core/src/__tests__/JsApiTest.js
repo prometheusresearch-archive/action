@@ -52,6 +52,12 @@ describe('JsApi', function() {
         let next = JsApi.around(state);
         expect(next.length).toBe(1);
       });
+
+      test('breadcrumb.length is 1', function() {
+        let state = getInitState();
+        let next = JsApi.breadcrumb(state);
+        expect(next.length).toBe(1);
+      });
     });
 
     describe('an item was selected', function() {
@@ -112,6 +118,12 @@ describe('JsApi', function() {
         let next = JsApi.next(state);
         expect(next.length).toBe(0);
       });
+
+      test('breadcrumb.length is 1', function() {
+        let state = getInitState();
+        let next = JsApi.breadcrumb(state);
+        expect(next.length).toBe(1);
+      });
     });
 
     describe('an item was selected', function() {
@@ -144,6 +156,12 @@ describe('JsApi', function() {
         let data = JsApi.query('value', state);
         expect(data).not.toBe(null);
         expect((data: any).id).toBe('ASIA');
+      });
+
+      test('breadcrumb.length is 1', function() {
+        let state = getInitState();
+        let next = JsApi.breadcrumb(state);
+        expect(next.length).toBe(2);
       });
     });
   });

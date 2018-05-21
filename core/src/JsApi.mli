@@ -33,6 +33,11 @@ val db : db
 val run : db -> workflow -> state
 
 (**
+ * Id of the workflow [state].
+ *)
+val id : state -> string
+
+(**
  * Get a list of states next to the current [state].
  *)
 val next : state -> state array
