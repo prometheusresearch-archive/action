@@ -6,13 +6,14 @@ module QueryMonoid = struct
   let show = Query.Untyped.show
 end
 
-module Lang = WorkflowLang.Make(QueryMonoid)
-module Syntax = Lang.Syntax
+module Workflow = Workflow.Make(QueryMonoid)
+module Syntax = Workflow.Syntax
 
 (**
  * Workflow.
  *)
-type workflow = Lang.t
+type t = Workflow.t
+type workflow = Workflow.t
 
 (**
  * Workflow state.
@@ -21,11 +22,11 @@ type workflow = Lang.t
  * list of arguments to apply to the current value at the workflow state.
  *)
 type state = {
-  workflow : Lang.t;
+  workflow : Workflow.t;
   db : JSONDatabase.t;
   ui : Value.UI.t;
-  pos : Lang.Pos.t;
-  posWithArgs : Lang.Pos.t;
+  pos : Workflow.Pos.t;
+  posWithArgs : Workflow.Pos.t;
   prev : state option;
 }
 
@@ -37,7 +38,7 @@ let runQuery ~db query =
 
 let positionToState ~workflow ~db ~prev pos =
   let open Run.Syntax in
-  let query = Lang.Pos.value pos in
+  let query = Workflow.Pos.value pos in
   let%bind value = runQuery ~db query in
   begin match Value.classify value with
   | Value.UI ui -> return (Some {
@@ -48,7 +49,7 @@ let positionToState ~workflow ~db ~prev pos =
       prev;
     })
   | Value.Null -> return None
-  | _ -> Lang.workflowError "expected UI"
+  | _ -> Workflow.workflowError "expected UI"
   end
 
 let rec firstOfPositions ~workflow ~db ~prev =
@@ -63,20 +64,20 @@ let rec firstOfPositions ~workflow ~db ~prev =
 
 let run ~db workflow =
   let open Run.Syntax in
-  let%bind pos = Lang.Pos.run ~label:"main" workflow in
-  let%bind next = Lang.Pos.next pos in
+  let%bind pos = Workflow.Pos.run ~label:"main" workflow in
+  let%bind next = Workflow.Pos.next pos in
   match%bind firstOfPositions ~db ~workflow ~prev:None next with
-  | None -> Lang.workflowError "no available actions"
+  | None -> Workflow.workflowError "no available actions"
   | Some state -> return state
 
 (**
  * Get the query which corresponds to the workflow [state].
  *)
 let query state =
-  Lang.Pos.value state.posWithArgs
+  Workflow.Pos.value state.posWithArgs
 
 let id state =
-  state.pos |> Lang.Pos.value |> Query.Untyped.show
+  state.pos |> Workflow.Pos.value |> Query.Untyped.show
 
 (**
  * Render [state] into UI.
@@ -102,10 +103,10 @@ let replaceArgs args state =
   let posWithArgs =
     let value =
       state.pos
-      |> Lang.Pos.value
+      |> Workflow.Pos.value
       |> Query.Untyped.Syntax.growArgs args
     in
-    Lang.Pos.replaceValue value state.pos
+    Workflow.Pos.replaceValue value state.pos
   in
   {state with posWithArgs}
 
@@ -125,7 +126,7 @@ let breadcrumb state =
  *)
 let next state =
   let open Run.Syntax in
-  let%bind next = Lang.Pos.next state.posWithArgs in
+  let%bind next = Workflow.Pos.next state.posWithArgs in
   let f next pos =
     match%bind positionToState ~prev:(Some state) ~workflow:state.workflow ~db:state.db pos with
     | Some state -> return (state::next)
@@ -138,8 +139,8 @@ let around state =
   let%bind around =
     match state.prev with
     | None ->
-      let%bind pos = Lang.Pos.run ~label:"main" state.workflow in
-      let%bind next = Lang.Pos.next pos in
+      let%bind pos = Workflow.Pos.run ~label:"main" state.workflow in
+      let%bind next = Workflow.Pos.next pos in
       let f next pos =
         match%bind positionToState ~prev:None ~workflow:state.workflow ~db:state.db pos with
         | Some state -> return (state::next)

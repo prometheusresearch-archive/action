@@ -1,7 +1,7 @@
 open! Jest
 open! Expect
 
-module W = WorkflowLang.Make(struct
+module W = Workflow.Make(struct
   type t = string
   let empty = "empty"
   let append a b = a ^ " -> " ^ b

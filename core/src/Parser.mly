@@ -46,7 +46,7 @@
 %{
 
   module S = Query.Untyped.Syntax
-  module WS = QueryWorkflow.Lang.Syntax
+  module WS = QueryWorkflow.Syntax
   module M = Query.Mutation.Syntax
   module StringMap = Belt.Map.String
 
