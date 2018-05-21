@@ -5,10 +5,13 @@
   "esy": {},
   "devDependencies": {
     "@glennsl/bs-jest": "^0.4.2",
+    "babel-jest": "^22.4.4",
+    "babel-preset-flow": "^6.0.0",
     "@opam/merlin": "*",
     "@opam/menhir": "*",
     "bs-platform": "^3.0.0",
-    "ocaml": "~4.2.0"
+    "ocaml": "~4.2.0",
+    "flow-bin": "0.72.0"
   },
   "author": "Andrey Popp <8mayday@gmail.com> (http://andreypopp.com/)",
   "license": "MIT",
