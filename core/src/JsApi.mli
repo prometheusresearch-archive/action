@@ -31,10 +31,10 @@ val db : db
 val run : db -> workflow -> state
 
 (** Get a list of next possible state given the current state. *)
-val next : state -> state list
+val next : state -> state array
 
 (** Get a breadcrumb for the current state. *)
-val breadcrumb : state -> state list
+val breadcrumb : state -> state array
 
 (** Update [state] with [args]. *)
 val replaceArgs : args -> state -> state

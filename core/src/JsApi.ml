@@ -54,10 +54,15 @@ let ui state =
   QueryWorkflow.ui state
 
 let next state =
-  runExn (QueryWorkflow.next state)
+  state
+  |> QueryWorkflow.next
+  |> runExn
+  |> Array.of_list
 
 let breadcrumb state =
-  QueryWorkflow.breadcrumb state
+  state
+  |> QueryWorkflow.breadcrumb
+  |> Array.of_list
 
 let parse s =
   let open Run.Syntax in
