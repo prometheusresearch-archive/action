@@ -11,9 +11,9 @@ let () =
       try
         let res = Parser.start Lexer.read filebuf in
         match res with
-        | ParserResult.Query q ->
+        | `Query q ->
           expect(q) |> toEqual(exp)
-        | ParserResult.Workflow _ ->
+        | `Workflow _ ->
           fail "expected query"
       with
       | Lexer.Error msg ->
@@ -29,9 +29,9 @@ let () =
       try
         let res = Parser.start Lexer.read filebuf in
         match res with
-        | ParserResult.Query _ ->
+        | `Query _ ->
           pass
-        | ParserResult.Workflow _ ->
+        | `Workflow _ ->
           pass
       with
       | Lexer.Error msg ->
@@ -47,9 +47,9 @@ let () =
       try
         let res = Parser.start Lexer.read filebuf in
         match res with
-        | ParserResult.Query _ ->
+        | `Query _ ->
           fail "expected workflow"
-        | ParserResult.Workflow _ ->
+        | `Workflow _ ->
           pass
       with
       | Lexer.Error msg ->

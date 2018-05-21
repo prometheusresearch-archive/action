@@ -69,7 +69,7 @@
 %}
 
 %start start
-%type <ParserResult.t> start
+%type <[ `Workflow of QueryWorkflow.t | `Query of Query.Untyped.t ]> start
 
 %%
 
@@ -77,8 +77,8 @@ start:
   | p = program EOF { p }
 
 program:
-  | q = query { ParserResult.Query q }
-  | w = workflow { ParserResult.Workflow w }
+  | q = query { `Query q }
+  | w = workflow { `Workflow w }
 
 workflow:
   | name = ID; EQ; node = workflowNode { WS.define name node WS.empty }

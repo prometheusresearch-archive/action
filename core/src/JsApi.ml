@@ -85,14 +85,14 @@ let parse s =
 let parseQueryResult s =
   let open Run.Syntax in
   match%bind parse s with
-  | ParserResult.Query q -> return q
-  | ParserResult.Workflow _ -> error (`ParseError "expected query")
+  | `Query q -> return q
+  | `Workflow _ -> error (`ParseError "expected query")
 
 let parseWorkflowResult s =
   let open Run.Syntax in
   match%bind parse s with
-  | ParserResult.Query _ -> error (`ParseError "expected workflow")
-  | ParserResult.Workflow w -> return w
+  | `Query _ -> error (`ParseError "expected workflow")
+  | `Workflow w -> return w
 
 let parseWorkflow s =
   runExn (parseWorkflowResult s)
