@@ -154,6 +154,11 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
     let empty = Map.empty
 
     let define name node workflow =
+      (* This is a trick so don't have the single value at the top level *)
+      let node = match node with
+      | Value _ -> Seq [node]
+      | _ -> node
+      in
       Map.set workflow name node
 
     let value v = Value v
