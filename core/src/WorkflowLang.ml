@@ -20,12 +20,6 @@ module type Lang = sig
 
   and value
 
-  val fold :
-    f : ('a -> string -> node -> 'a)
-    -> init : 'a
-    -> workflow
-    -> 'a
-
   val workflowError : string -> ('a, 'e error) Run.t
 
   (**
@@ -104,8 +98,7 @@ module type Lang = sig
     val run : ?value : value -> label : string -> workflow -> (t, 'e error) Run.t
 
     (**
-     * Find all next positions which contain some value and accumulate value
-     * during the search.
+     * Find all next positions.
      *)
     val next : t -> (t list, 'e error) Run.t
 
@@ -315,8 +308,5 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
       | None -> return []
 
   end
-
-  let fold ~f ~init workflow =
-    Map.reduce workflow init f
 
 end

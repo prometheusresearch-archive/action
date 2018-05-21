@@ -21,6 +21,7 @@ type workflow = Lang.t
  * list of arguments to apply to the current value at the workflow state.
  *)
 type state = {
+  workflow : Lang.t;
   db : JSONDatabase.t;
   ui : Value.UI.t;
   pos : Lang.Pos.t;
@@ -34,12 +35,13 @@ let runQuery ~db query =
   let%bind query = JSONDatabase.QueryTyper.typeQuery ~univ query in
   JSONDatabase.query ~db query
 
-let positionToState ~db pos =
+let positionToState ~workflow ~db pos =
   let open Run.Syntax in
   let query = Lang.Pos.value pos in
   let%bind value = runQuery ~db query in
   begin match Value.classify value with
   | Value.UI ui -> return (Some {
+      workflow;
       db;
       ui;
       pos; posWithArgs = pos;
@@ -49,21 +51,21 @@ let positionToState ~db pos =
   | _ -> Lang.workflowError "expected UI"
   end
 
-let rec firstOfPositions ~db =
+let rec firstOfPositions ~workflow ~db =
   let open Run.Syntax in
   function
   | [] -> return None
   | pos::rest ->
-    begin match%bind positionToState ~db pos with
+    begin match%bind positionToState ~workflow ~db pos with
     | Some state -> return (Some state)
-    | None -> firstOfPositions ~db rest
+    | None -> firstOfPositions ~db ~workflow rest
     end
 
 let run ~db workflow =
   let open Run.Syntax in
   let%bind pos = Lang.Pos.run ~label:"main" workflow in
   let%bind next = Lang.Pos.next pos in
-  match%bind firstOfPositions ~db next with
+  match%bind firstOfPositions ~db ~workflow next with
   | None -> Lang.workflowError "no available actions"
   | Some state -> return state
 
@@ -122,8 +124,23 @@ let next state =
   let open Run.Syntax in
   let%bind next = Lang.Pos.next state.posWithArgs in
   let f next pos =
-    match%bind positionToState ~db:state.db pos with
+    match%bind positionToState ~workflow:state.workflow ~db:state.db pos with
     | Some state -> return (state::next)
     | None -> return next
   in
   Run.List.foldLeft ~f ~init:[] next
+
+let around state =
+  let open Run.Syntax in
+  match state.prev with
+  | None ->
+    let%bind pos = Lang.Pos.run ~label:"main" state.workflow in
+    let%bind next = Lang.Pos.next pos in
+    let f next pos =
+      match%bind positionToState ~workflow:state.workflow ~db:state.db pos with
+      | Some state -> return (state::next)
+      | None -> return next
+    in
+    Run.List.foldLeft ~f ~init:[] next
+  | Some state ->
+    next state

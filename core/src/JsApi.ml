@@ -59,6 +59,12 @@ let next state =
   |> runExn
   |> Array.of_list
 
+let around state =
+  state
+  |> QueryWorkflow.around
+  |> runExn
+  |> Array.of_list
+
 let breadcrumb state =
   state
   |> QueryWorkflow.breadcrumb

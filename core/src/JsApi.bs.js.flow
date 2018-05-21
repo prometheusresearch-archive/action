@@ -5,19 +5,20 @@
  * @flow strict
  */
 
-declare export opaque type DB
-declare export opaque type Workflow
-declare export opaque type State
+declare export opaque type DB;
+declare export opaque type Workflow;
+declare export opaque type State;
 
 export type UI = {name: string};
-export type Value = mixed
-export type Query = string
-export type Args = mixed
+export type Value = mixed;
+export type Query = string;
+export type Args = mixed;
 
-declare export var db : DB;
+declare export var db: DB;
 
 declare export function run(DB, Workflow): State;
 declare export function next(State): State[];
+declare export function around(State): State[];
 declare export function breadcrumb(State): State[];
 declare export function replaceArgs(Args, State): State;
 declare export function ui(State): UI;
