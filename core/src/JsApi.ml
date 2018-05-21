@@ -104,6 +104,4 @@ let query query state =
     return value
   )
 
-let id state =
-  let query  = QueryWorkflow.query state in
-  Query.Untyped.show query
+let id = QueryWorkflow.id

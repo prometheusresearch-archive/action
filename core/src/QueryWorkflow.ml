@@ -75,6 +75,9 @@ let run ~db workflow =
 let query state =
   Lang.Pos.value state.posWithArgs
 
+let id state =
+  state.pos |> Lang.Pos.value |> Query.Untyped.show
+
 (**
  * Render [state] into UI.
  *)
@@ -132,15 +135,18 @@ let next state =
 
 let around state =
   let open Run.Syntax in
-  match state.prev with
-  | None ->
-    let%bind pos = Lang.Pos.run ~label:"main" state.workflow in
-    let%bind next = Lang.Pos.next pos in
-    let f next pos =
-      match%bind positionToState ~prev:None ~workflow:state.workflow ~db:state.db pos with
-      | Some state -> return (state::next)
-      | None -> return next
-    in
-    Run.List.foldLeft ~f ~init:[] next
-  | Some state ->
-    next state
+  let%bind around = 
+    match state.prev with
+    | None ->
+      let%bind pos = Lang.Pos.run ~label:"main" state.workflow in
+      let%bind next = Lang.Pos.next pos in
+      let f next pos =
+        match%bind positionToState ~prev:None ~workflow:state.workflow ~db:state.db pos with
+        | Some state -> return (state::next)
+        | None -> return next
+      in
+      Run.List.foldLeft ~f ~init:[] next
+    | Some state ->
+      next state
+  in
+  return (List.rev around)
