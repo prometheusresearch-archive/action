@@ -48,7 +48,6 @@
   module S = Query.Untyped.Syntax
   module WS = QueryWorkflow.Lang.Syntax
   module M = Query.Mutation.Syntax
-  module W = Workflow.Untyped.Syntax
   module StringMap = Belt.Map.String
 
   type nav = {

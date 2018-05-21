@@ -6,9 +6,7 @@ module Result = Common.Result
 
 module Q = Query.Untyped.Syntax
 module M = Query.Mutation.Syntax
-module W = Workflow.Untyped.Syntax
 module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
-module WorkflowTyper = WorkflowTyper.Make(JSONDatabase.Universe)
 
 let univ = Config.univ
 let db = Config.db
@@ -57,14 +55,6 @@ let expectQueryOk query =
   in
   expectOk (runToResult result)
 
-let expectWorkflowTyped workflow =
-  let result =
-    let open Run.Syntax in
-    let%bind _ = WorkflowTyper.typeWorkflow ~univ workflow in
-    return ()
-  in
-  expectOk (runToResult result)
-
 let unwrapAssertionResult = function
   | Result.Ok assertion -> assertion
   | Result.Error err -> fail err
@@ -76,9 +66,6 @@ let runQueryAndExpect q v =
     let%bind r = JSONDatabase.query ~db q in
     return (expect(r) |> toEqual(v))
   ))
-
-let typeWorkflow w =
-  runToResult (WorkflowTyper.typeWorkflow ~univ w)
 
 let () =
 
@@ -548,57 +535,3 @@ let () =
       ) (Value.bool false);
     end;
   end;
-
-  describe "Workflow" begin fun () ->
-
-    test "render(region:pick)" begin fun () ->
-      expectWorkflowTyped W.(render Q.(here |> nav "region" |> screen "pick"))
-    end;
-
-    test "render(/region:pick)" begin fun () ->
-      expectWorkflowTyped W.(render Q.(void |> nav "region" |> screen "pick"))
-    end;
-
-    test "render(region:pick) { render(value:view) }" begin fun () ->
-      expectWorkflowTyped W.(
-        render Q.(void |> nav "region" |> screen "pick")
-        |> andThen [
-          render Q.(here |> nav "value" |> screen "view")
-        ]
-      )
-    end;
-
-    test "main: render(region:pick) { main }" begin fun () ->
-      expectWorkflowTyped W.(
-        render ~label:"main" Q.(void |> nav "region" |> screen "pick")
-        |> andThen [
-          label "main"
-        ]
-      )
-    end;
-
-    test "main: render(region:pick) { render(value:view) { main } }" begin fun () ->
-      expectWorkflowTyped W.(
-        render ~label:"main" Q.(void |> nav "region" |> screen "pick")
-        |> andThen [
-          render Q.(here |> nav "value" |> screen "view")
-          |> andThen [
-            label "main"
-          ]
-        ]
-      )
-    end;
-
-    test "main: render(region:pick) { main { render(value:view) }" begin fun () ->
-      expectWorkflowTyped W.(
-        render ~label:"main" Q.(void |> nav "region" |> screen "pick")
-        |> andThen [
-          label "main"
-          |> andThen [
-            render Q.(here |> nav "value" |> screen "view")
-          ]
-        ]
-      )
-    end;
-
-  end
