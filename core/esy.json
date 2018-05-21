@@ -11,6 +11,7 @@
     "@opam/menhir": "*",
     "bs-platform": "^3.0.0",
     "ocaml": "~4.2.0",
+    "prettier": "*",
     "flow-bin": "0.72.0"
   },
   "author": "Andrey Popp <8mayday@gmail.com> (http://andreypopp.com/)",
