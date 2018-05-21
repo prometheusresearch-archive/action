@@ -96,8 +96,6 @@ module type Lang = sig
 
     val value : t -> value
 
-    val prev : t -> t option
-
     val replaceValue : value -> t -> t
 
     (**
@@ -202,11 +200,9 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
       label: string;
       loc: Loc.t * Loc.t list;
       value : M.t;
-      prev : t option;
     }
 
     let value {value;_} = value
-    let prev {prev;_} = prev
 
     let replaceValue value pos =
       {pos with value}
@@ -223,12 +219,11 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
           label;
           value;
           loc = (node, Loc.Root), [];
-          prev = None;
         }
       | None ->
         workflowError {j|unknown label $label|j}
 
-    let next ({loc; workflow; value; label} as pos) =
+    let next {loc; workflow; value; label} =
       let open Run.Syntax in
 
       let rec climbToNextInSequence ((curr, ctx), locs) =
@@ -248,7 +243,7 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
           match curr with
           | Value locValue ->
             let value = M.append value locValue in
-            let pos = {label; workflow; value; loc = loc, locs; prev = Some pos} in
+            let pos = {label; workflow; value; loc = loc, locs} in
             return (pos::acc)
           | Label nextLabel ->
             if Set.has visited nextLabel then
