@@ -32,15 +32,15 @@ export class Form extends React.Component<P, S> {
 
   fetch() {
     const result = W.query(
-      this.props.state,
       `
-      {
-        title: title,
-        data: data,
-        type: data:meta.type,
-        mutation: mutation,
-      }
-    `,
+        {
+          title: title,
+          data: data,
+          type: data:meta.type,
+          mutation: mutation,
+        }
+      `,
+      this.props.state,
     );
     // $FlowFixMe: ...
     const {title, data, type, mutation} = result;
@@ -54,7 +54,12 @@ export class Form extends React.Component<P, S> {
 
   onSubmit = mutation => {
     const value = this.state.value;
-    const state = W.mutate(mutation, value, this.props.state);
+    let state = this.props.state;
+    state = W.mutate(mutation, value, this.props.state);
+    const next = W.next(state);
+    if (next.length > 0) {
+      state = next[0];
+    }
     this.props.onState(state);
   };
 

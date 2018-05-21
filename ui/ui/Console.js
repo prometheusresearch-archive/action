@@ -6,7 +6,7 @@ import * as React from 'react';
 import outdent from 'outdent/lib/index';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import Textarea from 'react-textarea-autosize';
-import * as W from 'core';
+import * as Core from 'core';
 import {Workflow} from './Workflow.js';
 import {TextInput} from 'components/TextInput';
 import {Picker} from 'components/Picker';

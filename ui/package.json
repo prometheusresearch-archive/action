@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "babel-plugin-react-native-web": "^0.4.0",
-    "flow-bin": "^0.71.0",
+    "flow-bin": "^0.72.0",
     "gh-pages": "^1.1.0",
     "prettier": "^1.11.1"
   }
