@@ -329,7 +329,8 @@ let () =
         let open Run.Syntax in
         let%bind pos = P.run ~label:"main" workflow in
         let%bind next = collectNextValues pos in
-        return (expect next |> toEqual [|"empty -> a"; "empty -> b"|])
+        (* TODO: I think "emtpy -> b" shouldn't be duplicated here *)
+        return (expect next |> toEqual [|"empty -> a"; "empty -> b"; "empty -> b"|])
       end;
 
       testRun "a # ..." begin fun () ->

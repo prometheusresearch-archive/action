@@ -8,17 +8,19 @@ module type Lang = sig
 
   type workflow = t
 
+  type value
+
   type 'e error = [> `WorkflowError of string] as 'e
 
   (** A single node of the workflow *)
-  type node =
-    | Value of value
-    | Label of string
-    | NavigateAnd of value * node
-    | Seq of node list
-    | Par of node list
-
-  and value
+  module Node : sig
+    type t =
+      | Value of value
+      | Label of string
+      | NavigateAnd of value * t
+      | Seq of t list
+      | Par of t list
+  end
 
   val workflowError : string -> ('a, 'e error) Run.t
 
@@ -48,36 +50,36 @@ module type Lang = sig
      *
      * Label is used by label combinator to reference that workflow later.
      *)
-    val define : string -> node -> t -> t
+    val define : string -> Node.t -> t -> t
 
     (**
      * Construct a new workflow node out of value.
      *)
-    val value : value -> node
+    val value : value -> Node.t
 
     (**
      * Construct a new workflow node which references another workflow node.
      *)
-    val label : string -> node
+    val label : string -> Node.t
 
     (**
      * Construct a new workflow node which multiples an existent node on a
      * value.
      *)
-    val navigateAnd : value -> node -> node
+    val navigateAnd : value -> Node.t -> Node.t
 
-    val and_ : node -> node -> node
-    val or_ : node -> node -> node
+    val and_ : Node.t -> Node.t -> Node.t
+    val or_ : Node.t -> Node.t -> Node.t
 
     (**
      * A sequential composition of workflow nodes.
      *)
-    val seq : node list -> node
+    val seq : Node.t list -> Node.t
 
     (**
      * A parallel composition of workflow nodes.
      *)
-    val par : node list -> node
+    val par : Node.t list -> Node.t
 
   end
 
@@ -101,6 +103,8 @@ module type Lang = sig
      * Find all next positions.
      *)
     val next : t -> (t list, 'e error) Run.t
+
+    val show : t -> string
 
   end
 end
@@ -129,18 +133,33 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
   let workflowError msg =
     Run.error (`WorkflowError msg)
 
-  type t = node Map.t
-
-  and workflow = t
-
-  and node =
+  module Node = struct
+    type t =
     | Value of M.t
     | Label of string
-    | NavigateAnd of M.t * node
-    | Seq of node list
-    | Par of node list
+    | NavigateAnd of M.t * t
+    | Seq of t list
+    | Par of t list
 
-  and value = M.t
+    let rec show = function
+      | Value value ->
+        let value = M.show value in
+        {j|Value($value)|j}
+      | Label label ->
+        {j|Label($label)|j}
+      | NavigateAnd (value, node) ->
+        let value = M.show value in
+        let node = show node in
+        {j|$value -> $node|j}
+      | Seq nodes ->
+        nodes |. List.map show |> String.concat " ; "
+      | Par nodes ->
+        nodes |. List.map show |> String.concat " | "
+  end
+
+  type t = Node.t Map.t
+
+  and workflow = t
 
   module Syntax = struct
 
@@ -149,28 +168,28 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
     let define name node workflow =
       (* This is a trick so don't have the single value at the top level *)
       let node = match node with
-      | Value _ -> Seq [node]
+      | Node.Value _ -> Node.Seq [node]
       | _ -> node
       in
       Map.set workflow name node
 
-    let value v = Value v
-    let label name = Label name
-    let navigateAnd v node = NavigateAnd (v, node)
-    let seq nodes = Seq nodes
-    let par nodes = Par nodes
+    let value v = Node.Value v
+    let label name = Node.Label name
+    let navigateAnd v node = Node.NavigateAnd (v, node)
+    let seq nodes = Node.Seq nodes
+    let par nodes = Node.Par nodes
 
     let and_ a b =
       match a, b with
-      | Seq a, b -> Seq (a @ [b])
-      | a, Seq b -> Seq (a::b)
-      | a, b -> Seq [a; b]
+      | Node.Seq a, b -> Node.Seq (a @ [b])
+      | a, Node.Seq b -> Node.Seq (a::b)
+      | a, b -> Node.Seq [a; b]
 
     let or_ a b =
       match a, b with
-      | Par a, b -> Par (a @ [b])
-      | a, Par b -> Par (a::b)
-      | a, b -> Par [a; b]
+      | Node.Par a, b -> Node.Par (a @ [b])
+      | a, Node.Par b -> Node.Par (a::b)
+      | a, b -> Node.Par [a; b]
   end
 
   (**
@@ -178,13 +197,23 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
    *)
   module Loc = struct
 
-    type t = node * ctx
+    type t = Node.t * ctx
 
     and ctx =
       | Root
       | InNavigateAnd of t * M.t
-      | InSequence of t * node list * node list
-      | InChoice of t * node list * node list
+      | InSequence of t * Node.t list * Node.t list
+      | InChoice of t * Node.t list * Node.t list
+
+    let show (node, ctx) =
+      let node = Node.show node in
+      let ctx = match ctx with
+      | Root -> "Root"
+      | InNavigateAnd _ -> "InNavigateAnd"
+      | InSequence _ -> "InSequence"
+      | InChoice _ -> "InChoice"
+      in
+      {j|Loc($node at $ctx)|j}
 
   end
 
@@ -199,6 +228,11 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
       loc: Loc.t * Loc.t list;
       value : M.t;
     }
+
+    let show {loc = loc, stack; _} =
+      let loc = Loc.show loc in
+      let level = string_of_int (List.length stack) in
+      {j|Pos($loc, level: $level)|j}
 
     let value {value;_} = value
 
@@ -239,11 +273,11 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
       let recurseToValues loc =
         let rec aux value label visited acc ((curr, _ctx as loc), locs) =
           match curr with
-          | Value locValue ->
+          | Node.Value locValue ->
             let value = M.append value locValue in
             let pos = {label; workflow; value; loc = loc, locs} in
             return (pos::acc)
-          | Label nextLabel ->
+          | Node.Label nextLabel ->
             if Set.has visited nextLabel then
               return acc
             else begin
@@ -256,16 +290,16 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
               | None ->
                 workflowError {j|no such label $nextLabel|j}
             end
-          | NavigateAnd (query, node) ->
+          | Node.NavigateAnd (query, node) ->
             let value = M.append value query in
             let loc = node, Loc.InNavigateAnd (loc, query) in
             aux value label visited acc (loc, locs)
-          | Seq [] ->
+          | Node.Seq [] ->
             begin match climbToNextInSequence (loc, locs) with
             | Some loc -> aux value label visited acc loc
             | None -> return acc
             end
-          | Seq nodes ->
+          | Node.Seq nodes ->
             let rec f acc left = function
               | node::right ->
                 let loc = node, Loc.InSequence (loc, left, right) in
@@ -277,7 +311,7 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
             in
             f acc [] nodes
 
-          | Par nodes ->
+          | Node.Par nodes ->
             let rec f acc left = function
               | node::right ->
                 let loc = node, Loc.InChoice (loc, left, right) in
@@ -288,7 +322,7 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
             nodes |> List.reverse |> f acc []
 
         in
-        let visited = Set.(empty |. add label) in
+        let visited = Set.empty in
         aux value label visited [] loc
       in
 
@@ -304,7 +338,9 @@ module Make (M : Abstract.MONOID): Lang with type value := M.t = struct
       in
 
       match loc with
-      | Some loc -> recurseToValues loc
+      | Some loc ->
+        let%bind next = recurseToValues loc in
+        return next
       | None -> return []
 
   end

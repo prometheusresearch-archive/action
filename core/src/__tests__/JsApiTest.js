@@ -191,4 +191,32 @@ describe('JsApi', function() {
       });
     });
   });
+
+  describe('workflow with multiple alternatives at the root', function() {
+    let workflow = JsApi.parseWorkflow(`
+      main =
+        | (render region:pick; / -> goto main)
+        | render nation:pick
+    `);
+
+    describe('with selected region', function() {
+      let getInitState = () => {
+        let state = JsApi.run(JsApi.db, workflow);
+        state = JsApi.replaceArgs({id: 'ASIA'}, state);
+        return state;
+      };
+
+      test('init state', function() {
+        let state = getInitState();
+        let ui = JsApi.ui(state);
+        expect(ui.name).toBe('pick');
+      });
+
+      test('next.length is 2', function() {
+        let state = getInitState();
+        let next = JsApi.next(state);
+        expect(next.length).toBe(2);
+      });
+    });
+  });
 });
