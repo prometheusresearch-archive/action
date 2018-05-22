@@ -29,11 +29,9 @@ rule read = parse
   | '/'        { VOID }
   | "pick"     { PICK }
   | "view"     { VIEW }
-  | "edit"     { EDIT }
+  | "form"     { FORM }
+  | "goto"     { GOTO }
   | "barChart" { BAR_CHART }
-  | "count"    { COUNT }
-  | "first"    { FIRST }
-  | "meta"     { META }
   | "render"   { RENDER }
   | "null"     { NULL }
   | "update"   { UPDATE }
@@ -49,7 +47,17 @@ rule read = parse
   | ':'        { COLON }
   | '.'        { DOT }
   | ','        { COMMA }
-  | '<'        { LT }
+  | "="        { EQ }
+  | "!="       { NEQ }
+  | "<"        { LT }
+  | "<="       { LTE }
+  | ">"        { GT }
+  | ">="       { GTE }
+  | "&&"       { AND }
+  | "||"       { OR }
+  | "|"        { ALT }
+  | ";"        { SEMI }
+  | "->"       { ARROW_RIGHT }
   | id         { ID (Lexing.lexeme lexbuf) }
   | name       {
                  let buf = Lexing.lexeme lexbuf in

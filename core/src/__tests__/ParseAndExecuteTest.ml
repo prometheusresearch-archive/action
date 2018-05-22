@@ -6,10 +6,10 @@ module Result = Common.Result
 
 module Q = Query.Untyped.Syntax
 module M = Query.Mutation.Syntax
-module W = Workflow.Untyped.Syntax
+module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
 
-let univ = JsApi.univ
-let db = JsApi.db
+let univ = Config.univ
+let db = Config.db
 
 let errorMessage = function
   | `DatabaseError err
@@ -55,14 +55,6 @@ let expectQueryOk query =
   in
   expectOk (runToResult result)
 
-let expectWorkflowTyped workflow =
-  let result =
-    let open Run.Syntax in
-    let%bind _ = Workflow.Typer.typeWorkflow ~univ workflow in
-    return ()
-  in
-  expectOk (runToResult result)
-
 let unwrapAssertionResult = function
   | Result.Ok assertion -> assertion
   | Result.Error err -> fail err
@@ -70,13 +62,10 @@ let unwrapAssertionResult = function
 let runQueryAndExpect q v =
   unwrapAssertionResult (runToResult (
     let open Run.Syntax in
-    let%bind q = Core.QueryTyper.typeQuery ~univ q in
+    let%bind q = QueryTyper.typeQuery ~univ q in
     let%bind r = JSONDatabase.query ~db q in
     return (expect(r) |> toEqual(v))
   ))
-
-let typeWorkflow w =
-  runToResult (Workflow.Typer.typeWorkflow ~univ w)
 
 let () =
 
@@ -265,7 +254,7 @@ let () =
       );
     end;
 
-    test "here.region:first:edit(spec: :update {name: $value.name})" begin fun () ->
+    test "here.region:first:form(spec: :update {name: $value.name})" begin fun () ->
       expectQueryOk Q.(
         let spec =
           here
@@ -276,11 +265,11 @@ let () =
         void
         |> nav "region"
         |> first
-        |> screen ~args:[arg "spec" spec] "edit"
+        |> screen ~args:[arg "spec" spec] "form"
       );
     end;
 
-    test "here.region:first:edit(spec: :update {name: $value.name.nested})" begin fun () ->
+    test "here.region:first:form(spec: :update {name: $value.name.nested})" begin fun () ->
       expectQueryOk Q.(
         let spec =
           here
@@ -291,7 +280,7 @@ let () =
         void
         |> nav "region"
         |> first
-        |> screen ~args:[arg "spec" spec] "edit"
+        |> screen ~args:[arg "spec" spec] "form"
       );
     end;
   end;
@@ -344,6 +333,12 @@ let () =
       ) (Value.bool false);
     end;
 
+    test "1 < 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        lessThan (number 1.) (number 1.)
+      ) (Value.bool false);
+    end;
+
     test "1 < null -> null" begin fun () ->
       runQueryAndExpect Q.(
         lessThan (number 1.) null
@@ -361,28 +356,182 @@ let () =
         lessThan null null
       ) Value.null;
     end;
-
-
   end;
 
-  describe "Workflow" begin fun () ->
-
-
-    test "render(region:pick)" begin fun () ->
-      expectWorkflowTyped W.(render Q.(here |> nav "region" |> screen "pick"))
+  describe "> / greaterThan" begin fun () ->
+    test "1 > 2 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 1.) (number 2.)
+      ) (Value.bool false);
     end;
 
-    test "render(/region:pick)" begin fun () ->
-      expectWorkflowTyped W.(render Q.(void |> nav "region" |> screen "pick"))
+    test "2 > 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 2.) (number 1.)
+      ) (Value.bool true);
     end;
 
-    test "render(region:pick) { render(value:view) }" begin fun () ->
-      expectWorkflowTyped W.(
-        render Q.(void |> nav "region" |> screen "pick")
-        |> andThen [
-          render Q.(here |> nav "value" |> screen "view")
-        ]
-      )
+    test "1 > 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 1.) (number 1.)
+      ) (Value.bool false);
     end;
 
-  end
+    test "1 > null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null > 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null > null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterThan null null
+      ) Value.null;
+    end;
+  end;
+
+  describe "<= / lessOrEqThan" begin fun () ->
+    test "1 <= 2 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 1.) (number 2.)
+      ) (Value.bool true);
+    end;
+
+    test "2 <= 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 2.) (number 1.)
+      ) (Value.bool false);
+    end;
+
+    test "1 <= 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 1.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 <= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null <= 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null <= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        lessOrEqThan null null
+      ) Value.null;
+    end;
+  end;
+
+  describe ">= / greaterOrEq" begin fun () ->
+    test "1 >= 2 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 1.) (number 2.)
+      ) (Value.bool false);
+    end;
+
+    test "2 >= 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 2.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 >= 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 1.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 >= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan (number 1.) null
+      ) Value.null;
+    end;
+
+    test "null >= 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan null (number 1.)
+      ) Value.null;
+    end;
+
+    test "null >= null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        greaterOrEqThan null null
+      ) Value.null;
+    end;
+  end;
+
+  describe "= / eq" begin fun () ->
+    test "1 = 2 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        eq (number 1.) (number 2.)
+      ) (Value.bool false);
+    end;
+
+    test "1 = 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        eq (number 1.) (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "1 = null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        eq (number 1.) null
+      ) (Value.bool false);
+    end;
+
+    test "null = 1 -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        eq null (number 1.)
+      ) (Value.bool false);
+    end;
+
+    test "null = null -> null" begin fun () ->
+      runQueryAndExpect Q.(
+        eq null null
+      ) (Value.bool true);
+    end;
+  end;
+
+  describe "!= / notEq" begin fun () ->
+    test "1 != 2 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq (number 1.) (number 2.)
+      ) (Value.bool true);
+    end;
+
+    test "1 != 1 -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq (number 1.) (number 1.)
+      ) (Value.bool false);
+    end;
+
+    test "1 != null -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq (number 1.) null
+      ) (Value.bool true);
+    end;
+
+    test "null != 1 -> true" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq null (number 1.)
+      ) (Value.bool true);
+    end;
+
+    test "null != null -> false" begin fun () ->
+      runQueryAndExpect Q.(
+        notEq null null
+      ) (Value.bool false);
+    end;
+  end;

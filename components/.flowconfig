@@ -6,6 +6,7 @@
 
 [lints]
 all=error
+deprecated-type=off
 
 [options]
 

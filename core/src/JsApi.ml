@@ -1,342 +1,116 @@
 (**
- * JS API
+ * NOTE: It is a good idea to keep this as minimal as possinle and only contain
+ * code which lifts OCaml to JS idiom (e.g. result values' errors to raised
+ * exceptions).
  *)
 
-module Q = Query.Untyped.Syntax
-module T = Query.Type.Syntax
-module S = Screen.Syntax
-module Result = Common.Result
+module Json = Js.Json
 
-module WorkflowInterpreter = RunWorkflow.Make(JSONDatabase)
-
-let formatContext ctx =
-  let line = function
-    | `DatabaseError err
-    | `QueryTypeError err
-    | `RunWorkflowError err
-    | `WorkflowTypeError err
-    | `ParseError err -> err
-  in
-  ctx |> List.rev |> List.map line |> String.concat "\n"
-
-let runToResult v =
-  match Run.toResultWithContext v with
-  | Result.Ok v -> Result.Ok v
-  | Result.Error (`DatabaseError err, ctx) ->
-    let ctx = formatContext ctx in
-    let msg = {j|DatabaseError: $err\nContext: $ctx|j} in
-    Result.Error msg
-  | Result.Error (`RunWorkflowError err, ctx) ->
-    let ctx = formatContext ctx in
-    let msg = {j|WorkflowError: $err\nContext: $ctx|j} in
-    Result.Error msg
-  | Result.Error (`WorkflowTypeError err, ctx) ->
-    let ctx = formatContext ctx in
-    let msg = {j|WorkflowTypeError: $err\nContext: $ctx|j} in
-    Result.Error msg
-  | Result.Error (`QueryTypeError err, ctx) ->
-    let ctx = formatContext ctx in
-    let msg = {j|QueryTypeError: $err\nContext: $ctx|j} in
-    Result.Error msg
-  | Result.Error (`ParseError err, ctx) ->
-    let ctx = formatContext ctx in
-    let msg = {j|ParseError: $err\nContext: $ctx|j} in
-    Result.Error msg
-
-module JsResult = struct
-  type 'v t
-
-  let ok value = Obj.magic [%bs.obj {_type = "Ok"; value;}]
-  let error error = Obj.magic [%bs.obj {_type = "Error"; error;}]
-
-  let ofResult = function
-    | Result.Ok v -> ok v
-    | Result.Error err -> error err
-
-end
-
+type state = QueryWorkflow.state
+type workflow = QueryWorkflow.workflow
+type args = Json.t
+type db = JSONDatabase.t
 type ui = Value.UI.t
-type state = WorkflowInterpreter.t
-type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
-type query = Query.Typed.t
+type value = Value.t
+type query = string
 
-type error = [
-  | `DatabaseError of string
-  | `QueryTypeError of string
-  | `RunWorkflowError of string
-  | `WorkflowTypeError of string
-  | `ParseError of string
-]
+let runExn comp = match Run.toResult comp with
+  | Js.Result.Ok v -> v
+  | Js.Result.Error (`WorkflowError err) -> Js.Exn.raiseError err
+  | Js.Result.Error (`DatabaseError err) -> Js.Exn.raiseError err
+  | Js.Result.Error (`QueryTypeError err) -> Js.Exn.raiseError err
+  | Js.Result.Error (`ParseError err) -> Js.Exn.raiseError err
 
-type mutation = (unit, error) Mutation.t
+let db = Config.db
 
-let showQuery = Query.Typed.show
+let run db workflow =
+  runExn (QueryWorkflow.run ~db workflow)
 
-let unwrapResult v =
-  match v with
-  | Result.Ok v -> v
-  | Result.Error err -> Js.Exn.raiseError err
-
-let id state =
-  state |> WorkflowInterpreter.uiQuery |> runToResult |> unwrapResult |> Query.Typed.show
-
-let pickScreen =
-
-  Screen.Syntax.(screen
-    ~inputCard:Query.Card.Many
-    ~args:[
-      arg "id" ~default:Q.null (one number);
-      arg "title" ~default:(Q.string "Pick") (one string);
-      arg "fields" ~default:(Q.here) (one string);
-    ]
-    Q.(
-      let parent = name "parent" in
-      let title = name "title" in
-      let fields = name "fields" in
-      let id = name "id" in
-      let base = void |> select [
-          field ~alias:"data" parent;
-          field ~alias:"value" (parent |> locate id);
-        ]
+let replaceArgs args state =
+  let parseArgs args =
+    let f args (name, value) =
+      let value =
+        match Json.classify value with
+        | Json.JSONTrue -> Query.Untyped.Syntax.bool true
+        | Json.JSONFalse -> Query.Untyped.Syntax.bool false
+        | Json.JSONNumber v -> Query.Untyped.Syntax.number v
+        | Json.JSONString v -> Query.Untyped.Syntax.string v
+        | Json.JSONNull -> Query.Untyped.Syntax.null
+        | Json.JSONArray _
+        | Json.JSONObject _ ->
+          Js.Exn.raiseError "invalid argument type"
       in
-      void
-      |> select [
-        field ~alias:"data" parent;
-        field ~alias:"dataForUI" (parent |> grow fields);
-        field ~alias:"value" (base |> nav "value");
-        field ~alias:"title" (base |> grow title);
-      ]
-    )
-  )
-
-let viewScreen =
-  Screen.Syntax.(screen
-    ~inputCard:Query.Card.One
-    ~args:[
-      arg "title" ~default:(Q.string "View") (one string);
-    ]
-    Q.(
-      let base = void |> select [
-        field ~alias:"value" (name "parent");
-      ] in
-      void
-      |> select [
-        field ~alias:"data" (name "parent");
-        field ~alias:"value" (name "parent");
-        field ~alias:"title" (base |> grow (name "title"));
-      ]
-    )
-  )
-
-let editScreen =
-  Screen.Syntax.(screen
-    ~inputCard:Query.Card.One
-    ~args:[
-      arg "title" ~default:(Q.string "Edit") (one string);
-      arg "spec" (one string);
-      arg "value" ~default:(Q.null) (one string);
-    ]
-    Q.(
-      let title = name "title" in
-      let parent = name "parent" in
-      let base = void |> select [
-        field ~alias:"value" parent;
-      ] in
-      let mutation =
-        parent
-        |> grow (name "spec")
-      in
-      void
-      |> select [
-        field ~alias:"mutation" mutation;
-        field ~alias:"data" parent;
-        field ~alias:"value" parent;
-        field ~alias:"title" (base |> grow title);
-      ]
-    )
-  )
-
-let barChartScreen =
-  Screen.Syntax.(screen
-    ~inputCard:Query.Card.Many
-    ~args:[
-      arg "title" ~default:(Q.string "View") (one string);
-    ]
-    Q.(
-      void
-      |> select [
-        field ~alias:"data" (name "parent");
-        field ~alias:"value" (name "parent");
-        field ~alias:"title" (name "title");
-      ]
-    )
-  )
-
-let univ =
-
-  let rec customer = lazy Query.Type.Syntax.(entity "customer" (fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "comment" string;
-    hasOne "phone" string;
-    hasOne "acctbal" string;
-  ]))
-
-  and nation = lazy Query.Type.Syntax.(entity "nation" (fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "comment" string;
-    hasMany "customer" (Lazy.force customer);
-    hasOne "region" (Lazy.force region);
-  ]))
-
-  and region = lazy Query.Type.Syntax.(entity "region" (fun _ -> [
-    hasOne "id" string;
-    hasOne "name" string;
-    hasOne "comment" string;
-    hasMany "nation" (Lazy.force nation);
-  ]))
-
+      (Query.Untyped.Syntax.arg name value)::args
+    in
+    Belt.Array.reduce (Js.Dict.entries args) [] f
   in
+  match Json.classify args with
+  | Json.JSONObject args ->
+    let args = parseArgs args in
+    QueryWorkflow.replaceArgs args state
+  | _ -> Js.Exn.raiseError "expected arguments to be an object"
 
-  Universe.(
-    empty
-
-    |> hasMany "region" (Lazy.force region)
-    |> hasMany "nation" (Lazy.force nation)
-    |> hasMany "customer" (Lazy.force customer)
-
-    |> hasScreen "pick" pickScreen
-    |> hasScreen "view" viewScreen
-    |> hasScreen "edit" editScreen
-    |> hasScreen "barChart" barChartScreen
-  )
-
-external data : Js.Json.t = "data" [@@bs.module "./data.js"]
-
-let db = JSONDatabase.ofJson ~univ data
-
-let toJS state =
-  JsResult.ofResult (
-    let open Result.Syntax in
-    let%bind state, ui = state in
-    Result.Ok [%bs.obj { state; ui = Js.Nullable.fromOption ui }]
-  )
-
-let breadcrumbs state =
-  state |> WorkflowInterpreter.breadcrumbs |> Array.of_list
+let ui state =
+  QueryWorkflow.ui state
 
 let next state =
-  match runToResult (WorkflowInterpreter.next state) with
-  | Result.Ok next -> Array.of_list next
-  | Result.Error err -> Js.Exn.raiseError err
+  state
+  |> QueryWorkflow.next
+  |> runExn
+  |> List.rev
+  |> Array.of_list
 
-let render state =
-  toJS (runToResult (WorkflowInterpreter.render state))
+let around state =
+  state
+  |> QueryWorkflow.around
+  |> runExn
+  |> Array.of_list
 
-let pickValue id state =
-  let id = match Js.Json.classify id with
-  | Js.Json.JSONNumber id -> Q.number id
-  | Js.Json.JSONString id -> Q.string id
-  | _ -> Js.Exn.raiseError "invalid id for pickValue"
-  in
-  Js.log2 "pickValue.id" id;
-  toJS (
-    let open Result.Syntax in
-    let args = Common.StringMap.(empty |> fun m -> set m "id" id) in
-    Js.log2 "pickValue" (Query.Untyped.showArgs args);
-    let%bind state = runToResult (WorkflowInterpreter.setArgs ~args state) in
-    let%bind state = runToResult (WorkflowInterpreter.step state) in
-    runToResult (WorkflowInterpreter.render state)
-  )
-
-let executeQuery q =
-  let res =
-    let open Run.Syntax in
-    let%bind q = q in
-    let%bind data = JSONDatabase.query ~db q in
-    return data
-  in match runToResult res with
-  | Result.Ok data -> data
-  | Result.Error err -> Js.Exn.raiseError err
-
-let parseQuery q =
-  let open Run.Syntax in
-  let filebuf = Lexing.from_string q in
-  try
-    match Parser.start Lexer.read filebuf with
-    | ParserResult.Workflow _ ->
-      error (`ParseError "expected query")
-    | ParserResult.Query q ->
-      return q
-  with
-  | Lexer.Error msg ->
-    error (`ParseError msg)
-  | Parser.Error ->
-    error (`ParseError "syntax error")
-
-
-let query state q =
-  executeQuery (
-    let open Run.Syntax in
-    let%bind q = parseQuery q in
-    let%bind base = WorkflowInterpreter.uiQuery state in
-    let%bind q = QueryTyper.growQuery ~univ ~base q in
-    Js.log3 "QUERY" (WorkflowInterpreter.show state) (Query.Typed.show q);
-    return q
-  )
-
-let mutate ~mutation ~value =
-  let mut = Obj.magic mutation in
-  (
-    let open Run.Syntax in
-    let%bind _ = Mutation.execute mut value in
-    return ()
-  ) |> runToResult |> unwrapResult
+let breadcrumb state =
+  state
+  |> QueryWorkflow.breadcrumb
+  |> Array.of_list
 
 let parse s =
-  let module N = Js.Nullable in
-  let makeError err = [%bs.obj {error = N.return err; ui = N.null; data = N.null;}] in
-  let r =
-    let makeData data =
-      Run.return [%bs.obj {error = N.null; ui = N.null; data = N.return data;}]
-    in
-    let makeError err =
-      Run.return (makeError err)
-    in
-    let makeWorkflow w =
-      let state =
-        runToResult (
-          let open Run.Syntax in
-          let%bind w = Workflow.Typer.typeWorkflow ~univ w in
-          WorkflowInterpreter.boot ~db w
-        )
-      in
-      Run.return [%bs.obj {error = N.null; data = N.null; ui = N.return (toJS state)}]
-    in
-    let makeUi ui =
-      let w = Workflow.Untyped.Syntax.render ui in
-      makeWorkflow w
-    in
-    let open Run.Syntax in
-    let filebuf = Lexing.from_string s in
-    try
-      match Parser.start Lexer.read filebuf with
-      | ParserResult.Workflow w ->
-        makeWorkflow w
-      | ParserResult.Query q ->
-        let%bind tq = QueryTyper.typeQuery ~univ q in
-        let%bind value = JSONDatabase.query ~db tq in
-        match Value.classify value with
-        | Value.UI _ -> makeUi q
-        | _ -> makeData value
-    with
-    | Lexer.Error msg ->
-      makeError msg
-    | Parser.Error ->
-      makeError "Syntax Error"
-  in match runToResult r with
-  | Result.Ok r -> r
-  | Result.Error err -> makeError err
+  let open Run.Syntax in
+  let filebuf = Lexing.from_string s in
+  match Parser.start Lexer.read filebuf with
+  | value -> return value
+  | exception Lexer.Error msg ->
+    error (`ParseError msg)
+  | exception Parser.Error ->
+    let msg = {j|syntax error while parsing $s|j} in
+    error (`ParseError msg)
 
-let uiName = Value.UI.name
+let parseQueryResult s =
+  let open Run.Syntax in
+  match%bind parse s with
+  | `Query q -> return q
+  | `Workflow _ -> error (`ParseError "expected query")
+
+let parseWorkflowResult s =
+  let open Run.Syntax in
+  match%bind parse s with
+  | `Query _ -> error (`ParseError "expected workflow")
+  | `Workflow w -> return w
+
+let parseWorkflow s =
+  runExn (parseWorkflowResult s)
+
+let query query state =
+  runExn (
+    let open Run.Syntax in
+    let%bind query = parseQueryResult query in
+    let%bind value = QueryWorkflow.execute query state in
+    return value
+  )
+
+let mutate mutation value state =
+  let c =
+    let open Run.Syntax in
+    let mutation = Obj.magic mutation in
+    let%bind state = QueryWorkflow.mutate ~mutation ~value state in
+    return state
+  in runExn c
+
+let id = QueryWorkflow.id

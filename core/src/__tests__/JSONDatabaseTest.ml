@@ -5,6 +5,8 @@ open! Expect.Operators
 module Q = Query.Untyped.Syntax
 module M = Query.Mutation.Syntax
 
+module QueryTyper = QueryTyper.Make(JSONDatabase.Universe)
+
 let liftResult = function
   | Js.Result.Ok v -> Run.return v
   | Js.Result.Error err -> Run.error (`DatabaseError err)
@@ -14,27 +16,26 @@ let liftOption ~err = function
   | None -> Run.error (`DatabaseError err)
 
 let univ =
-  let rec nation = lazy Query.Type.Syntax.(
-    entity "nation" (fun _ -> [
+
+  JSONDatabase.Config.(
+    let nation = fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
-      hasOne "region" (Lazy.force region);
-    ])
-  )
-  and region = lazy Query.Type.Syntax.(
-    entity "region" (fun _ -> [
+      hasLink ~via:("region", "id") "region" (entity "region");
+    ] in
+
+    let region = fun _ -> [
       hasOne "id" string;
       hasOne "name" string;
-      hasMany "nation" (Lazy.force nation);
-    ])
-  )
-  in
-  Core.Universe.(
-    empty
-    |> hasMany "region" (Lazy.force region)
-    |> hasMany "nation" (Lazy.force nation)
-    |> hasScreen "pick" JsApi.pickScreen
-    |> hasScreen "view" JsApi.viewScreen
+      hasManyBackLink ~via:("nation", "region") "nation" (entity "nation");
+    ] in
+
+    init
+    |> defineEntity "region" region
+    |> defineEntity "nation" nation
+    |> defineScreen "pick" Config.pickScreen
+    |> defineScreen "view" Config.viewScreen
+    |> finish
   )
 
 let getDb () =
@@ -43,18 +44,11 @@ let getDb () =
       "region": {
         "AMERICA": {
           "id": "AMERICA",
-          "name": "America",
-          "nation": [
-            {"$ref": {"entity": "nation", "id": "US"}}
-          ]
+          "name": "America"
         },
         "ASIA": {
           "id": "ASIA",
-          "name": "Asia",
-          "nation": [
-            {"$ref": {"entity": "nation", "id": "RUSSIA"}},
-            {"$ref": {"entity": "nation", "id": "CHINA"}}
-          ]
+          "name": "Asia"
         }
       },
 
@@ -83,7 +77,7 @@ let expectDbToMatchSnapshot db =
 
 let runQuery ~db q =
   let open Run.Syntax in
-  let%bind q = Core.QueryTyper.typeQuery ~univ q in
+  let%bind q = QueryTyper.typeQuery ~univ q in
   let%bind r = JSONDatabase.query ~db q in
   return r
 
@@ -180,7 +174,7 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
           {"nation": [{"label": "United States of America"}]},
-          {"nation": [{"label": "Russia"}, {"label": "China"}]}
+          {"nation": [{"label": "China"}, {"label": "Russia"}]}
         ]
       |})
     end;
@@ -244,8 +238,8 @@ let () =
       ) in
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
-          {"id": "RUSSIA", "name": "Russia"},
-          {"id": "CHINA", "name": "China"}
+          {"id": "CHINA", "name": "China"},
+          {"id": "RUSSIA", "name": "Russia"}
         ]
       |})
     end;
@@ -260,8 +254,8 @@ let () =
       ) in
       runQueryAndExpect ~db q (valueOfStringExn {|
         [
-          "Russia",
-          "China"
+          "China",
+          "Russia"
         ]
       |})
     end;
@@ -321,8 +315,8 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asiaNations": [
-            {"id": "RUSSIA", "name": "Russia"},
-            {"id": "CHINA", "name": "China"}
+            {"id": "CHINA", "name": "China"},
+            {"id": "RUSSIA", "name": "Russia"}
           ]
         }
       |})
@@ -344,8 +338,8 @@ let () =
       runQueryAndExpect ~db q (valueOfStringExn {|
         {
           "asiaNationNames": [
-            "Russia",
-            "China"
+            "China",
+            "Russia"
           ]
         }
       |})
@@ -372,8 +366,8 @@ let () =
         {
           "data": {
             "nations": [
-              {"id": "RUSSIA", "name": "Russia"},
-              {"id": "CHINA", "name": "China"}
+              {"id": "CHINA", "name": "China"},
+              {"id": "RUSSIA", "name": "Russia"}
             ]
           }
         }
@@ -402,8 +396,8 @@ let () =
         {
           "data": {
             "nationNames": [
-              "Russia",
-              "China"
+              "China",
+              "Russia"
             ]
           }
         }
@@ -432,6 +426,81 @@ let () =
             "name": "Asia"
           }
         ]
+      |})
+    end;
+
+    test "region.filter(id = 'ASIA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> filter (eq (here |> nav "id") (string "ASIA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "id": "ASIA",
+            "name": "Asia"
+          }
+        ]
+      |})
+    end;
+
+    test "region.filter(nation:count = 2).nation" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> filter (eq (here |> nav "nation" |> count) (number 2.))
+        |> nav "nation"
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        [
+          {
+            "id": "CHINA",
+            "name": "China"
+          },
+          {
+            "id": "RUSSIA",
+            "name": "Russia"
+          }
+        ]
+      |})
+    end;
+
+    test "region.filter(id = 'ATLANTIDA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> filter (eq (here |> nav "id") (string "ATLANTIDA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        []
+      |})
+    end;
+
+    test "region['ASIA']:filter(id = 'ASIA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> locate (string "ASIA")
+        |> filter (eq (here |> nav "id") (string "ASIA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        {
+          "id": "ASIA",
+          "name": "Asia"
+        }
+      |})
+    end;
+
+    test "region['AMERICA']:filter(id = 'ASIA')" begin fun () ->
+      let q = Q.(
+        void
+        |> nav "region"
+        |> locate (string "AMERICA")
+        |> filter (eq (here |> nav "id") (string "ASIA"))
+      ) in
+      runQueryAndExpect ~db q (valueOfStringExn {|
+        null
       |})
     end;
 
@@ -563,7 +632,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
     end;
@@ -586,7 +655,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -610,7 +679,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -635,7 +704,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -657,7 +726,7 @@ let () =
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
         let value = Value.null in
-        let%bind () = Mutation.execute mut value in
+        let%bind () = Mutation.execute ~mutation:mut value in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -681,7 +750,7 @@ let () =
         let value = createFormValue {|
           {"name": "HEY"}
         |} in
-        let%bind () = Mutation.execute mut value in
+        let%bind () = Mutation.execute ~mutation:mut value in
         return (expectDbToMatchSnapshot db)
       )
 
@@ -705,7 +774,7 @@ let () =
         let%bind query = QueryTyper.typeQuery ~univ query in
         let%bind res = JSONDatabase.query ~db query in
         let%bind mut = liftOption ~err:"expected mutation" (Value.decodeMutation res) in
-        let%bind () = Mutation.execute mut Value.null in
+        let%bind () = Mutation.execute ~mutation:mut Value.null in
         return (expectDbToMatchSnapshot db)
       )
 

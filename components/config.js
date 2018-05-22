@@ -1,5 +1,5 @@
 /*
- * @flow
+ * @flow strict
  *
  * Based on Tailwind - The Utility-First CSS Framework
  *

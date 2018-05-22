@@ -15,7 +15,6 @@ type P = {
 
 export function View(props: P) {
   const result = W.query(
-    props.state,
     `
       {
         title: title,
@@ -23,6 +22,7 @@ export function View(props: P) {
         type: data:meta.type,
       }
     `,
+    props.state,
   );
   // $FlowFixMe: ...
   const {title, data, type} = result;

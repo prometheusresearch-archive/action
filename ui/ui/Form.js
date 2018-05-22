@@ -4,8 +4,8 @@
 
 import * as React from 'react';
 import {View} from 'react-native-web';
-import * as W from 'core';
 import type {State} from 'core';
+import * as W from 'core';
 import {ScreenTitle} from './ScreenTitle.js';
 import * as cfg from 'components/config';
 import {DataCard} from 'components/DataCard';
@@ -15,6 +15,7 @@ import {OutlineButton} from 'components/OutlineButton';
 
 type P = {
   state: State,
+  onState: State => void,
 };
 
 type S = {
@@ -22,7 +23,7 @@ type S = {
   value: Object,
 };
 
-export class Edit extends React.Component<P, S> {
+export class Form extends React.Component<P, S> {
   constructor(props: P) {
     super(props);
     let {data} = this.fetch();
@@ -31,56 +32,45 @@ export class Edit extends React.Component<P, S> {
 
   fetch() {
     const result = W.query(
-      this.props.state,
       `
-      {
-        title: title,
-        data: data,
-        type: data:meta.type,
-        mutation: mutation,
-      }
-    `,
+        {
+          title: title,
+          data: data,
+          type: data:meta.type,
+          mutation: mutation,
+        }
+      `,
+      this.props.state,
     );
     // $FlowFixMe: ...
     const {title, data, type, mutation} = result;
     return {title, data, type, mutation};
   }
 
-  onChange = (key: string, update: any) => {
+  onChange = (key: string, update: string | number) => {
     const value = {...this.state.value, [key]: update};
     this.setState({value});
   };
 
   onSubmit = mutation => {
     const value = this.state.value;
-    W.mutate(mutation, value);
+    let state = this.props.state;
+    state = W.mutate(mutation, value, this.props.state);
+    const next = W.next(state);
+    if (next.length > 0) {
+      state = next[0];
+    }
+    this.props.onState(state);
   };
 
   render() {
     let props = this.props;
     let {title, data, type, mutation} = this.fetch();
     const entityName = getEntityName(type, data);
-    const fields = [];
-    for (let key in this.state.value) {
-      fields.push(
-        <View key={key} style={{paddingBottom: cfg.padding.size2}}>
-          <FormField
-            label={capitalize(key)}
-            renderInput={props => (
-              <TextInput
-                {...props}
-                value={this.state.value[key]}
-                onChangeText={this.onChange.bind(null, key)}
-              />
-            )}
-          />
-        </View>,
-      );
-    }
     return (
       <View>
         <ScreenTitle>{title}</ScreenTitle>
-        {fields}
+        <UpdateForm value={this.state.value} onChange={this.onChange} />
         <View style={{flexDirection: 'row', paddingVertical: cfg.padding.size2}}>
           <View style={{paddingRight: cfg.padding.size2}}>
             <OutlineButton
@@ -97,6 +87,54 @@ export class Edit extends React.Component<P, S> {
       </View>
     );
   }
+}
+
+function UpdateForm(props: {
+  value: {[name: string]: string},
+  onChange: (string, string) => void,
+}) {
+  const fields = [];
+  for (let key in props.value) {
+    fields.push(
+      <View key={key} style={{paddingBottom: cfg.padding.size2}}>
+        <FormField
+          label={capitalize(key)}
+          renderInput={inputProps => (
+            <TextInput
+              {...inputProps}
+              value={props.value[key]}
+              onChangeText={props.onChange.bind(null, key)}
+            />
+          )}
+        />
+      </View>,
+    );
+  }
+  return <View>{fields}</View>;
+}
+
+function CreateForm(props: {
+  value: {[name: string]: string},
+  onChange: (string, string) => void,
+}) {
+  const fields = [];
+  for (let key in props.value) {
+    fields.push(
+      <View key={key} style={{paddingBottom: cfg.padding.size2}}>
+        <FormField
+          label={capitalize(key)}
+          renderInput={inputProps => (
+            <TextInput
+              {...inputProps}
+              value={props.value[key]}
+              onChangeText={props.onChange.bind(null, key)}
+            />
+          )}
+        />
+      </View>,
+    );
+  }
+  return <View>{fields}</View>;
 }
 
 function getEntityName({type}, data) {

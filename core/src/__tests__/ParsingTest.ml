@@ -1,8 +1,27 @@
 open! Jest
 open! Expect
 open! Expect.Operators
+module Q = Query.Untyped.Syntax
 
 let () =
+
+  let expectParseQueryAndEq s exp =
+    test s begin fun () ->
+      let filebuf = Lexing.from_string s in
+      try
+        let res = Parser.start Lexer.read filebuf in
+        match res with
+        | `Query q ->
+          expect(q) |> toEqual(exp)
+        | `Workflow _ ->
+          fail "expected query"
+      with
+      | Lexer.Error msg ->
+        fail msg
+      | Parser.Error ->
+        fail "Syntax error"
+    end
+  in
 
   let expectParseOk s =
     test s begin fun () ->
@@ -10,18 +29,39 @@ let () =
       try
         let res = Parser.start Lexer.read filebuf in
         match res with
-        | ParserResult.Query _ ->
+        | `Query _ ->
           pass
-        | ParserResult.Workflow _ ->
+        | `Workflow _ ->
           pass
       with
       | Lexer.Error msg ->
         fail msg
       | Parser.Error ->
         fail "Syntax error"
-    end in
+    end
+  in
+
+  let expectParseWorkflow s =
+    test s begin fun () ->
+      let filebuf = Lexing.from_string s in
+      try
+        let res = Parser.start Lexer.read filebuf in
+        match res with
+        | `Query _ ->
+          fail "expected workflow"
+        | `Workflow _ ->
+          pass
+      with
+      | Lexer.Error msg ->
+        fail msg
+      | Parser.Error ->
+        fail "Syntax error"
+    end
+  in
 
   describe "Parsing" begin fun () ->
+
+    (** Trivia *)
     expectParseOk "/";
     expectParseOk "/ ";
     expectParseOk " /";
@@ -49,19 +89,136 @@ let () =
     expectParseOk "individual:meta";
     expectParseOk "individual.nation:meta";
 
-    expectParseOk "render(individual:pick)";
-    expectParseOk "render(individual:pick) { render(here:view) }";
-    expectParseOk "render(individual:pick) { render(here:view), }";
+    expectParseOk ":count";
+    expectParseOk "individual:count";
+    expectParseOk "individual.nation:count";
+
+    expectParseOk ":grow(true)";
+    expectParseOk ":grow(true)";
+    expectParseOk "individual:grow(false)";
+    expectParseOk "individual.nation:grow(true)";
+
+    expectParseOk ":filter(true)";
+    expectParseOk "individual:filter(false)";
+    expectParseOk "individual.nation:filter(true)";
+
     expectParseOk {|
-
-      render(individual:pick) {
-        render(here:view),
-        render(site:view)
+      {
+        title: title,
+        data: dataForUI,
+        metadata: dataForUI:meta,
+        id: value.id,
       }
-
     |};
-    expectParseOk "1 < 2";
     expectParseOk "null";
+
+    (** Workflows *)
+
+    expectParseWorkflow "
+      main =
+        render individual:pick
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ;
+    ";
+    expectParseWorkflow "
+      main =
+        render(individual:pick)
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ; render value:view
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick;
+        render value:view
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ; render value:view ; render value.study:view
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick | render study:pick
+    ";
+    expectParseWorkflow "
+      main =
+        | render individual:pick
+        | render study:pick
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick | render study:pick | render todo:pick
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick ; (render value:view | render value:form)
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick | (render value:view ; render value:form)
+    ";
+    expectParseWorkflow "
+      main =
+        render individual:pick;
+        goto then
+
+      then =
+        render value:view;
+        render value:form
+    ";
+
+    expectParseWorkflow "
+      main =
+        / -> render individual:pick
+    ";
+    expectParseWorkflow "
+      main =
+        / -> render individual:pick;
+        value -> render :view
+    ";
+
+
+    (** Operators *)
+
+    expectParseOk "1 < 2";
+    expectParseOk "1 > 2";
+    expectParseOk "1 <= 2";
+    expectParseOk "1 >= 2";
+    expectParseOk "1 = 2";
+    expectParseOk "1 != 2";
+    expectParseOk "true && false";
+    expectParseOk "true || false";
+
+    expectParseQueryAndEq "true || false" Q.(
+      or_ (bool true) (bool false)
+    );
+
+    expectParseQueryAndEq "true && false" Q.(
+      and_ (bool true) (bool false)
+    );
+
+    expectParseQueryAndEq "true && false || true" Q.(
+      or_ (and_ (bool true) (bool false)) (bool true)
+    );
+
+    expectParseQueryAndEq "true && (false || true)" Q.(
+      and_ (bool true) (or_ (bool false) (bool true))
+    );
+
+    expectParseQueryAndEq "true || true && false" Q.(
+      or_ (bool true) (and_ (bool true) (bool false))
+    );
+
+    expectParseQueryAndEq "1 > 2 && false" Q.(
+      and_ (greaterThan (number 1.) (number 2.)) (bool false)
+    );
+
+    expectParseQueryAndEq "1 < 2 && false" Q.(
+      and_ (lessThan (number 1.) (number 2.)) (bool false)
+    );
 
     (** Mutations *)
 

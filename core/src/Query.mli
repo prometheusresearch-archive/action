@@ -23,6 +23,32 @@ module Card : sig
   end
 end
 
+module EqOp : sig
+  type t =
+    | EQ
+    | NEQ
+
+  val show : t -> string
+end
+
+module ComparisonOp : sig
+  type t =
+    | LT
+    | GT
+    | LTE
+    | GTE
+
+  val show : t -> string
+end
+
+module LogicalOp : sig
+  type t =
+    | AND
+    | OR
+
+  val show : t -> string
+end
+
 (**
  * Constant values tagged with types.
  *)
@@ -70,6 +96,7 @@ module Untyped : sig
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
+    | Filter of (t * t)
     | Count of t
     | Screen of (t * screen)
     | Mutation of (t * mutation)
@@ -80,7 +107,9 @@ module Untyped : sig
     | Meta of t
     | Grow of (t * t)
     | GrowArgs of (t * args)
-    | LessThan of (t * t)
+    | ComparisonOp of (ComparisonOp.t * t * t)
+    | EqOp of (EqOp.t * t * t)
+    | LogicalOp of (LogicalOp.t * t * t)
 
   and args = t Common.StringMap.t
 
@@ -117,6 +146,7 @@ module Untyped : sig
     val screen : ?args:Arg.arg list -> string -> t -> t
     val count : t -> t
     val first : t -> t
+    val filter : t -> t -> t
     val string : string -> t
     val number : float -> t
     val bool : bool -> t
@@ -128,13 +158,25 @@ module Untyped : sig
     val grow : t -> t -> t
     val growArgs : Arg.arg list -> t -> t
     val lessThan : t -> t -> t
+    val lessOrEqThan : t -> t -> t
+    val greaterThan : t -> t -> t
+    val greaterOrEqThan : t -> t -> t
+    val eq : t -> t -> t
+    val notEq : t -> t -> t
+    val and_ : t -> t -> t
+    val or_ : t -> t -> t
     val arg : string -> t -> Arg.arg
     val update : (string * t Mutation.op) list -> t -> t
     val create : (string * t Mutation.op) list -> t -> t
   end
 end
 
+(**
+ * Query type representation.
+ *)
 module Type : sig
+
+  (** Type. *)
   type t =
     | Void
     | Screen of screen
@@ -142,9 +184,13 @@ module Type : sig
     | Record of field list
     | Value of value
 
+  (** Type with cardinality info. *)
   and ctyp = Card.t * t
 
-  and screen = { screenName : string; screenOut : ctyp; }
+  and screen = {
+    screenName : string;
+    screenOut : ctyp;
+  }
 
   and value =
     | String
@@ -153,9 +199,15 @@ module Type : sig
     | Null
     | Abstract
 
-  and entity = { entityName : string; entityFields : t -> field list; }
+  and entity = {
+    entityName : string;
+  }
 
-  and field = { fieldName : string; fieldArgs : args; fieldCtyp : ctyp; }
+  and field = {
+    fieldName : string;
+    fieldArgs : args;
+    fieldCtyp : ctyp;
+  }
 
   and arg = { argCtyp : ctyp; argDefault : Untyped.t option; }
 
@@ -183,7 +235,7 @@ module Type : sig
       val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
     end
 
-    val entity : string -> (t -> field list) -> t
+    val entity : string -> t
     val has :
       ?card:Card.t ->
       ?args:Arg.ArgSyntax.t Belt.List.t -> string -> t -> field
@@ -193,11 +245,17 @@ module Type : sig
     val one : 'a -> Card.t * 'a
     val opt : 'a -> Card.t * 'a
     val many : 'a -> Card.t * 'a
-    module Value : sig val string : t val number : t val bool : t end
-    val string : t
-    val number : t
-    val bool : t
+
+    module Value : sig
+      val string : t
+      val number : t
+      val bool : t
+    end
+
+    include module type of Value
+
     module ArgSyntax = Arg.ArgSyntax
+
     type arg = ArgSyntax.t
     val arg : ?default:Untyped.t -> string -> ctyp -> ArgSyntax.t
 
@@ -232,6 +290,7 @@ module Typed : sig
     | Select of (t * select)
     | Navigate of t * nav
     | First of t
+    | Filter of (t * t)
     | Count of t
     | Screen of (t * screen)
     | Mutation of (t * mutation)
@@ -242,7 +301,9 @@ module Typed : sig
     | Meta of t
     | Grow of (t * t)
     | GrowArgs of (t * Untyped.args)
-    | LessThan of (t * t)
+    | ComparisonOp of (ComparisonOp.t * t * t)
+    | EqOp of (EqOp.t * t * t)
+    | LogicalOp of (LogicalOp.t * t * t)
 
   and nav = { navName : string; }
 

@@ -6,7 +6,7 @@ import * as React from 'react';
 import outdent from 'outdent/lib/index';
 import {View, Text, TouchableOpacity} from 'react-native-web';
 import Textarea from 'react-textarea-autosize';
-import * as W from 'core';
+import * as Core from 'core';
 import {Workflow} from './Workflow.js';
 import {TextInput} from 'components/TextInput';
 import {Picker} from 'components/Picker';
@@ -184,8 +184,28 @@ function Help({value, onPress}) {
       value: outdent`
           render(region:pick(title: "Regions")) {
 
-            render(value:edit(
+            render(value:form(
               title: value.name,
+              spec: :update {
+                name: $value.name,
+                comment: $value.comment,
+              }
+            ))
+
+          }
+        `,
+    },
+    {
+      label: 'Workflow: Conditional Edit',
+      value: outdent`
+          render(region:pick(title: "Regions")) {
+
+            render(value:view(
+              title: "View"
+            )),
+
+            render(value:filter(name != "ASIA"):form(
+              title: "Edit",
               spec: :update {
                 name: $value.name,
                 comment: $value.comment,

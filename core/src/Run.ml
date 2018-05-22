@@ -64,11 +64,46 @@ module List = struct
 end
 
 module Array = struct
+
+  let iter ~f v =
+    let module Let_syntax = Syntax.Let_syntax in
+    let f res item =
+      let%bind () = res in
+      let%bind () = f item in
+      return ()
+    in
+    Belt.Array.reduce v (return ()) f
+
   let map ~f v =
     let module Let_syntax = Syntax.Let_syntax in
-    let v = Array.to_list v in
-    let%bind v = List.map ~f v in
-    return (Array.of_list v)
+    let f res item =
+      let%bind res = res in
+      let%bind item = f item in
+      let _ = Js.Array.push item res in
+      return res
+    in
+    Belt.Array.reduce v (return [||]) f
+
+  let filter ~f v =
+    let module Let_syntax = Syntax.Let_syntax in
+    let f res item =
+      let%bind res = res in
+      match%bind f item with
+      | true ->
+        let _ = Js.Array.push item res in
+        return res
+      | false ->
+        return res
+    in
+    Belt.Array.reduce v (return [||]) f
+
+  let foldLeft ~f ~init v =
+    let module Let_syntax = Syntax.Let_syntax in
+    let f res item =
+      let%bind res = res in
+      f res item
+    in
+    Belt.Array.reduce v (return init) f
 end
 
 module StringMap = struct

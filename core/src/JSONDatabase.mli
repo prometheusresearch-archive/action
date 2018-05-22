@@ -53,13 +53,74 @@
 include Abstract.DATABASE
 
 (**
+ * Database configuration API.
+ *
+ * This allows to specify database schema and produce a universe.
+ *
+ * The example usage would be:
+ *
+ *   let univ = Config.(
+ *     init
+ *     |> hasMany "user" ...
+ *     |> hasMany "site" ...
+ *     ...
+ *     |> hasScreen "view" ...
+ *     |> hasScreen "pick" ...
+ *     |> finish
+ *   ) in ...
+ *
+ *)
+module Config : sig
+
+  (** Configuration *)
+  type t
+  type entityField
+
+  (** An initial, empty configuration *)
+  val init : t
+
+  (** Define a collection of entities *)
+  val defineEntity :
+    ?args : Query.Type.Syntax.arg list
+    -> string
+    -> (Query.Type.t -> entityField list)
+    -> t -> t
+
+  (** Define entity fields *)
+  val hasOne : string -> Query.Type.t -> entityField
+  val hasOpt : string -> Query.Type.t -> entityField
+  val hasMany : string -> Query.Type.t -> entityField
+
+  (** Define entity relationships *)
+  val hasLink : via : string * string -> string -> Query.Type.t -> entityField
+  val hasOptLink : via : string * string -> string -> Query.Type.t -> entityField
+  val hasManyBackLink : via : string * string -> string -> Query.Type.t -> entityField
+
+  (** Re-export needed convenience for defining types *)
+  include module type of Query.Type.Syntax.Value
+  val entity : string -> Query.Type.t
+
+  (** Define a screen *)
+  val defineScreen :
+    string
+    -> Screen.t
+    -> t -> t
+
+  (** Finish configuration and produce a universe *)
+  val finish : t -> Universe.t
+
+end
+
+module QueryTyper : QueryTyper.Typer with type universe := Universe.t
+
+(**
  * Construct database out of a JSON value.
  *)
-val ofJson : univ : Core.Universe.t -> Js.Json.t -> t
+val ofJson : univ : Universe.t -> Js.Json.t -> t
 
 (**
  * Construct database out of a string value.
  *
  * This throws an exception on an invalid JSON value.
  *)
-val ofStringExn : univ : Core.Universe.t -> string -> t
+val ofStringExn : univ : Universe.t -> string -> t

@@ -87,6 +87,9 @@ end
 module Array : sig
 
   val map : f:('a -> ('b, 'errctx) t) -> 'a array -> ('b array, 'errctx) t
+  val iter : f:('a -> (unit, 'errctx) t) -> 'a array -> (unit, 'errctx) t
+  val filter : f:('a -> (bool, 'errctx) t) -> 'a array -> ('a array, 'errctx) t
+  val foldLeft : f:('a -> 'b -> ('a, 'errctx) t) -> init:'a -> 'b array -> ('a, 'errctx) t
 end
 
 (**
@@ -95,7 +98,7 @@ end
 module StringMap : sig
 
   val foldLeft :
-    f:('a -> Core.Common.StringMap.key -> 'b -> ('a, 'c) t)
+    f:('a -> Common.StringMap.key -> 'b -> ('a, 'c) t)
     -> init:'a
-    -> 'b Core.Common.StringMap.t -> ('a, 'c) t
+    -> 'b Common.StringMap.t -> ('a, 'c) t
 end

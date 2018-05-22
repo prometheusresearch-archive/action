@@ -1,5 +1,5 @@
 # RexAction2
-
+ 
 ## 1.2.2018
 
 ### Motivation
@@ -411,3 +411,240 @@ Examples of workflows:
     ))
   }
   ```
+
+## 20.04.2018
+
+### Thoughts on workflow language
+
+Currently what we have is a monadic language on top of query langauge. This
+isn't enough as we are unable to represent recursive workflows.
+
+The  proposal is to model workflow as a grammar
+
+#### Primitives
+
+There are primitives:
+
+- Screen
+
+  Screens are specified with `render(q)` syntax where `q` is a query which
+  results in a UI (result of `:pick`, `:view` and so on).
+
+#### Combinators
+
+There are combinators:
+
+- Sequence
+
+  Given workflows `A` and `B` then `A ; B` is a workflow which executes `B`
+  after `A`.
+
+- Alternation
+
+  Given workflows `A` and `B` then `A | B` is a workflow which executes either
+  `A` or `B`.
+
+- Navigation
+
+  Given workflows `A` and a query `q` then `q -> A` is a workflow which follows
+  query q and then executes `A`.
+
+  Another form is `A -> q` in which query `q` executes against an output of
+  workflow `A`.
+
+  In the first form if `q` evaluates to `null` then workflow is not executed.
+  This allows to use navigation as a branching mechanism.
+
+#### Storing and reusing values
+
+And a *store* construct which allows to store the results of workflow executions
+and reuse them later:
+
+```
+let individual = render(indivdual:pick) -> value
+```
+
+Note that only certain values can be stored. We intent to allow to store only
+valyes of the `Entity` type (more types of values can be enabled later if
+needed, like for passing sets as queries).
+
+#### Examples
+
+A complete "real-world" example:
+
+```
+main =                        # An entry point, which
+  | regionWorkflow            # ... executes either regionWorkflow or
+  | nationWorkflow            # ... nationWorkflow
+
+nationWorkflow =              # This is the nationWorkflow definition, which
+  render nation:pick;         # ... renders nation:pick screen
+  render value:view           # ... then renders value:view screen
+
+regionWorkflow =              # This is the regionWorkflow definition, which
+  render region:pick;         # ... renders the region:pick screen
+  | render value:view         # ... then either renders the value:view
+  | value -> nationWorkflow   # ... or navigates to value and then starts the nationWorkflow
+```
+
+ An example of a recursive workflow which allows to traverse the recursive
+ structure of indivduals with links amongh other individuals.
+
+```
+ main =
+  individual -> individualWorkflow
+
+individualWorkflow =
+  render :pick;
+  | render value:view
+  | value.parents -> individualWorkflow
+  | value.children -> individualWorkflow
+```
+
+An example of using Navigation as a branching mechanism:
+
+```
+main =
+  todoWorkflow
+
+todoWorkflow =
+  pickOrCreateTodo;
+  processTodo
+
+pickOrCreateTodo =
+  | pickTodo
+  | createTodo
+
+pickTodo =
+  render(todo:pick) -> value
+
+createTodo =
+  render todo:form(spec: :create {name: $value.name, status: "new"})
+
+processTodo =
+  | render :view
+  | :filter(status != "completed") -> completeTodo
+
+completeTodo =
+  render :form(spec: :update {status: "completed"})
+```
+
+An example of preserving values from the previous steps:
+
+```
+main = enrollmentWorkflow
+
+enrollmentWorkflow =
+  let study = render /study:pick;            # Pick the study from the list
+  let individual = render /individual:pick;  # Pick the individual from the list
+
+  render /enrollment:form(         # Render an enrollment form which
+    title: "Enroll individual",    # ... uses the values from the previous
+    spec: :create {                # ... steps of the workflow.
+      study: $study,
+      individual: $individual,
+      date: now(),
+    }
+  )
+```
+
+Now consider the case we want to factor out the complex enrollment screen into a
+separate workflow. We clearly need to allow to parametrize the workflows:
+
+```
+main = enrollmentWorkflow
+
+enrollmentWorkflow =
+  let study =                        # Pick the study from the list
+    render /study:pick -> value;     # ... and store the result in `study` var
+
+  let individual =                   # Pick the individual from the list
+    render /individual:pick;         # ... and store the result in `individual` var
+
+  enrollIndividual(
+    study: $study,
+    individual: $individual
+  )
+
+enrollIndividual(study, individual) =
+  render /enrollment:form(         # Render an enrollment form which
+    title: "Enroll individual",    # ... uses the `study` and `individual`
+    spec: :create {                # ... values from the previous steps.
+      study: $study,
+      individual: $individual,
+      date: now(),
+    }
+  )
+```
+
+#### Modules
+
+Each source file which contains workflow language expressions is treated as a
+module unit.
+
+We can mark certain workflows in a module as exported:
+
+```
+# A.workflow source file
+
+export pickIndividual =
+  render individual:pick
+```
+
+Which allows those exported names to be referred by other workflow modules:
+
+```
+# B.workflow source file
+
+main =
+  A.pickIndividual
+```
+
+### Todo workflow as found in Rex Study
+
+```
+main =
+  | viewTodo -> value; processTodo
+  | viewTodoSkipped -> value; main
+
+processTodo =
+  | fulfillMeasureEntryStart; enterMeasure
+  | enterMeasure
+  | reconcileMeasure; main
+  | useExistingMeasure; (measureWizard | processTodo)
+  | fulfillSample
+  | useExistingSample; (sampleWizard | processTodo)
+  | fulfillConsent
+  | useExistingConsent; (consentWizard | processTodo)
+  | measureWizard
+  | sampleWizard
+  | consentWizard
+  | completeTodo
+  | editDataEntryProperties; main
+  | editEntryMeasureAdhocTodo; main
+  | editPortalSmsMeasureAdhocTodo; main
+  | editPortalMeasureAdhocTodo; main
+  | editSampleAdhocTodo; main
+  | editConsentAdhocTodo; main
+  | editOtherAdhocTodo; main
+  | skipTodo; viewTodoSkipped
+  | viewTodoDelete; dropTodo
+
+processTodo =
+  ...
+  | value:filter(measure.isReconciled) -> measureEntryStart
+
+sampleWizard = render ..
+
+consentWizard = render ..
+
+measureWizard = render ...
+
+viewTodo = render :view
+
+enterMeasure = ...
+
+viewTodoSkipped =
+  render :view;
+  render :edit(spec: :update {status: "new"});
+```

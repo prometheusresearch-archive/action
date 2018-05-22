@@ -1,67 +1,27 @@
 /**
+ * This module provides Flow typings for JsApi.mli, see JsApi.mli for
+ * documentation though.
+ *
  * @flow strict
  */
 
-export type Result<T> = {+type: 'Error', +error: string} | {+type: 'Ok', +value: T};
+declare export opaque type DB;
+declare export opaque type Workflow;
+declare export opaque type State;
 
-export opaque type Mutation = mixed;
-export opaque type UI = mixed;
-export opaque type State = mixed;
-export opaque type Value = mixed;
-export type Args = {[name: string]: string | number | boolean};
-export type RenderableState = {ui: ?UI, state: State};
+export type UI = {name: string};
+export type Value = mixed;
+export type Query = string;
+export type Args = mixed;
 
-export type ParseResult = {
-  error: ?string,
-  ui: ?Result<RenderableState>,
-  data: ?Value,
-};
+declare export var db: DB;
 
-export type Card = 'one' | 'opt' | 'many';
-
-export type Type =
-  | {type: 'string'}
-  | {type: 'number'}
-  | {type: 'void'}
-  | {type: 'bool'}
-  | {type: 'null'}
-  | {type: 'abstract'}
-  | {type: 'screen'}
-  | {type: 'entity', name: string}
-  | {type: 'record', fields: {[name: string]: CType}}
-
-export type CType = {
-  card: Card,
-  type: Type,
-};
-
-export type EntityType = {
-  name: string,
-  fields: {
-    [name: string]: CType
-  }
-}
-
-export type Meta = {
-  type: CType,
-  registry: {[name: string]: EntityType}
-}
-
-declare export var start: Result<RenderableState>;
-declare export function id(state: State): string;
-declare export function render(state: State): Result<RenderableState>;
-declare export function next(state: State): Array<State>;
-
-declare export function getData(state: State): Value;
-declare export function getTitle(state: State): Value;
-declare export function query(state: State, query: string): Value;
-declare export function mutate(mutation: Mutation, value: mixed): void;
-
-declare export function pickValue(id: mixed, state: State): Result<RenderableState>;
-
-declare export function uiName(ui: UI): string;
-declare export function uiArgs(ui: UI): Args;
-declare export function breadcrumbs(State): Array<State>;
-declare export function next(State): Array<State>;
-
-declare export function parse(string): ParseResult;
+declare export function run(DB, Workflow): State;
+declare export function next(State): State[];
+declare export function around(State): State[];
+declare export function breadcrumb(State): State[];
+declare export function replaceArgs(Args, State): State;
+declare export function ui(State): UI;
+declare export function id(State): string;
+declare export function query(Query, State): Value;
+declare export function parseWorkflow(string): Workflow;

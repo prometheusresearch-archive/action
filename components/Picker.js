@@ -12,6 +12,9 @@ import {
 } from 'react-native-web';
 import * as cfg from './config.js';
 
+// $FlowFixMe: ...
+const PickerBaseItem = PickerBase.Item;
+
 let style = StyleSheet.create({
   base: {
     appearance: 'none',
@@ -47,7 +50,7 @@ export function Picker(props: P) {
     outlineColor: focusRingColor,
   };
   let options = props.options.map(option => (
-    <PickerBase.Item key={option.value} label={option.label} value={option.value} />
+    <PickerBaseItem key={option.value} label={option.label} value={option.value} />
   ));
   return (
     <View>

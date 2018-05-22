@@ -1,47 +1,80 @@
+(**
+ * JS API
+ *
+ * This works as the facade for the Action API for JS consumers.
+ *)
 
-module JsResult : sig
-  type 'v t
+(** Database *)
+type db
 
-  val ok : 'v -> 'v t
-  val error : string -> 'v t
-  val ofResult : ('v, string) Common.Result.t -> 'v t
+(** Workflow Configuration *)
+type workflow
 
-end
-
-type ui
+(** Workflow state *)
 type state
-type renderableState = < state : state; ui : ui Js.Nullable.t > Js.t
-type query
 
-type mutation
+(** UI *)
+type ui
 
-val pickScreen : Screen.t
-val viewScreen : Screen.t
+(** Value *)
+type value
 
-val render : state -> renderableState JsResult.t
+(** Query *)
+type query = string
 
-val pickValue : Js.Json.t -> state -> renderableState JsResult.t
+(** Args *)
+type args = Js.Json.t
 
+val db : db
+
+(**
+ * Run [workflow] given the [db]
+ *)
+val run : db -> workflow -> state
+
+(**
+ * Id of the workflow [state].
+ *)
 val id : state -> string
-val uiName : ui -> string
-val breadcrumbs : state -> state array
+
+(**
+ * Get a list of states next to the current [state].
+ *)
 val next : state -> state array
 
-(** Query against the current state *)
-val query : state -> string -> Value.t
+(**
+ * Get a list of states around the current [state].
+ *
+ * This includes the current state.
+ *)
+val around : state -> state array
 
-(** Mutate database state *)
-val mutate : mutation : mutation -> value : Value.t -> unit
+(**
+ * Get a breadcrumb for the current [state].
+ *)
+val breadcrumb : state -> state array
 
-val db : JSONDatabase.t
-val univ : Core.Universe.t
+(**
+ * Update [state] with [args].
+ *)
+val replaceArgs : args -> state -> state
 
-val showQuery : Query.Typed.t -> string
+(**
+ * Get [ui] for the [state]
+ *)
+val ui : state -> ui
 
-val parse :
-  string
-  -> <
-    error : string Js.Nullable.t;
-    ui : renderableState Js.Nullable.t;
-    data : Value.t Js.Nullable.t;
-  > Js.t
+(**
+ * Run [query] against the context specified by the current [state].
+ *)
+val query : query -> state -> value
+
+(**
+ * Run [mutation] with the [value] and produce a new state
+ *)
+val mutate : value -> value -> state -> state
+
+(**
+ * Parse [workflow] out of a string.
+ *)
+val parseWorkflow : string -> workflow

@@ -1,28 +1,51 @@
+# NOW
+
+* [ ] Bindings to JS
+
 # TODO
 
-- [x] Expose metadata via query API
+* [ ] Workflow Language redesign
 
-- [ ] In-memory JSONDatabase redesign
-  - [x] Use multiple normalized stores per entity at the root and model
-        relations as links
-  - [x] Back & circular references
-  - [ ] Converter from PostgreSQL to JSONDatabase JSON format
+  * [ ] Typing
+  * [ ] Add parametrized workflows
+  * [ ] Replace operator
+  * [x] Bug with self-recursive workflows
+  * [x] Rebuilding states
+  * [x] Make sure mutations work
+  * [x] UI + JsApi
+  * [x] More tests for JsApi
+  * [x] JsApi: Flow Typings
+  * [x] Fix bug with a singular action
+  * [x] JsApi
+  * [x] Interpreter
+  * [x] AST and related utilities
 
-- [ ] Create/Edit support for databases
+* [ ] Redesign UI components
 
-- [ ] Add more combinators
-  - [ ] Compare operators (=, !=, <, >, <=, >=)
-  - [ ] Logical operators (&&, ||, !)
-  - [ ] Filter
-  - [ ] String interpolation
-  - [ ] Numeric ops (+, -, *, /, mod?, div?)
-  - [ ] String ops / interpolation
-- [ ] Add conditionals to workflow language
-- [ ] Choice eliminators
-- [ ] Add locations to lexer/parser
-- [ ] Improve error reporting to provide more context (location, contextual
-      info)
-- [ ] Add pretty-printer
-- [ ] Allow editing workflow "live"
-- [ ] Compilation into SQL
-- [ ] Better query/workflow editing experience
+  * [ ] Pick
+
+    Idea: use react-virtualized
+
+  * [ ] View
+  * [ ] Form
+
+* [ ] Query Combinators backends
+
+  * [ ] SQL backend
+
+    Idea: translate to RA/RC (relatinal algebra/calculus) and then generate SQL
+
+  * [ ] JSON backend
+
+    JSON backend exists but it's not optimized
+
+    * [x] Initial implementation
+
+    * [ ] Optimizations
+
+      Idea: look at NRA/NRC (nested relatinal algebra/calculus)
+
+  * [ ] Compile query both to SQL and JSON
+
+    Idea: we need a way to compile QC down to GraphQL level language (no
+    arbitrary queyr constructs, all filters and such are hidden behind API).

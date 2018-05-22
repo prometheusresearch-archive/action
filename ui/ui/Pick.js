@@ -1,22 +1,20 @@
 /**
- * @flow strict
+ * @flow
  */
 
 import * as React from 'react';
 import {View, Text, TouchableHighlight} from 'react-native-web';
-import * as W from 'core';
-import type {State, Args, Meta} from 'core';
+import * as Core from 'core';
+import type {State, Args} from 'core';
 import {ScreenTitle} from './ScreenTitle.js';
 
 type P = {
   state: State,
-  args: Args,
-  onPick: mixed => void,
+  onState: State => void,
 };
 
 export function Pick(props: P) {
-  const result = W.query(
-    props.state,
+  const result = Core.query(
     `
       {
         title: title,
@@ -25,11 +23,18 @@ export function Pick(props: P) {
         id: value.id,
       }
     `,
+    props.state,
   );
   // $FlowFixMe: ...
   const {id, title, data, metadata: meta} = result;
   const onSelect = id => {
-    props.onPick(id);
+    let state = props.state;
+    state = Core.replaceArgs({id}, state);
+    let next = Core.next(state);
+    if (next.length > 0) {
+      state = next[0];
+    }
+    props.onState(state);
   };
   const fields = fieldsFromMeta(meta);
   return (
@@ -42,7 +47,7 @@ export function Pick(props: P) {
   );
 }
 
-function fieldsFromMeta(meta: Meta) {
+function fieldsFromMeta(meta: Object) {
   const {type: {type}, registry} = meta;
   switch (type.type) {
     case 'entity': {

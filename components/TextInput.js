@@ -56,6 +56,7 @@ TextInput.defaultProps = {
   outlineColor: cfg.color.black,
 };
 
+// $FlowFixMe: update to new Flow which has it
 TextInput = React.forwardRef(TextInput);
 
 TextInput.displayName = 'TextInput';

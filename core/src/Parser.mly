@@ -1,15 +1,13 @@
 %token VOID
 %token PICK
 %token VIEW
-%token EDIT
+%token FORM
 %token BAR_CHART
 %token UPDATE
 %token CREATE
-%token COUNT
-%token META
-%token FIRST
 %token RENDER
 %token NULL
+%token GOTO
 %token DOT
 %token COMMA
 %token COLON
@@ -24,14 +22,32 @@
 %token <string> STRING
 %token <float> NUMBER
 %token <bool> BOOL
+%token EQ
+%token NEQ
 %token LT
+%token LTE
+%token GT
+%token GTE
+%token AND
+%token OR
 %token EOF
+%token ARROW_RIGHT
+%token ALT
+%token SEMI
+
+%right ALT
+%right SEMI
+%right ARROW_RIGHT
+%right OR
+%right AND
+%left LT LTE GT GTE EQ NEQ
+%right DOT COLON
 
 %{
 
   module S = Query.Untyped.Syntax
+  module WS = QueryWorkflow.Syntax
   module M = Query.Mutation.Syntax
-  module W = Workflow.Untyped.Syntax
   module StringMap = Belt.Map.String
 
   type nav = {
@@ -39,10 +55,21 @@
     args : Query.Untyped.Syntax.Arg.arg list;
   }
 
+  let mkGlobalCombinator0 here = function
+    | "meta" -> Some (S.meta here)
+    | "count" -> Some (S.count here)
+    | "first" -> Some (S.first here)
+    | _ -> None
+
+  let mkGlobalCombinator1 here arg = function
+    | "grow" -> Some (S.grow arg here)
+    | "filter" -> Some (S.filter arg here)
+    | _ -> None
+
 %}
 
 %start start
-%type <ParserResult.t> start
+%type <[ `Workflow of QueryWorkflow.t | `Query of Query.Untyped.t ]> start
 
 %%
 
@@ -50,52 +77,89 @@ start:
   | p = program EOF { p }
 
 program:
-  | q = query { ParserResult.Query q }
-  | w = workflow { ParserResult.Workflow w }
+  | q = query { `Query q }
+  | w = workflow { `Workflow w }
 
 workflow:
-  | RENDER; LEFT_PAREN; q = query; RIGHT_PAREN { W.render q }
-  | w = workflow; LEFT_BRACE; RIGHT_BRACE { w }
-  | w = workflow; LEFT_BRACE; ws = workflowList; RIGHT_BRACE { W.andThen ws w }
+  | name = ID; EQ; node = workflowNode { WS.define name node WS.empty }
+  | name = ID; EQ; node = workflowNode; wc = workflow { WS.define name node wc }
 
-workflowList:
-  | w = workflow { [w] }
-  | w = workflow; COMMA { [w] }
-  | w = workflow; COMMA; ws = workflowList { w::ws }
+workflowNode:
+  | LEFT_PAREN; node = workflowNode; RIGHT_PAREN { node }
+  | RENDER; q = query; { WS.value q }
+  | GOTO; label = ID { WS.label label }
+  | q = query; ARROW_RIGHT; node = workflowNode { WS.navigateAnd q node }
+  | ALT; left = workflowNode; ALT; right = workflowNode { WS.or_ left right } %prec ALT
+  | left = workflowNode; ALT; right = workflowNode { WS.or_ left right } %prec ALT
+  | left = workflowNode; SEMI; right = workflowNode { WS.and_ left right } %prec SEMI
+  | node = workflowNode; SEMI; { node }
 
 query:
   | VOID { S.void }
   | name = ID { S.nav name S.here }
+  | query = queryCombinator1 { query }
+  | query = queryCombinator0 { query }
   | COLON; nav = screen { S.screen ~args:nav.args nav.name S.here }
   | COLON; mut = mutation { mut S.here }
   | VOID; name = ID { S.nav name S.void }
   | VOID; COLON; s = screen { S.screen ~args:s.args s.name S.void }
   | VOID; COLON; mut = mutation { mut S.void }
-  | COLON; COUNT { S.count S.here }
-  | parent = query; COLON; COUNT { S.count parent }
-  | COLON; META { S.meta S.here }
-  | parent = query; COLON; META { S.meta parent }
-  | COLON; FIRST { S.first S.here }
-  | parent = query; COLON; FIRST { S.first parent }
   | parent = query; DOT; name = ID { S.nav name parent }
   | parent = query; COLON; s = screen { S.screen ~args:s.args s.name parent }
   | parent = query; COLON; mut = mutation { mut parent }
+  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
+  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
   | parent = query; LEFT_BRACE; RIGHT_BRACE { S.select [] parent }
   | parent = query; LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s parent }
   | parent = query; LEFT_BRACKET; id = query RIGHT_BRACKET { S.locate id parent }
-  | LEFT_BRACE; RIGHT_BRACE { S.select [] S.here }
-  | LEFT_BRACE; s = selectFieldList; RIGHT_BRACE { S.select s S.here }
   | v = STRING { S.string v }
   | v = NUMBER { S.number v }
   | v = BOOL { S.bool v }
   | NULL { S.null }
   | name = NAME { S.name name }
-  | left = query; LT; right = query { S.lessThan left right }
+  | LEFT_PAREN; q = query; RIGHT_PAREN { q }
+  | left = query; OR; right = query { S.or_ left right } %prec OR
+  | left = query; AND; right = query { S.and_ left right } %prec AND
+  | left = query; LT; right = query { S.lessThan left right } %prec LT
+  | left = query; GT; right = query { S.greaterThan left right } %prec GT
+  | left = query; LTE; right = query { S.lessOrEqThan left right } %prec LTE
+  | left = query; GTE; right = query { S.greaterOrEqThan left right } %prec GTE
+  | left = query; EQ; right = query { S.eq left right } %prec EQ
+  | left = query; NEQ; right = query { S.notEq left right } %prec NEQ
 
-nav:
-  | name = ID { {name; args = []} }
-  | name = ID; LEFT_PAREN; RIGHT_PAREN { {name; args = StringMap.empty} }
-  | name = ID; LEFT_PAREN; args = argList; RIGHT_PAREN { {name; args = Some args} }
+queryCombinator0:
+  | parent = query; COLON; name = ID; LEFT_PAREN; RIGHT_PAREN {
+      match mkGlobalCombinator0 parent name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | parent = query; COLON; name = ID {
+      match mkGlobalCombinator0 parent name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | COLON; name = ID; LEFT_PAREN; RIGHT_PAREN {
+      match mkGlobalCombinator0 S.here name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | COLON; name = ID {
+      match mkGlobalCombinator0 S.here name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+
+queryCombinator1:
+  | parent = query; COLON; name = ID; LEFT_PAREN; arg1 = query; RIGHT_PAREN {
+      match mkGlobalCombinator1 parent arg1 name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
+  | COLON; name = ID; LEFT_PAREN; arg1 = query; RIGHT_PAREN {
+      match mkGlobalCombinator1 S.here arg1 name with
+      | Some q -> q
+      | None -> $syntaxerror
+    }
 
 mutation:
   | UPDATE; LEFT_BRACE; RIGHT_BRACE { (fun query -> S.update [] query)  }
@@ -120,9 +184,9 @@ screen:
   | VIEW { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; RIGHT_PAREN { {name = "view"; args = [] } }
   | VIEW; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "view"; args} }
-  | EDIT { {name = "edit"; args = [] } }
-  | EDIT; LEFT_PAREN; RIGHT_PAREN { {name = "edit"; args = [] } }
-  | EDIT; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "edit"; args} }
+  | FORM { {name = "form"; args = [] } }
+  | FORM; LEFT_PAREN; RIGHT_PAREN { {name = "form"; args = [] } }
+  | FORM; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "form"; args} }
   | BAR_CHART { {name = "barChart"; args = [] } }
   | BAR_CHART; LEFT_PAREN; RIGHT_PAREN { {name = "barChart"; args = [] } }
   | BAR_CHART; LEFT_PAREN; args = argList; RIGHT_PAREN { {name = "barChart"; args} }

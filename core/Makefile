@@ -14,7 +14,7 @@ ppx_let:
 menhirLib:
 	@cp -rf $$(esy ocamlfind query menhirLib) $(@)
 
-build:
+build: ppx_let menhirLib
 	@esy $(NODE_MODULE_BIN)/bsb -make-world
 
 watch:
@@ -25,3 +25,9 @@ test: build
 
 test-watch:
 	@$(NODE_MODULE_BIN)/jest --watch
+
+clean:
+	@esy $(NODE_MODULE_BIN)/bsb -clean
+	@rm -rf $(PROJECT_DIR)/lib
+	@rm -rf $(PROJECT_DIR)/menhirLib
+	@rm -f $(PROJECT_DIR)/ppx_let

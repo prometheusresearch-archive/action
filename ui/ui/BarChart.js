@@ -28,13 +28,13 @@ type P = {
 
 export const BarChart = withScreenSize(({state, width = 400, height = 400}: P) => {
   const result = W.query(
-    state,
     `
       {
         title: title,
         data: data,
       }
     `,
+    state,
   );
   // $FlowFixMe: ...
   const {title, data} = result;
