@@ -10,20 +10,11 @@
       "generators": [
         {
           "name": "ocamllex",
-          "edge": [
-            "Lexer.ml",
-            ":",
-            "Lexer.mll"
-          ]
+          "edge": ["Lexer.ml", ":", "Lexer.mll"]
         },
         {
           "name": "menhir",
-          "edge": [
-            "Parser.ml",
-            "Parser.mli",
-            ":",
-            "Parser.mly"
-          ]
+          "edge": ["Parser.ml", "Parser.mli", ":", "Parser.mly"]
         }
       ]
     },
@@ -46,11 +37,7 @@
       "command": "menhir --explain --table $in"
     }
   ],
-  "bs-dev-dependencies": [
-    "@glennsl/bs-jest"
-  ],
+  "bs-dev-dependencies": ["@glennsl/bs-jest"],
   "suffix": ".bs.js",
-  "ppx-flags": [
-    "./ppx_let"
-  ]
+  "ppx-flags": ["./ppx_let"]
 }
