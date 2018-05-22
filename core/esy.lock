@@ -718,9 +718,9 @@ browser-resolve@^1.11.2:
   dependencies:
     resolve "1.1.7"
 
-bs-platform@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/bs-platform/-/bs-platform-3.0.0.tgz#38f200730db52fdea37819376b6ac3dfb20244c0"
+bs-platform@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/bs-platform/-/bs-platform-3.1.0.tgz#2e2065c32a9b8b41843bf7ae54bd6a5929521173"
 
 bser@^2.0.0:
   version "2.0.0"
