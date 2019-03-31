@@ -1,0 +1,2 @@
+#!/bin/bash
+esy '#{@opam/ppx_let.lib}'/ppx_let/ppx.exe --as-ppx "$@"

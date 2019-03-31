@@ -1,5 +1,9 @@
 {
   "name": "core",
   "version": "1.0.0",
-  "main": "./src/JsApi.bs.js"
+  "main": "./src/JsApi.bs.js",
+  "dependencies": {
+    "@glennsl/bs-jest": "^0.4.2",
+    "bs-platform": "6.0.0-dev.1"
+  }
 }

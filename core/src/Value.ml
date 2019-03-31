@@ -118,16 +118,12 @@ end
 let null : t = Obj.magic (Js.null)
 external string : string -> t = "%identity"
 external number : float -> t = "%identity"
-external jsBool : Js.boolean -> t = "%identity"
+external bool : bool -> t = "%identity"
 external ui : UI.t -> t = "%identity"
 external mutation : (t, 'err) Mutation.t -> t = "%identity"
 external array : t array -> t = "%identity"
 external obj : t Js.Dict.t -> t = "%identity"
 external ofJson : Js.Json.t -> t = "%identity"
-
-let bool = function
-  | true -> jsBool Js.true_
-  | false -> jsBool Js.false_
 
 let ofOption = function
   | Some v -> v
@@ -257,9 +253,9 @@ let classify (v : t) =
   then String (Obj.magic v)
   else if Js.typeof v = "number"
   then Number (Obj.magic v)
-  else if Obj.magic v == Js.true_
+  else if Obj.magic v == true
   then Bool true
-  else if Obj.magic v == Js.false_
+  else if Obj.magic v == false
   then Bool false
   else if Obj.magic v == Js.null
   then Null

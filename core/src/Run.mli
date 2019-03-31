@@ -65,7 +65,7 @@ module Syntax : sig
    *)
   module Let_syntax : sig
 
-    val bind : ('a, 'errctx) t -> ('a -> ('b, 'errctx) t) -> ('b, 'errctx) t
+    val bind : ('a, 'errctx) t -> f:('a -> ('b, 'errctx) t) -> ('b, 'errctx) t
   end
 end
 
@@ -95,7 +95,7 @@ end
 module StringMap : sig
 
   val foldLeft :
-    f:('a -> Core.Common.StringMap.key -> 'b -> ('a, 'c) t)
+    f:('a -> Common.StringMap.key -> 'b -> ('a, 'c) t)
     -> init:'a
-    -> 'b Core.Common.StringMap.t -> ('a, 'c) t
+    -> 'b Common.StringMap.t -> ('a, 'c) t
 end

@@ -29,7 +29,7 @@ module Syntax = struct
 
   module Let_syntax = struct
 
-    let bind v f =
+    let bind v ~f =
       match v with
       | R.Ok v -> f v
       | R.Error ctxs -> R.Error ctxs

@@ -21,7 +21,7 @@ module Result = struct
     let error err = Error err
 
     module Let_syntax = struct
-      let bind v f = match v with
+      let bind v ~f = match v with
       | Ok v -> f v
       | Error err -> Error err
     end
@@ -75,7 +75,7 @@ module Option = struct
     let return v = Some v
 
     module Let_syntax = struct
-      let bind v f = match v with
+      let bind v ~f = match v with
       | Some v -> f v
       | None -> None
     end
